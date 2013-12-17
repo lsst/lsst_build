@@ -38,6 +38,5 @@ parser_prepare.add_argument('build_dir', type=str, help='Build directory')
 parser_prepare.add_argument('manifest', type=str, help='Manifest of products to build')
 
 args = parser.parse_args()
-print args
 
 args.func(args)
