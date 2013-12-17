@@ -8,6 +8,7 @@ import textwrap
 import os, stat, sys
 import pipes
 import time
+import eups
 
 Product = collections.namedtuple('Product', ['name', 'sha1', 'version'])
 
@@ -35,6 +36,15 @@ class Builder(object):
 	def _build(self, name):
 		product = self.products[name]
 
+		# test if the product is already installed, skip build if so.
+		e = eups.Eups()
+		try:
+			e.getProduct(product.name, product.version)
+			sys.stderr.write('%15s: ok (already installed).\n' % product.name)
+			return True
+		except eups.ProductNotFound:
+			pass
+
 		# run the pkgbuild sequence for the product
 		productdir = os.path.abspath(os.path.join(self.build_dir, product.name))
 		buildscript = os.path.join(productdir, '_build.sh')
@@ -42,12 +52,6 @@ class Builder(object):
 
 		# compute the setup invocations for dependencies
 		setups = []
-#		table_fn = os.path.join(productdir, 'ups', '%s.table' % name)
-#		if os.path.isfile(table_fn):
-#			for dep in eups.table.Table(table_fn).dependencies(eups.Eups()):
-#				depname = dep[0].name
-#				if depname in self.products:
-#					setups.append("setup --type=build --j %(name)-15s %(version)s" % self.products[depname]._asdict())
 		for dep in self.products.itervalues():
 			if dep.name == product.name:
 				break
