@@ -40,7 +40,7 @@ class Builder(object):
 		e = eups.Eups()
 		try:
 			e.getProduct(product.name, product.version)
-			sys.stderr.write('%15s: ok (already installed).\n' % product.name)
+			sys.stderr.write('%20s: ok (already installed).\n' % product.name)
 			return True
 		except eups.ProductNotFound:
 			pass
@@ -55,7 +55,7 @@ class Builder(object):
 		for dep in self.products.itervalues():
 			if dep.name == product.name:
 				break
-			setups.append("setup --type=build --j %(name)-15s %(version)s" % dep._asdict())
+			setups.append("setup --type=build --j %(name)-20s %(version)s" % dep._asdict())
 
 		# create the buildscript
 		with open(buildscript, 'w') as fp:
@@ -103,7 +103,7 @@ class Builder(object):
 		os.chmod(buildscript, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 		# Run the build script
-		sys.stderr.write('%15s: ' % name)
+		sys.stderr.write('%20s: ' % name)
 		with open(logfile, 'w') as logfp:
 			# execute the build file from the product directory, capturing the output and return code
 			t0 = t = time.time()

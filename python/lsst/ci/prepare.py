@@ -6,18 +6,21 @@ import sys
 import eups
 import hashlib
 import shutil
+import time
+import re
 
 import tsort
 
 from .git import Git, GitError
 
 class Preparer(object):
-	def __init__(self, build_dir, refs, repository_patterns, sha_abbrev_len, no_pull):
+	def __init__(self, build_dir, refs, repository_patterns, sha_abbrev_len, no_pull, exclusions):
 		self.build_dir = os.path.abspath(build_dir)
 		self.refs = refs
 		self.repository_patterns = repository_patterns.split('|')
 		self.sha_abbrev_len = sha_abbrev_len
 		self.no_pull = no_pull
+		self.exclusions = exclusions
 
 		self.deps = []
 		self.versions = {}
@@ -28,12 +31,13 @@ class Preparer(object):
 		return [ pat % data for pat in self.repository_patterns ]
 
 	def _prepare(self, product):
-		print "Preparing ", product
-
 		try:
 			return self.versions[product]
 		except KeyError:
 			pass
+
+		sys.stderr.write("%20s: " % product)
+		t0 = time.time()
 
 		productdir = os.path.join(self.build_dir, product)
 
@@ -58,9 +62,6 @@ class Preparer(object):
 					Git.clone(url, productdir)
 					break
 				except GitError as e:
-					print e
-					print e.stderr
-					print e.output
 					pass
 			else:
 				raise Exception("Failed to clone product '%s' from any of the offered repositories" % product)
@@ -96,6 +97,8 @@ class Preparer(object):
 		git("reset", "--hard")
 		git("clean", "-d", "-f", "-q")
 
+		print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
+
 		# Parse the table file to discover dependencies
 		dep_vers = []
 		table_fn = os.path.join(productdir, 'ups', '%s.table' % product)
@@ -103,7 +106,8 @@ class Preparer(object):
 			# Choose which dependencies to prepare
 			product_deps = []
 			for dep in eups.table.Table(table_fn).dependencies(eups.Eups()):
-				if dep[1] == True: continue				# skip optionals
+				if dep[1] == True and self._is_excluded(dep[0].name, product):	# skip excluded optionals
+					continue;
 				if dep[0].name == "implicitProducts": continue;		# skip implicit products
 				product_deps.append(dep[0].name)
 
@@ -121,6 +125,22 @@ class Preparer(object):
 		self.versions[product] = (version, ref)
 
 		return self.versions[product]
+
+	def _is_excluded(self, dep, product):
+		""" Check if dependency 'dep' is excluded for product 'product' """
+		try:
+			rc = self.exclusion_regex_cache
+		except AttributeError:
+			rc = self.exclusion_regex_cache = dict()
+
+		if product not in rc:
+			rc[product] = [ dep_re for (dep_re, prod_re) in self.exclusions if prod_re.match(product) ]
+		
+		for dep_re in rc[product]:
+			if dep_re.match(dep):
+				return True
+
+		return False
 
 	def _get_git_ref(self, git, product):
 		""" Return a git ref to this product's source code. """
@@ -149,9 +169,20 @@ class Preparer(object):
 		refs = args.ref
 		if 'master' not in refs:
 			refs.append('master')
-	
+
+		# Load exclusion map
+		exclusions = []
+		if args.exclusion_map:
+			with open(args.exclusion_map) as fp:
+				for line in fp:
+					line = line.strip()
+					if not line or line.startswith("#"):
+						continue
+					(dep_re, prod_re) = line.split()[:2]
+					exclusions.append((re.compile(dep_re), re.compile(prod_re)))
+
 		# Prepare products
-		p = Preparer(build_dir, refs, args.repository_pattern, args.sha_abbrev_len, args.no_pull)
+		p = Preparer(build_dir, refs, args.repository_pattern, args.sha_abbrev_len, args.no_pull, exclusions)
 		for product in args.products:
 			p._prepare(product)
 

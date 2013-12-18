@@ -25,15 +25,15 @@ class Git:
 		# Run git with the given arguments, returning stdout.
 
 		cmd = ('git',) + args
-		print "---> ", " ".join(cmd)
+		#print "---> ", " ".join(cmd)
 
 		process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.cwd)
 		(stdout, stderr) = process.communicate()
 		retcode = process.poll()
 		if retcode:
-			print cmd
-			print stdout
-			print stderr
+			#print cmd
+			#print stdout
+			#print stderr
 			raise GitError(retcode, cmd, stdout, stderr)
 
 		return stdout.rstrip()
