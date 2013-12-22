@@ -118,11 +118,11 @@ class Preparer(object):
 				self.deps.append((dep_product, product))
 
 		# Construct EUPS version
-		ref = self._get_git_ref(git, product)
-		version = self._construct_version(ref, dep_vers)
+		sha = self._get_git_sha(git, product)
+		version = self._construct_version(git, sha, dep_vers)
 
 		# Store the result
-		self.versions[product] = (version, ref)
+		self.versions[product] = (version, sha)
 
 		return self.versions[product]
 
@@ -142,12 +142,59 @@ class Preparer(object):
 
 		return False
 
-	def _get_git_ref(self, git, product):
+	def _get_git_sha(self, git, product):
 		""" Return a git ref to this product's source code. """
-		return git('rev-parse', '--short=%d' % self.sha_abbrev_len, 'HEAD')
+		sha = git('rev-parse', 'HEAD')
+		return sha
 
-	def _construct_version(self, ref, dep_versions):
+	dot_ver_re = re.compile(r'^([0-9]+)(\.[0-9]+)*$')
+	dot_quad_re = re.compile(r'^([0-9]+)(\.[0-9]+){3}$')
+	def _get_git_ref(self, git, sha):
+		""" Return a git ref to this product's source code. """
+		ref = git('describe', '--first-parent', '--always', '--long', '--abbrev=%d' % self.sha_abbrev_len, sha)
+		rs = ref.split('-')
+		if len(rs) == 1:
+			return sha[:self.sha_abbrev_len]	# no tags
+		tag, ct, abbrev = rs
+
+		# if there are multiple tags on the commit, git-describe will return
+		# a random one. Try to work around the problem.
+		s = git('rev-parse', tag + '^{}')	# The commit the tag is pointing to
+		refs = []
+		import cStringIO
+		fp = cStringIO.StringIO(git('show-ref', '--tags', '-d'))
+		for line in fp:
+			(sha_, ref) = line.split()
+			if not sha_.startswith(s) or ref.startswith('/refs/tags/'):
+				continue
+			ref = ref[len('/refs/tags'):-3]
+			if not self.dot_ver_re.match(ref):
+				continue
+			refs.append(ref)
+
+		if refs:
+			from eups.VersionCompare import VersionCompare
+			tag = sorted(refs, cmp=VersionCompare())[0]
+			if ct != "0":
+#				# See if we can increment the .W
+#				if self.dot_quad_re.match(tag):
+#					(a, b, c, d) = tag.split('.')
+#					d = str(int(d) + 1)
+#					print tag, " --> "
+#					tag = "%s.%s.%s.%s" % (a, b, c, d)
+#					print tag
+#					# TODO: Also tag & push the git repo!
+#					return tag
+				return "%s.%s" % (tag, abbrev)
+			else:
+				return tag
+		else:
+			return sha[:self.sha_abbrev_len]
+
+	def _construct_version(self, git, sha, dep_versions):
 		""" Return a standardized XXX+YYY EUPS version, that includes the dependencies. """
+		ref = self._get_git_ref(git, sha)
+
 		if dep_versions:
 			deps_sha1 = self._depver_hash(dep_versions)
 			return "%s+%s" % (ref, deps_sha1)
@@ -190,5 +237,5 @@ class Preparer(object):
 		products = tsort.tsort(p.deps)
 		print '# %-23s\t%s\t%s' % ("product", "git ref", "EUPS version")
 		for product in products:
-			print '%-25s\t%s\t%s' % (product, p.versions[product][1], p.versions[product][0])
+			print '%-25s %-41s %-30s' % (product, p.versions[product][1], p.versions[product][0])
 

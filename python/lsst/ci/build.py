@@ -40,7 +40,7 @@ class Builder(object):
 		e = eups.Eups()
 		try:
 			e.getProduct(product.name, product.version)
-			sys.stderr.write('%20s: ok (already installed).\n' % product.name)
+			sys.stderr.write('%20s: v%s (already installed).\n' % (product.name, product.version))
 			return True
 		except eups.ProductNotFound:
 			pass
@@ -87,10 +87,16 @@ class Builder(object):
 			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild config
 			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild build
 			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild install
+
+			# declare to EUPS
 			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild eups_declare
+
+			# explicitly append SHA1 to pkginfo
+			echo SHA1=%(sha1)s >> $(eups list %(product)s %(version)s -d)/ups/pkginfo
 			""" %	{
 					'product': product.name,
 					'version': product.version,
+					'sha1' : product.sha1,
 					'productdir' : productdir,
 					'setups': '\n			'.join(setups)
 				}
@@ -113,9 +119,9 @@ class Builder(object):
 				
 				# throttle progress reporting
 				t1 = time.time()
-				if (t1 - t) >= 1:
+				while t <= t1:
 					sys.stderr.write('+')
-					t = t1
+					t += 2
 
 		retcode = process.poll()
 		if retcode:
@@ -129,7 +135,7 @@ class Builder(object):
 
 			return False
 		else:
-			print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
+			print >>sys.stderr, " v%s (%.1f sec)." % (product.version, time.time() - t0)
 
 		return True
 
