@@ -8,6 +8,8 @@ import hashlib
 import shutil
 import time
 import re
+import pipes
+import subprocess
 
 import tsort
 
@@ -69,31 +71,39 @@ class Preparer(object):
 		git = Git(productdir)
 
 		if not self.no_pull:
-			# reset, clean, & pull
-			git("fetch", "origin", "--prune")
+			# fetch updates from the remote
+			git("fetch", "origin", "--prune", "--tags")
 
 		# Check out the first matching requested ref
 		for ref in self.refs:
-			oref = 'origin/%s' % ref
 			try:
-				sha1 = git('rev-parse', '--verify', '-q', oref)
+				# Presume the ref is a tag
+				sha1 = git('rev-parse', '--verify', '-q', 'refs/tags/%s' % ref)
 			except GitError:
-				sha1 = None
-
-			if sha1:
-				# avoid checking out if already checked out (speed)
 				try:
-					checkout = git('rev-parse', 'HEAD') != sha1
+					# Presume it's a branch
+					sha1 = git('rev-parse', '--verify', '-q', 'origin/%s' % ref)
+					ref = sha1
 				except GitError:
-					checkout = True
+					try:
+						# Presume it's a straight SHA1
+						sha1 = git('rev-parse', '--verify', '-q', 'dummy-g%s' % ref)
+					except GitError:
+						continue
 
-				if checkout:
-					git('checkout', '-f', oref)
-				break
+			# avoid checking out if already checked out (for speed)
+			try:
+				checkout = git('rev-parse', 'HEAD') != sha1
+			except GitError:
+				checkout = True
+
+			if checkout:
+				git('checkout', '-f', ref)
+			break
 		else:
 			raise Exception("None of the specified refs exist in product '%s'" % product)
 
-		# Clean up the working directory
+		# Reset and clean up the working directory
 		git("reset", "--hard")
 		git("clean", "-d", "-f", "-q")
 
@@ -118,13 +128,24 @@ class Preparer(object):
 				self.deps.append((dep_product, product))
 
 		# Construct EUPS version
-		sha = self._get_git_sha(git, product)
-		version = self._construct_version(git, sha, dep_vers)
+		version = self._construct_version(productdir, ref, dep_vers)
 
 		# Store the result
-		self.versions[product] = (version, sha)
+		self.versions[product] = (version, sha1)
 
 		return self.versions[product]
+
+	def _construct_version(self, productdir, ref, dep_versions):
+		""" Return a standardized XXX+YYY EUPS version, that includes the dependencies. """
+		q = pipes.quote
+		cmd ="cd %s && pkgbuild -f git_version %s" % (q(productdir), q(ref))
+		ver = subprocess.check_output(cmd, shell=True).strip()
+
+		if dep_versions:
+			deps_sha1 = self._depver_hash(dep_versions)
+			return "%s+%s" % (ver, deps_sha1)
+		else:
+			return ver
 
 	def _is_excluded(self, dep, product):
 		""" Check if dependency 'dep' is excluded for product 'product' """
@@ -141,65 +162,6 @@ class Preparer(object):
 				return True
 
 		return False
-
-	def _get_git_sha(self, git, product):
-		""" Return a git ref to this product's source code. """
-		sha = git('rev-parse', 'HEAD')
-		return sha
-
-	dot_ver_re = re.compile(r'^([0-9]+)(\.[0-9]+)*$')
-	dot_quad_re = re.compile(r'^([0-9]+)(\.[0-9]+){3}$')
-	def _get_git_ref(self, git, sha):
-		""" Return a git ref to this product's source code. """
-		ref = git('describe', '--first-parent', '--always', '--long', '--abbrev=%d' % self.sha_abbrev_len, sha)
-		rs = ref.split('-')
-		if len(rs) == 1:
-			return sha[:self.sha_abbrev_len]	# no tags
-		tag, ct, abbrev = rs
-
-		# if there are multiple tags on the commit, git-describe will return
-		# a random one. Try to work around the problem.
-		s = git('rev-parse', tag + '^{}')	# The commit the tag is pointing to
-		refs = []
-		import cStringIO
-		fp = cStringIO.StringIO(git('show-ref', '--tags', '-d'))
-		for line in fp:
-			(sha_, ref) = line.split()
-			if not sha_.startswith(s) or ref.startswith('/refs/tags/'):
-				continue
-			ref = ref[len('/refs/tags'):-3]
-			if not self.dot_ver_re.match(ref):
-				continue
-			refs.append(ref)
-
-		if refs:
-			from eups.VersionCompare import VersionCompare
-			tag = sorted(refs, cmp=VersionCompare())[0]
-			if ct != "0":
-#				# See if we can increment the .W
-#				if self.dot_quad_re.match(tag):
-#					(a, b, c, d) = tag.split('.')
-#					d = str(int(d) + 1)
-#					print tag, " --> "
-#					tag = "%s.%s.%s.%s" % (a, b, c, d)
-#					print tag
-#					# TODO: Also tag & push the git repo!
-#					return tag
-				return "%s.%s" % (tag, abbrev)
-			else:
-				return tag
-		else:
-			return sha[:self.sha_abbrev_len]
-
-	def _construct_version(self, git, sha, dep_versions):
-		""" Return a standardized XXX+YYY EUPS version, that includes the dependencies. """
-		ref = self._get_git_ref(git, sha)
-
-		if dep_versions:
-			deps_sha1 = self._depver_hash(dep_versions)
-			return "%s+%s" % (ref, deps_sha1)
-		else:
-			return ref
 
 	def _depver_hash(self, versions):
 		""" Return a standardized hash of the list of versions """
@@ -235,7 +197,7 @@ class Preparer(object):
 
 		# Topologically sort the result
 		products = tsort.tsort(p.deps)
-		print '# %-23s\t%s\t%s' % ("product", "git ref", "EUPS version")
+		print '# %-23s %-41s %-30s' % ("product", "SHA1", "Version")
 		for product in products:
 			print '%-25s %-41s %-30s' % (product, p.versions[product][1], p.versions[product][0])
 
