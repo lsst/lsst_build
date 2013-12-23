@@ -64,9 +64,9 @@ class Builder(object):
 		buildscript = os.path.join(productdir, '_build.sh')
 		logfile = os.path.join(productdir, '_build.log')
 
-		# compute the setup invocations for dependencies
+		# construct the tags file with exact dependencies
 		setups = [ 
-			"setup --type=build -j %(name)-20s %(version)s" % self.products[dep]._asdict()
+			"\t%(name)-20s %(version)s" % self.products[dep]._asdict()
 				for dep in self._flatten_dependencies(product)
 		]
 
@@ -91,9 +91,13 @@ class Builder(object):
 			# prepare
 			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild prep
 
-			# setup dependencies (if any)
+			# setup the package with its exact dependencies
+			cat > _build.tags <<-EOF
 			%(setups)s
-			setup -j -r .
+			EOF
+			set +x
+			setup --vro=_build.tags -r .
+			set -x
 
 			# build
 			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild config
