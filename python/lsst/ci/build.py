@@ -10,7 +10,7 @@ import pipes
 import time
 import eups
 
-Product = collections.namedtuple('Product', ['name', 'sha1', 'version'])
+Product = collections.namedtuple('Product', ['name', 'sha1', 'version', 'dependencies'])
 
 class Builder(object):
 	def __init__(self, build_dir, manifest):
@@ -18,20 +18,34 @@ class Builder(object):
 		# FIXME: the constructor should taka a _parsed_ manifest
 		
 		self.build_dir = build_dir
-		
+
 		self.products = collections.OrderedDict()
 		with open(manifest) as fp:
 			for line in fp:
 				line = line.strip()
 				if line.startswith('#'):
 					continue
-				(name, sha1, version) = line.split()[:3]
-				self.products[name] = Product(name, sha1, version)
+
+				arr = line.split()
+				if len(arr) == 4:
+					(name, sha1, version, deps) = arr
+					deps = deps.split(',')
+				else:
+					(name, sha1, version) = arr
+					deps = []
+
+				self.products[name] = Product(name, sha1, version, deps)
 
 	def build_all(self):
 		for name in self.products:
 			if not self._build(name):
 				return False
+
+	def _flatten_dependencies(self, product, res=set()):
+		res.update(product.dependencies)
+		for dep in product.dependencies:
+			self._flatten_dependencies(self.products[dep], res)
+		return res
 
 	def _build(self, name):
 		product = self.products[name]
@@ -51,11 +65,10 @@ class Builder(object):
 		logfile = os.path.join(productdir, '_build.log')
 
 		# compute the setup invocations for dependencies
-		setups = []
-		for dep in self.products.itervalues():
-			if dep.name == product.name:
-				break
-			setups.append("setup --type=build --j %(name)-20s %(version)s" % dep._asdict())
+		setups = [ 
+			"setup --type=build -j %(name)-20s %(version)s" % self.products[dep]._asdict()
+				for dep in self._flatten_dependencies(product)
+		]
 
 		# create the buildscript
 		with open(buildscript, 'w') as fp:
@@ -77,10 +90,9 @@ class Builder(object):
 
 			# prepare
 			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild prep
-			
+
 			# setup dependencies (if any)
 			%(setups)s
-			
 			setup -j -r .
 
 			# build
@@ -110,7 +122,7 @@ class Builder(object):
 
 		# Run the build script
 		sys.stderr.write('%20s: ' % name)
-		progress = product.version + " "	# cute attack: display the version string as progress bar, character by character
+		progress_bar = product.version + " "	# cute attack: display the version string as progress bar, character by character
 		with open(logfile, 'w') as logfp:
 			# execute the build file from the product directory, capturing the output and return code
 			t0 = t = time.time()
@@ -121,18 +133,18 @@ class Builder(object):
 				# throttle progress reporting
 				t1 = time.time()
 				while t <= t1:
-					if progress:
-						sys.stderr.write(progress[0])
-						progress = progress[1:]
+					if progress_bar:
+						sys.stderr.write(progress_bar[0])
+						progress_bar = progress_bar[1:]
 					else:
 						sys.stderr.write('.')
 					t += 2
-		if progress:
-			sys.stderr.write(progress)
+		if progress_bar:
+			sys.stderr.write(progress_bar)
 
 		retcode = process.poll()
 		if retcode:
-			print >>sys.stderr, " ERROR (%d sec)." % (time.time() - t0)
+			print >>sys.stderr, "ERROR (%d sec)." % (time.time() - t0)
 			print >>sys.stderr, "*** error building product %s." % product.name
 			print >>sys.stderr, "*** exit code = %d" % retcode
 			print >>sys.stderr, "*** log is in %s" % logfile
@@ -142,7 +154,7 @@ class Builder(object):
 
 			return False
 		else:
-			print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
+			print >>sys.stderr, "ok (%.1f sec)." % (time.time() - t0)
 
 		return True
 

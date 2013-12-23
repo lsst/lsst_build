@@ -97,18 +97,18 @@ class Preparer(object):
 		# Parse the table file to discover dependencies
 		productdir = os.path.join(self.build_dir, product)
 		dep_vers = []
+		dependencies = []
 		table_fn = os.path.join(productdir, 'ups', '%s.table' % product)
 		if os.path.isfile(table_fn):
 			# Choose which dependencies to prepare
-			product_deps = []
 			for dep in eups.table.Table(table_fn).dependencies(eups.Eups()):
 				if dep[1] == True and self._is_excluded(dep[0].name, product):	# skip excluded optionals
 					continue;
 				if dep[0].name == "implicitProducts": continue;			# skip implicit products
-				product_deps.append(dep[0].name)
+				dependencies.append(dep[0].name)
 
 			# Recursively prepare the chosen dependencies
-			for dep_product in product_deps:
+			for dep_product in dependencies:
 				dep_ver = self._prepare(dep_product)[0]
 				dep_vers.append(dep_ver)
 				self.deps.append((dep_product, product))
@@ -117,7 +117,7 @@ class Preparer(object):
 		version = self._construct_version(productdir, ref, dep_vers)
 
 		# Store the result
-		self.versions[product] = (version, sha1)
+		self.versions[product] = (version, sha1, dependencies)
 		
 		return self.versions[product]
 
@@ -190,5 +190,6 @@ class Preparer(object):
 
 		print '# %-23s %-41s %-30s' % ("product", "SHA1", "Version")
 		for product in products:
-			print '%-25s %-41s %-30s' % (product, p.versions[product][1], p.versions[product][0])
+			(version, sha1, dependencies) = p.versions[product]
+			print '%-25s %-41s %-40s %s' % (product, sha1, version, ','.join(dependencies))
 
