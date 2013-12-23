@@ -40,7 +40,7 @@ class Builder(object):
 		e = eups.Eups()
 		try:
 			e.getProduct(product.name, product.version)
-			sys.stderr.write('%20s: v%s (already installed).\n' % (product.name, product.version))
+			sys.stderr.write('%20s: %s (already installed).\n' % (product.name, product.version))
 			return True
 		except eups.ProductNotFound:
 			pass
@@ -110,6 +110,7 @@ class Builder(object):
 
 		# Run the build script
 		sys.stderr.write('%20s: ' % name)
+		progress = product.version + " "	# cute attack: display the version string as progress bar, character by character
 		with open(logfile, 'w') as logfp:
 			# execute the build file from the product directory, capturing the output and return code
 			t0 = t = time.time()
@@ -120,8 +121,14 @@ class Builder(object):
 				# throttle progress reporting
 				t1 = time.time()
 				while t <= t1:
-					sys.stderr.write('+')
+					if progress:
+						sys.stderr.write(progress[0])
+						progress = progress[1:]
+					else:
+						sys.stderr.write('.')
 					t += 2
+		if progress:
+			sys.stderr.write(progress)
 
 		retcode = process.poll()
 		if retcode:
@@ -135,7 +142,7 @@ class Builder(object):
 
 			return False
 		else:
-			print >>sys.stderr, " v%s (%.1f sec)." % (product.version, time.time() - t0)
+			print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
 
 		return True
 
