@@ -32,84 +32,70 @@ class Preparer(object):
 		data = { 'product': product }
 		return [ pat % data for pat in self.repository_patterns ]
 
+	def _mirror(self, product):
+		t0 = time.time()
+		sys.stderr.write("%20s: " % product)
+
+		productdir = os.path.join(self.build_dir, product)
+		git = Git(productdir)
+
+		# verify the URL of origin hasn't changed
+		if os.path.isdir(productdir):
+			origin = git('config', '--get', 'remote.origin.url')
+			if origin not in self._origin_candidates(product):
+				shutil.rmtree(productdir)
+
+		# clone
+		if not os.path.isdir(productdir):
+			for url in self._origin_candidates(product):
+				if not Git.clone(url, productdir, return_status=True)[1]:
+					break
+			else:
+				raise Exception("Failed to clone product '%s' from any of the offered repositories" % product)
+
+		# update from origin
+		git("fetch", "origin", "--force", "--prune")
+		git("fetch", "origin", "--force", "--tags")
+
+		# find a ref that matches, checkout it
+		for ref in self.refs:
+			sha1, _ = git("rev-parse", "-q", "--verify", "refs/remotes/origin/" + ref, return_status=True)
+			#print ref, "branch=", sha1
+			branch = sha1 != ""
+			if not sha1:
+				sha1, _ = git("rev-parse", "-q", "--verify", "refs/tags/" + ref + "^0", return_status=True)
+			if not sha1:
+				sha1, _ = git("rev-parse", "-q", "--verify", "__dummy-g" + ref, return_status=True)
+			if not sha1:
+				continue
+
+			git("checkout", "--force", ref)
+
+			if branch:
+				git("pull")
+
+			#print "HEAD=", git("rev-parse", "HEAD")
+			assert(git("rev-parse", "HEAD") == sha1)
+			break
+		else:
+			raise Exception("None of the specified refs exist in product '%s'" % product)
+
+		git("reset", "--hard")
+		git("clean", "-d", "-f", "-q")
+
+		print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
+		return ref, sha1
+
 	def _prepare(self, product):
 		try:
 			return self.versions[product]
 		except KeyError:
 			pass
 
-		sys.stderr.write("%20s: " % product)
-		t0 = time.time()
-
-		productdir = os.path.join(self.build_dir, product)
-
-		if os.path.isdir(productdir):
-			# Check that the remote hasn't changed; remove the clone if it did
-			# so it will get cloned again
-			git = Git(productdir)
-			origin = git('config', '--get', 'remote.origin.url')
-			for candidate in self._origin_candidates(product):
-				if origin == candidate:
-					break
-			else:
-				shutil.rmtree(productdir)
-
-		# Clone the product, if needed
-		if not os.path.isdir(productdir):
-			if os.path.exists(productdir):
-				raise Exception("%s exists and is not a directory. Cannot clone a git repository there." % productdir)
-
-			for url in self._origin_candidates(product):
-				try:
-					Git.clone(url, productdir)
-					break
-				except GitError as e:
-					pass
-			else:
-				raise Exception("Failed to clone product '%s' from any of the offered repositories" % product)
-
-		git = Git(productdir)
-
-		if not self.no_pull:
-			# fetch updates from the remote
-			git("fetch", "origin", "--prune", "--tags")
-
-		# Check out the first matching requested ref
-		for ref in self.refs:
-			try:
-				# Presume the ref is a tag
-				sha1 = git('rev-parse', '--verify', '-q', 'refs/tags/%s' % ref)
-			except GitError:
-				try:
-					# Presume it's a branch
-					sha1 = git('rev-parse', '--verify', '-q', 'origin/%s' % ref)
-					ref = sha1
-				except GitError:
-					try:
-						# Presume it's a straight SHA1
-						sha1 = git('rev-parse', '--verify', '-q', 'dummy-g%s' % ref)
-					except GitError:
-						continue
-
-			# avoid checking out if already checked out (for speed)
-			try:
-				checkout = git('rev-parse', 'HEAD') != sha1
-			except GitError:
-				checkout = True
-
-			if checkout:
-				git('checkout', '-f', ref)
-			break
-		else:
-			raise Exception("None of the specified refs exist in product '%s'" % product)
-
-		# Reset and clean up the working directory
-		git("reset", "--hard")
-		git("clean", "-d", "-f", "-q")
-
-		print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
+		ref, sha1 = self._mirror(product)
 
 		# Parse the table file to discover dependencies
+		productdir = os.path.join(self.build_dir, product)
 		dep_vers = []
 		table_fn = os.path.join(productdir, 'ups', '%s.table' % product)
 		if os.path.isfile(table_fn):
@@ -118,7 +104,7 @@ class Preparer(object):
 			for dep in eups.table.Table(table_fn).dependencies(eups.Eups()):
 				if dep[1] == True and self._is_excluded(dep[0].name, product):	# skip excluded optionals
 					continue;
-				if dep[0].name == "implicitProducts": continue;		# skip implicit products
+				if dep[0].name == "implicitProducts": continue;			# skip implicit products
 				product_deps.append(dep[0].name)
 
 			# Recursively prepare the chosen dependencies
@@ -132,7 +118,7 @@ class Preparer(object):
 
 		# Store the result
 		self.versions[product] = (version, sha1)
-
+		
 		return self.versions[product]
 
 	def _construct_version(self, productdir, ref, dep_versions):
@@ -195,8 +181,13 @@ class Preparer(object):
 		for product in args.products:
 			p._prepare(product)
 
-		# Topologically sort the result
+		# Topologically sort the result, add any products that have no dependencies
 		products = tsort.tsort(p.deps)
+		_p = set(products)
+		for product in set(args.products):
+			if product not in _p:
+				products.append(product)
+
 		print '# %-23s %-41s %-30s' % ("product", "SHA1", "Version")
 		for product in products:
 			print '%-25s %-41s %-30s' % (product, p.versions[product][1], p.versions[product][0])

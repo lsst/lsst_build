@@ -18,11 +18,13 @@ class Git:
 		self.cwd = cwd
 
 	@staticmethod
-	def clone(*args):
-		return Git()('clone', *args)
+	def clone(*args, **kwargs):
+		return Git()('clone', *args, **kwargs)
 
-	def __call__(self, *args):
+	def __call__(self, *args, **kwargs):
 		# Run git with the given arguments, returning stdout.
+
+		return_status = kwargs.get("return_status", False)
 
 		cmd = ('git',) + args
 		#print "---> ", " ".join(cmd)
@@ -30,11 +32,12 @@ class Git:
 		process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.cwd)
 		(stdout, stderr) = process.communicate()
 		retcode = process.poll()
-		if retcode:
+
+		if retcode and not return_status:
 			#print cmd
 			#print stdout
 			#print stderr
 			raise GitError(retcode, cmd, stdout, stderr)
 
-		return stdout.rstrip()
+		return stdout.rstrip() if not return_status else (stdout.rstrip(), retcode)
 
