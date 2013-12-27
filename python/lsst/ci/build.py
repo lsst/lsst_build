@@ -5,12 +5,15 @@ import eups
 import collections
 import subprocess
 import textwrap
-import os, stat, sys
+import os, stat, sys, shutil
 import pipes
 import time
-import eups
+import eups, eups.tags
+import re
 
 Product = collections.namedtuple('Product', ['name', 'sha1', 'version', 'dependencies'])
+
+e = eups.Eups()
 
 class Builder(object):
 	def __init__(self, build_dir, manifest):
@@ -18,12 +21,22 @@ class Builder(object):
 		# FIXME: the constructor should taka a _parsed_ manifest
 		
 		self.build_dir = build_dir
+		self.BUILD = None
 
 		self.products = collections.OrderedDict()
 		with open(manifest) as fp:
+			varre = re.compile('^(\w+)=(.*)$')
 			for line in fp:
 				line = line.strip()
+				if not line:
+					continue
 				if line.startswith('#'):
+					continue
+
+				# Look for variable assignments
+				m = varre.match(line)
+				if m:
+					setattr(self, m.group(1), m.group(2))
 					continue
 
 				arr = line.split()
@@ -37,6 +50,17 @@ class Builder(object):
 				self.products[name] = Product(name, sha1, version, deps)
 
 	def build_all(self):
+		# Make sure EUPS knows about the BUILD tag
+		if self.BUILD:
+			global e
+			tags = eups.tags.Tags()
+			tags.loadFromEupsPath(e.path)
+			if self.BUILD not in tags.getTagNames():
+				tags.registerTag(self.BUILD)
+				tags.saveGlobalTags(e.path[0])
+				e = eups.Eups()			# reload new tags
+
+		# Build all products
 		for name in self.products:
 			if not self._build(name):
 				return False
@@ -47,14 +71,18 @@ class Builder(object):
 			self._flatten_dependencies(self.products[dep], res)
 		return res
 
+	def _tag_product(self, name, version, tag):
+		if tag:
+			e.declare(name, version, tag=tag)
+
 	def _build(self, name):
 		product = self.products[name]
 
 		# test if the product is already installed, skip build if so.
-		e = eups.Eups()
 		try:
 			e.getProduct(product.name, product.version)
 			sys.stderr.write('%20s: %s (already installed).\n' % (product.name, product.version))
+			self._tag_product(product.name, product.version, self.BUILD)
 			return True
 		except eups.ProductNotFound:
 			pass
@@ -105,7 +133,7 @@ class Builder(object):
 			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild install
 
 			# declare to EUPS
-			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild eups_declare
+			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild xdeclare -
 
 			# explicitly append SHA1 to pkginfo
 			echo SHA1=%(sha1)s >> $(eups list %(product)s %(version)s -d)/ups/pkginfo
@@ -158,6 +186,13 @@ class Builder(object):
 
 			return False
 		else:
+			# copy the log file to product directory
+			
+			productDir = e.getProduct(product.name, product.version).dir
+			shutil.copy2(logfile, productDir)
+
+			self._tag_product(product.name, product.version, self.BUILD)
+
 			print >>sys.stderr, "ok (%.1f sec)." % (time.time() - t0)
 
 		return True

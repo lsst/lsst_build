@@ -41,3 +41,20 @@ class Git:
 
 		return stdout.rstrip() if not return_status else (stdout.rstrip(), retcode)
 
+	def checkout(self, *args, **kwargs):
+		return self('checkout', *args, **kwargs)
+
+	def rev_parse(self, *args, **kwargs):
+		return self('rev-parse', *args, **kwargs)
+
+	def reset(self, *args, **kwargs):
+		return self('reset', *args, **kwargs)
+
+	def clean(self, *args, **kwargs):
+		return self('clean', *args, **kwargs)
+
+	def fetch(self, *args, **kwargs):
+		return self('fetch', *args, **kwargs)
+
+	def pull(self, *args, **kwargs):
+		return self('pull', *args, **kwargs)

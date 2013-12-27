@@ -29,7 +29,7 @@ parser_prepare.add_argument('products', type=str, help='Top-level products to bu
 parser_prepare.add_argument('--ref', default=[], action='append', type=str, help='An ordered list of refs to check out')
 parser_prepare.add_argument('--repository-pattern', default=os.environ.get("REPOSITORY_PATTERN", "git://git.lsstcorp.org/LSST/DMS/%(product).git"), type=str, help="Python pattern to source git repository ('|'-delimited; default: $REPOSITORY_PATTERN)")
 parser_prepare.add_argument('--sha-abbrev-len', default=10, type=int, help='Length of SHA1 commit ID abbreviation')
-parser_prepare.add_argument('--no-pull', action='store_true', help="Don't git-pull any products")
+parser_prepare.add_argument('--no-fetch', action='store_true', help="Don't git-fetch any products")
 parser_prepare.add_argument('--exclusion-map', type=str, help="File with map of optional packages to exclude.")
 
 # Parser for the 'build' command

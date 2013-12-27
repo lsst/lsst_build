@@ -3,7 +3,7 @@
 
 import os, os.path
 import sys
-import eups
+import eups, eups.tags
 import hashlib
 import shutil
 import time
@@ -13,15 +13,17 @@ import subprocess
 
 import tsort
 
+e = eups.Eups()
+
 from .git import Git, GitError
 
 class Preparer(object):
-	def __init__(self, build_dir, refs, repository_patterns, sha_abbrev_len, no_pull, exclusions):
+	def __init__(self, build_dir, refs, repository_patterns, sha_abbrev_len, no_fetch, exclusions):
 		self.build_dir = os.path.abspath(build_dir)
 		self.refs = refs
 		self.repository_patterns = repository_patterns.split('|')
 		self.sha_abbrev_len = sha_abbrev_len
-		self.no_pull = no_pull
+		self.no_fetch = no_fetch
 		self.exclusions = exclusions
 
 		self.deps = []
@@ -54,34 +56,39 @@ class Preparer(object):
 				raise Exception("Failed to clone product '%s' from any of the offered repositories" % product)
 
 		# update from origin
-		git("fetch", "origin", "--force", "--prune")
-		git("fetch", "origin", "--force", "--tags")
+		if not self.no_fetch:
+			git.fetch("origin", "--force", "--prune")
+			## git.fetch("origin", "--force", "--tags") # This fetches odd tags
 
 		# find a ref that matches, checkout it
 		for ref in self.refs:
-			sha1, _ = git("rev-parse", "-q", "--verify", "refs/remotes/origin/" + ref, return_status=True)
+			sha1, _ = git.rev_parse("-q", "--verify", "refs/remotes/origin/" + ref, return_status=True)
 			#print ref, "branch=", sha1
 			branch = sha1 != ""
 			if not sha1:
-				sha1, _ = git("rev-parse", "-q", "--verify", "refs/tags/" + ref + "^0", return_status=True)
+				sha1, _ = git.rev_parse("-q", "--verify", "refs/tags/" + ref + "^0", return_status=True)
 			if not sha1:
-				sha1, _ = git("rev-parse", "-q", "--verify", "__dummy-g" + ref, return_status=True)
+				sha1, _ = git.rev_parse("-q", "--verify", "__dummy-g" + ref, return_status=True)
 			if not sha1:
 				continue
 
-			git("checkout", "--force", ref)
+			git.checkout("--force", ref)
 
 			if branch:
-				git("pull")
+				# profiling showed that git-pull took a lot of time; since
+				# we know we want the checked out branch to be at the remote sha1
+				# we'll just reset it
+				git.reset("--hard", sha1)
 
-			#print "HEAD=", git("rev-parse", "HEAD")
-			assert(git("rev-parse", "HEAD") == sha1)
+			#print "HEAD=", git.rev_parse("HEAD")
+			assert(git.rev_parse("HEAD") == sha1)
 			break
 		else:
 			raise Exception("None of the specified refs exist in product '%s'" % product)
 
-		git("reset", "--hard")
-		git("clean", "-d", "-f", "-q")
+		# clean up the working directory (eg., remove remnants of
+		# previous builds)
+		git.clean("-d", "-f", "-q")
 
 		print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
 		return ref, sha1
@@ -101,7 +108,7 @@ class Preparer(object):
 		table_fn = os.path.join(productdir, 'ups', '%s.table' % product)
 		if os.path.isfile(table_fn):
 			# Choose which dependencies to prepare
-			for dep in eups.table.Table(table_fn).dependencies(eups.Eups()):
+			for dep in eups.table.Table(table_fn).dependencies(e):
 				if dep[1] == True and self._is_excluded(dep[0].name, product):	# skip excluded optionals
 					continue;
 				if dep[0].name == "implicitProducts": continue;			# skip implicit products
@@ -124,7 +131,7 @@ class Preparer(object):
 	def _construct_version(self, productdir, ref, dep_versions):
 		""" Return a standardized XXX+YYY EUPS version, that includes the dependencies. """
 		q = pipes.quote
-		cmd ="cd %s && pkgbuild -f git_version %s" % (q(productdir), q(ref))
+		cmd ="cd %s && pkgautoversion %s" % (q(productdir), q(ref))
 		ver = subprocess.check_output(cmd, shell=True).strip()
 
 		if dep_versions:
@@ -177,7 +184,7 @@ class Preparer(object):
 					exclusions.append((re.compile(dep_re), re.compile(prod_re)))
 
 		# Prepare products
-		p = Preparer(build_dir, refs, args.repository_pattern, args.sha_abbrev_len, args.no_pull, exclusions)
+		p = Preparer(build_dir, refs, args.repository_pattern, args.sha_abbrev_len, args.no_fetch, exclusions)
 		for product in args.products:
 			p._prepare(product)
 
@@ -188,7 +195,19 @@ class Preparer(object):
 			if product not in _p:
 				products.append(product)
 
+		# Generate a build ID
+		tags = eups.tags.Tags()
+		tags.loadFromEupsPath(e.path)
+		btre = re.compile('^b[0-9]+$')
+		btags = [ 0 ]
+		btags += [ int(tag[1:]) for tag in tags.getTagNames() if btre.match(tag) ]
+		tag = "b%s" % (max(btags) + 1)
+		tags.registerTag(tag)
+		tags.saveGlobalTags(e.path[0])
+
+		# Write out the manifest
 		print '# %-23s %-41s %-30s' % ("product", "SHA1", "Version")
+		print 'BUILD=%s' % tag
 		for product in products:
 			(version, sha1, dependencies) = p.versions[product]
 			print '%-25s %-41s %-40s %s' % (product, sha1, version, ','.join(dependencies))
