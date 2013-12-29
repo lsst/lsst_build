@@ -57,8 +57,11 @@ class Preparer(object):
 
 		# update from origin
 		if not self.no_fetch:
-			git.fetch("origin", "--force", "--prune")
-			## git.fetch("origin", "--force", "--tags") # This fetches odd tags
+			# the line below should be equivalent to:
+			#     git.fetch("origin", "--force", "--prune")
+			#     git.fetch("origin", "--force", "--tags")
+			# but avoids the overhead of two (possibly remote) git calls.
+			git.fetch("-fup", "origin", "+refs/heads/*:refs/heads/*", "refs/tags/*:refs/tags/*")
 
 		# find a ref that matches, checkout it
 		for ref in self.refs:
