@@ -87,7 +87,7 @@ class Builder(object):
 		except eups.ProductNotFound:
 			pass
 
-		# run the pkgbuild sequence for the product
+		# run the eupspkg sequence for the product
 		productdir = os.path.abspath(os.path.join(self.build_dir, product.name))
 		buildscript = os.path.join(productdir, '_build.sh')
 		logfile = os.path.join(productdir, '_build.log')
@@ -114,10 +114,10 @@ class Builder(object):
 
 			# clean up the working directory
 			git reset --hard
-			git clean -d -f -q -e '_build.*'
+			git clean -d -f -q -x -e '_build.*'
 
 			# prepare
-			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild prep
+			eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic prep
 
 			# setup the package with its exact dependencies
 			cat > _build.tags <<-EOF
@@ -128,12 +128,12 @@ class Builder(object):
 			set -x
 
 			# build
-			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild config
-			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild build
-			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild install
+			eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic config
+			eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic build
+			eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic install
 
 			# declare to EUPS
-			env PRODUCT=%(product)s VERSION=%(version)s   pkgbuild xdeclare -
+			eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic decl
 
 			# explicitly append SHA1 to pkginfo
 			echo SHA1=%(sha1)s >> $(eups list %(product)s %(version)s -d)/ups/pkginfo
