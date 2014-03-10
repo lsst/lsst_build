@@ -9,7 +9,7 @@
 
 import argparse, os
 
-from lsst.ci.prepare import Preparer
+from lsst.ci.prepare import BuildDirectoryConstructor
 from lsst.ci.build import Builder
 
 parser = argparse.ArgumentParser(description='Build LSST Software Stack from git source',
@@ -23,7 +23,7 @@ subparsers = parser.add_subparsers()
 
 # Parser for the 'prepare' command
 parser_prepare = subparsers.add_parser('prepare', help='Prepare the source tree for build')
-parser_prepare.set_defaults(func=Preparer.run)
+parser_prepare.set_defaults(func=BuildDirectoryConstructor.run)
 parser_prepare.add_argument('build_dir', type=str, help='Build directory')
 parser_prepare.add_argument('products', type=str, help='Top-level products to build', nargs='+')
 parser_prepare.add_argument('--ref', default=[], action='append', type=str, help='An ordered list of refs to check out')

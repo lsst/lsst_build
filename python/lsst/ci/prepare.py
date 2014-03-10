@@ -10,31 +10,72 @@ import time
 import re
 import pipes
 import subprocess
+import collections
 
 import tsort
 
-e = eups.Eups()
-
 from .git import Git, GitError
 
-class Preparer(object):
-	def __init__(self, build_dir, refs, repository_patterns, sha_abbrev_len, no_fetch, exclusions):
+class VerDB(object):
+	def __init__(self, dbrepo):
+		self.dbrepo = dbrepo
+		self.git = Git(dbrepo)
+
+	def get_version(self):
+		pass
+
+class Product(object):
+	def __init__(self, name, sha1, version, dependencies):
+		self.name = name
+		self.sha1 = sha1
+		self.version = version
+		self.dependencies = dependencies
+
+class Manifest(object):
+	def __init__(self, productsList, buildID=None):
+		self.buildID = buildID
+		self.products = productsList
+
+	def toFile(self, fileObject):
+		# Write out the build manifest
+		print '# %-23s %-41s %-30s' % ("product", "SHA1", "Version")
+		print 'BUILD=%s' % self.buildID
+		for prod in self.products:
+			print '%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version, ','.join(dep.name for dep in prod.dependencies))
+
+	@staticmethod
+	def fromFile(fileObject):
+		pass;
+
+	@staticmethod
+	def fromProductDict(productDict):
+		# Topologically sort the list of products
+		deps = [ (dep.name, prod.name) for prod in productDict.itervalues() for dep in prod.dependencies ];
+		topoSortedProductNames = tsort.tsort(deps)
+
+		# Append top-level products with no dependencies
+		_p = set(topoSortedProductNames)
+		for name in set(productDict.iterkeys()):
+			if name not in _p:
+				topoSortedProductNames.append(name)
+
+		return Manifest( [productDict[name] for name in topoSortedProductNames], None)
+
+class ProductFetcher(object):
+	def __init__(self, build_dir, repository_patterns, refs, no_fetch):
 		self.build_dir = os.path.abspath(build_dir)
 		self.refs = refs
 		self.repository_patterns = repository_patterns.split('|')
-		self.sha_abbrev_len = sha_abbrev_len
 		self.no_fetch = no_fetch
-		self.exclusions = exclusions
-
-		self.deps = []
-		self.versions = {}
 
 	def _origin_candidates(self, product):
 		""" Expand repository_patterns into URLs. """
 		data = { 'product': product }
 		return [ pat % data for pat in self.repository_patterns ]
 
-	def _mirror(self, product):
+	def fetch(self, product):
+		""" Mirror the product repository into the build directory and extract the appropriate ref """
+
 		t0 = time.time()
 		sys.stderr.write("%20s: " % product)
 
@@ -96,75 +137,129 @@ class Preparer(object):
 		print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
 		return ref, sha1
 
-	def _prepare(self, product):
-		try:
-			return self.versions[product]
-		except KeyError:
-			pass
+class VersionMaker(object):
+	def __init__(self, sha_abbrev_len):
+		self.sha_abbrev_len = sha_abbrev_len
+		pass
 
-		ref, sha1 = self._mirror(product)
+	def _rebuild_suffix(self, dependencies):
+		""" Return a hash of the sorted list of printed (dep_name, dep_version) tuples """
+		m = hashlib.sha1()
+		for dep in sorted(dependencies, lambda a, b: cmp(a.name, b.name)):
+			s = '%s\t%s\n' % (dep.name, dep.version)
+			m.update(s)
 
-		# Parse the table file to discover dependencies
-		productdir = os.path.join(self.build_dir, product)
-		dep_vers = []
-		dependencies = []
-		table_fn = os.path.join(productdir, 'ups', '%s.table' % product)
-		if os.path.isfile(table_fn):
-			# Choose which dependencies to prepare
-			for dep in eups.table.Table(table_fn).dependencies(e):
-				if dep[1] == True and self._is_excluded(dep[0].name, product):	# skip excluded optionals
-					continue;
-				if dep[0].name == "implicitProducts": continue;			# skip implicit products
-				dependencies.append(dep[0].name)
+		suffix = m.hexdigest()[:self.sha_abbrev_len]
+		return suffix
 
-			# Recursively prepare the chosen dependencies
-			for dep_product in dependencies:
-				dep_ver = self._prepare(dep_product)[0]
-				dep_vers.append(dep_ver)
-				self.deps.append((dep_product, product))
-
-		# Construct EUPS version
-		version = self._construct_version(productdir, ref, dep_vers)
-
-		# Store the result
-		self.versions[product] = (version, sha1, dependencies)
-		
-		return self.versions[product]
-
-	def _construct_version(self, productdir, ref, dep_versions):
+	def version(self, productdir, ref, dependencies):
 		""" Return a standardized XXX+YYY EUPS version, that includes the dependencies. """
 		q = pipes.quote
 		cmd ="cd %s && pkgautoversion %s" % (q(productdir), q(ref))
 		ver = subprocess.check_output(cmd, shell=True).strip()
 
-		if dep_versions:
-			deps_sha1 = self._depver_hash(dep_versions)
+		if dependencies:
+			deps_sha1 = self._rebuild_suffix(dependencies)
 			return "%s+%s" % (ver, deps_sha1)
 		else:
 			return ver
 
-	def _is_excluded(self, dep, product):
+class ExclusionResolver(object):
+	def __init__(self, exclusion_patterns):
+		self.exclusions = [
+			(re.compile(dep_re), re.compile(prod_re)) for (dep_re, prod_re) in exclusion_patterns
+		]
+
+	def is_excluded(self, dep, product):
 		""" Check if dependency 'dep' is excluded for product 'product' """
 		try:
-			rc = self.exclusion_regex_cache
+			rc = self._exclusion_regex_cache
 		except AttributeError:
-			rc = self.exclusion_regex_cache = dict()
+			rc = self._exclusion_regex_cache = dict()
 
 		if product not in rc:
 			rc[product] = [ dep_re for (dep_re, prod_re) in self.exclusions if prod_re.match(product) ]
-		
+
 		for dep_re in rc[product]:
 			if dep_re.match(dep):
 				return True
 
 		return False
 
-	def _depver_hash(self, versions):
-		""" Return a standardized hash of the list of versions """
-		return hashlib.sha1('\n'.join(sorted(versions))).hexdigest()[:self.sha_abbrev_len]
+	@staticmethod
+	def fromFile(fileObject):
+		exclusion_patterns = []
+
+		for line in fileObject:
+			line = line.strip()
+			if not line or line.startswith("#"):
+				continue
+
+			exclusion_patterns.append(line.split()[:2])
+
+		return ExclusionResolver(exclusion_patterns)
+
+def nextAvailableEupsBuildTag(tags):
+	# Generate a build ID
+
+	btre = re.compile('^b[0-9]+$')
+	btags = [ 0 ]
+	btags += [ int(tag[1:]) for tag in tags.getTagNames() if btre.match(tag) ]
+	tag = "b%s" % (max(btags) + 1)
+
+	return tag
+
+class BuildDirectoryConstructor(object):
+	def __init__(self, build_dir, eups, product_fetcher, version_maker, exclusion_resolver):
+		self.build_dir = os.path.abspath(build_dir)
+
+		self.eups = eups
+		self.product_fetcher = product_fetcher
+		self.version_maker = version_maker
+		self.exclusion_resolver = exclusion_resolver
+
+	def _add_product_tree(self, products, productName):
+		if productName in products:
+			return products[productName]
+
+		# Mirror the product into the build directory (clone or git-pull it)
+		ref, sha1 = self.product_fetcher.fetch(productName)
+
+		# Parse the table file to discover dependencies
+		dependencies = []
+		productdir = os.path.join(self.build_dir, productName)
+		table_fn = os.path.join(productdir, 'ups', '%s.table' % productName)
+		if os.path.isfile(table_fn):
+			# Prepare the non-excluded dependencies
+			for dep in eups.table.Table(table_fn).dependencies(self.eups):
+				(dprod, doptional) = dep[0:2]
+
+				# skip excluded optional products, and implicit products
+				if doptional and self.exclusion_resolver.is_excluded(dprod.name, productName):
+					continue;
+				if dprod.name == "implicitProducts":
+					continue;
+
+				dependencies.append( self._add_product_tree(products, dprod.name) )
+
+		# Construct EUPS version
+		version = self.version_maker.version(productdir, ref, dependencies)
+
+		# Add the result to products, return it for convenience
+		products[productName] = Product(productName, sha1, version, dependencies)
+		return products[productName]
+
+	def prepare(self, productNames):
+		products = dict()
+		for name in productNames:
+			self._add_product_tree(products, name)
+
+		return Manifest.fromProductDict(products)
 
 	@staticmethod
 	def run(args):
+		e = eups.Eups()
+
 		# Ensure build directory exists and is writable
 		build_dir = args.build_dir
 		if not os.access(build_dir, os.W_OK):
@@ -175,46 +270,23 @@ class Preparer(object):
 		if 'master' not in refs:
 			refs.append('master')
 
-		# Load exclusion map
-		exclusions = []
+		# Wire-up the preparer
 		if args.exclusion_map:
 			with open(args.exclusion_map) as fp:
-				for line in fp:
-					line = line.strip()
-					if not line or line.startswith("#"):
-						continue
-					(dep_re, prod_re) = line.split()[:2]
-					exclusions.append((re.compile(dep_re), re.compile(prod_re)))
+				exclusion_resolver = ExclusionResolver.fromFile(fp)
+		else:
+			exclusion_resolver = ExclusionResolver([])
+		product_fetcher = ProductFetcher(build_dir, args.repository_pattern, refs, args.no_fetch)
+		version_maker = VersionMaker(args.sha_abbrev_len)
+		p = BuildDirectoryConstructor(build_dir, e, product_fetcher, version_maker, exclusion_resolver)
 
-		# Prepare products
-		p = Preparer(build_dir, refs, args.repository_pattern, args.sha_abbrev_len, args.no_fetch, exclusions)
-		for product in args.products:
-			p._prepare(product)
+		# Run
+		manifest = p.prepare(args.products)
 
-		# Topologically sort the result, add any products that have no dependencies
-		products = tsort.tsort(p.deps)
-		_p = set(products)
-		for product in set(args.products):
-			if product not in _p:
-				products.append(product)
-
-		# Generate a build ID
 		tags = eups.tags.Tags()
 		tags.loadFromEupsPath(e.path)
-		if args.build_id is None:
-			btre = re.compile('^b[0-9]+$')
-			btags = [ 0 ]
-			btags += [ int(tag[1:]) for tag in tags.getTagNames() if btre.match(tag) ]
-			tag = "b%s" % (max(btags) + 1)
-		else:
-			tag = args.build_id
-		tags.registerTag(tag)
+		manifest.buildID = nextAvailableEupsBuildTag(tags)
+		tags.registerTag(manifest.buildID)
 		tags.saveGlobalTags(e.path[0])
 
-		# Write out the manifest
-		print '# %-23s %-41s %-30s' % ("product", "SHA1", "Version")
-		print 'BUILD=%s' % tag
-		for product in products:
-			(version, sha1, dependencies) = p.versions[product]
-			print '%-25s %-41s %-40s %s' % (product, sha1, version, ','.join(dependencies))
-
+		manifest.toFile(sys.stdout)
