@@ -201,10 +201,13 @@ class Preparer(object):
 		# Generate a build ID
 		tags = eups.tags.Tags()
 		tags.loadFromEupsPath(e.path)
-		btre = re.compile('^b[0-9]+$')
-		btags = [ 0 ]
-		btags += [ int(tag[1:]) for tag in tags.getTagNames() if btre.match(tag) ]
-		tag = "b%s" % (max(btags) + 1)
+		if args.build_id is None:
+			btre = re.compile('^b[0-9]+$')
+			btags = [ 0 ]
+			btags += [ int(tag[1:]) for tag in tags.getTagNames() if btre.match(tag) ]
+			tag = "b%s" % (max(btags) + 1)
+		else:
+			tag = args.build_id
 		tags.registerTag(tag)
 		tags.saveGlobalTags(e.path[0])
 
