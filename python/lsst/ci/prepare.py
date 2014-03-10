@@ -16,14 +16,6 @@ import tsort
 
 from .git import Git, GitError
 
-class VerDB(object):
-	def __init__(self, dbrepo):
-		self.dbrepo = dbrepo
-		self.git = Git(dbrepo)
-
-	def get_version(self):
-		pass
-
 class Product(object):
 	def __init__(self, name, sha1, version, dependencies):
 		self.name = name
@@ -38,10 +30,10 @@ class Manifest(object):
 
 	def toFile(self, fileObject):
 		# Write out the build manifest
-		print '# %-23s %-41s %-30s' % ("product", "SHA1", "Version")
-		print 'BUILD=%s' % self.buildID
+		print >>fileObject, '# %-23s %-41s %-30s' % ("product", "SHA1", "Version")
+		print >>fileObject, 'BUILD=%s' % self.buildID
 		for prod in self.products:
-			print '%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version, ','.join(dep.name for dep in prod.dependencies))
+			print >>fileObject, '%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version, ','.join(dep.name for dep in prod.dependencies))
 
 	@staticmethod
 	def fromFile(fileObject):
@@ -138,31 +130,161 @@ class ProductFetcher(object):
 		return ref, sha1
 
 class VersionMaker(object):
-	def __init__(self, sha_abbrev_len):
-		self.sha_abbrev_len = sha_abbrev_len
-		pass
+	def __init__(self, verdb):
+		self.verdb = verdb
 
-	def _rebuild_suffix(self, dependencies):
-		""" Return a hash of the sorted list of printed (dep_name, dep_version) tuples """
-		m = hashlib.sha1()
-		for dep in sorted(dependencies, lambda a, b: cmp(a.name, b.name)):
-			s = '%s\t%s\n' % (dep.name, dep.version)
-			m.update(s)
-
-		suffix = m.hexdigest()[:self.sha_abbrev_len]
-		return suffix
-
-	def version(self, productdir, ref, dependencies):
+	def version(self, productName, productdir, ref, dependencies):
 		""" Return a standardized XXX+YYY EUPS version, that includes the dependencies. """
 		q = pipes.quote
 		cmd ="cd %s && pkgautoversion %s" % (q(productdir), q(ref))
 		ver = subprocess.check_output(cmd, shell=True).strip()
 
 		if dependencies:
-			deps_sha1 = self._rebuild_suffix(dependencies)
+			deps_sha1 = self.verdb.getSuffix(productName, dependencies)
 			return "%s+%s" % (ver, deps_sha1)
 		else:
 			return ver
+
+class VersionDbHash(object):
+	def __init__(self, sha_abbrev_len):
+		self.sha_abbrev_len = sha_abbrev_len
+
+	def _hash_dependencies(self, dependencies):
+		m = hashlib.sha1()
+		for dep in sorted(dependencies, lambda a, b: cmp(a.name, b.name)):
+			s = '%s\t%s\n' % (dep.name, dep.version)
+			m.update(s)
+
+		return m.hexdigest()
+
+	def getSuffix(self, productName, dependencies):
+		""" Return a hash of the sorted list of printed (dep_name, dep_version) tuples """
+		hash = self._hash_dependencies(dependencies)
+		suffix = hash[:self.sha_abbrev_len]
+		return suffix
+
+	def commit(self, msg):
+		pass
+
+class VersionDbGit(VersionDbHash):
+	class VersionMap(object):
+		def __init__(self):
+			self.hash2suffix = dict()
+			self.suffix2hash = dict()
+
+			self.added_entries = dict()
+
+			self.dirty = False
+
+		def __just_add(self, hash, suffix):
+			assert isinstance(suffix, int)
+
+			self.hash2suffix[hash] = suffix
+			self.suffix2hash[suffix] = hash
+
+		def __add(self, hash, suffix, dependencies):
+			self.__just_add(hash, suffix)
+
+			# Record additions to know what needs to be appended
+			self.added_entries[suffix] = [ (product.name, product.version) for product in dependencies ]
+
+			self.dirty = True
+
+		def suffix(self, hash):
+			return self.hash2suffix[hash]
+
+		def hash(self, suffix):
+			return self.suffix2hash[suffix]
+
+		def new_suffix(self, hash, dependencies):
+			suffix = max(self.suffix2hash.iterkeys()) + 1 if self.suffix2hash else 0
+			self.__add(hash, suffix, dependencies)
+			return suffix
+
+		def appendAdditionsToFile(self, fileObjectVer, fileObjectDep):
+			# write hash<->suffix and dependency table updates
+			for suffix, dependencies in self.added_entries.iteritems():
+				fileObjectVer.write("%s\t%d\n" % (self.hash(suffix), suffix))
+				for name, version in dependencies:
+					fileObjectDep.write("%d\t%s\t%s\n" % (suffix, name, version))
+
+			self.added_entries = []
+			self.dirty = False
+
+		@staticmethod
+		def fromFile(fileObject):
+			vm = VersionDbGit.VersionMap()
+			for line in iter(fileObject.readline, ''):
+				(hash, suffix) = line.strip().split()[:2]
+				vm.__just_add(hash, int(suffix))
+
+			return vm
+
+	def __init__(self, dbdir):
+		super(VersionDbGit, self).__init__(None)
+		self.dbdir = dbdir
+
+		self.versionMaps = dict()
+
+	def __verfn(self, productName):
+		return os.path.join("ver_db", productName + '.txt')
+
+	def __depfn(self, productName):
+		return os.path.join("dep_db", productName + '.txt')
+
+	def getSuffix(self, productName, dependencies):
+		hash = self._hash_dependencies(dependencies)
+
+		# Lazy-load/create
+		try:
+			vm = self.versionMaps[productName]
+		except KeyError:
+			absverfn = os.path.join(self.dbdir, self.__verfn(productName))
+			try:
+				vm = VersionDbGit.VersionMap.fromFile(file(absverfn))
+			except IOError:
+				vm = VersionDbGit.VersionMap()
+			self.versionMaps[productName] = vm
+
+		# get or create a new suffix
+		try:
+			suffix = vm.suffix(hash)
+		except KeyError:
+			suffix = vm.new_suffix(hash, dependencies)
+
+		return suffix
+
+	def commit(self, manifest):
+		git = Git(self.dbdir)
+
+		# Write files
+		dirty = False
+		for (productName, vm) in self.versionMaps.iteritems():
+			if not vm.dirty:
+				continue
+
+			verfn = self.__verfn(productName)
+			depfn = self.__depfn(productName)
+			absverfn = os.path.join(self.dbdir, verfn)
+			absdepfn = os.path.join(self.dbdir, depfn)
+
+			with open(absverfn, 'a') as fpVer:
+				with open(absdepfn, 'a') as fpDep:
+					vm.appendAdditionsToFile(fpVer, fpDep)
+
+			git.add(verfn, depfn)
+			dirty = True
+
+		# Store a copy of the manifest
+		manfn = os.path.join('manifests', "%s.txt" % manifest.buildID)
+		absmanfn = os.path.join(self.dbdir, manfn)
+		with open(absmanfn, 'w') as fp:
+			manifest.toFile(fp)
+		git.add(manfn)
+
+		# git-commit
+		msg = "Updates for build %s." % manifest.buildID
+		git.commit('-m', msg)
 
 class ExclusionResolver(object):
 	def __init__(self, exclusion_patterns):
@@ -199,13 +321,18 @@ class ExclusionResolver(object):
 
 		return ExclusionResolver(exclusion_patterns)
 
-def nextAvailableEupsBuildTag(tags):
+def allocateNextAvailableEupsBuildTag(eupsObj):
 	# Generate a build ID
+	tags = eups.tags.Tags()
+	tags.loadFromEupsPath(eupsObj.path)
 
 	btre = re.compile('^b[0-9]+$')
 	btags = [ 0 ]
 	btags += [ int(tag[1:]) for tag in tags.getTagNames() if btre.match(tag) ]
 	tag = "b%s" % (max(btags) + 1)
+
+	tags.registerTag(tag)
+	tags.saveGlobalTags(eupsObj.path[0])
 
 	return tag
 
@@ -243,13 +370,13 @@ class BuildDirectoryConstructor(object):
 				dependencies.append( self._add_product_tree(products, dprod.name) )
 
 		# Construct EUPS version
-		version = self.version_maker.version(productdir, ref, dependencies)
+		version = self.version_maker.version(productName, productdir, ref, dependencies)
 
 		# Add the result to products, return it for convenience
 		products[productName] = Product(productName, sha1, version, dependencies)
 		return products[productName]
 
-	def prepare(self, productNames):
+	def construct(self, productNames):
 		products = dict()
 		for name in productNames:
 			self._add_product_tree(products, name)
@@ -258,35 +385,44 @@ class BuildDirectoryConstructor(object):
 
 	@staticmethod
 	def run(args):
-		e = eups.Eups()
-
+		#
 		# Ensure build directory exists and is writable
+		#
 		build_dir = args.build_dir
 		if not os.access(build_dir, os.W_OK):
 			raise Exception("Directory '%s' does not exist or isn't writable." % build_dir)
 
+		#
 		# Add 'master' to list of refs, if not there already
+		#
 		refs = args.ref
 		if 'master' not in refs:
 			refs.append('master')
 
-		# Wire-up the preparer
+		#
+		# Wire-up the BuildDirectoryConstructor constructor
+		#
 		if args.exclusion_map:
 			with open(args.exclusion_map) as fp:
 				exclusion_resolver = ExclusionResolver.fromFile(fp)
 		else:
 			exclusion_resolver = ExclusionResolver([])
+
+		if args.version_git_repo:
+			version_db = VersionDbGit(args.version_git_repo)
+		else:
+			version_db = VersionDbHash(args.sha_abbrev_len)
+
 		product_fetcher = ProductFetcher(build_dir, args.repository_pattern, refs, args.no_fetch)
-		version_maker = VersionMaker(args.sha_abbrev_len)
-		p = BuildDirectoryConstructor(build_dir, e, product_fetcher, version_maker, exclusion_resolver)
+		version_maker = VersionMaker(version_db)
+		eupsObj = eups.Eups()
+		p = BuildDirectoryConstructor(build_dir, eupsObj, product_fetcher, version_maker, exclusion_resolver)
 
-		# Run
-		manifest = p.prepare(args.products)
-
-		tags = eups.tags.Tags()
-		tags.loadFromEupsPath(e.path)
-		manifest.buildID = nextAvailableEupsBuildTag(tags)
-		tags.registerTag(manifest.buildID)
-		tags.saveGlobalTags(e.path[0])
+		#
+		# Run the construction
+		#
+		manifest = p.construct(args.products)
+		manifest.buildID = allocateNextAvailableEupsBuildTag(eupsObj)
+		version_db.commit(manifest, )
 
 		manifest.toFile(sys.stdout)

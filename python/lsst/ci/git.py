@@ -58,3 +58,9 @@ class Git:
 
 	def pull(self, *args, **kwargs):
 		return self('pull', *args, **kwargs)
+
+	def commit(self, *args, **kwargs):
+		return self('commit', *args, **kwargs)
+
+	def add(self, *args, **kwargs):
+		return self('add', *args, **kwargs)
