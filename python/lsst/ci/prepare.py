@@ -11,12 +11,14 @@ import re
 import pipes
 import subprocess
 import collections
+import abc
 
 import tsort
 
 from .git import Git, GitError
 
 class Product(object):
+	"""Class representing an EUPS product to be built"""
 	def __init__(self, name, sha1, version, dependencies):
 		self.name = name
 		self.sha1 = sha1
@@ -24,12 +26,25 @@ class Product(object):
 		self.dependencies = dependencies
 
 class Manifest(object):
+	"""A representation of topologically ordered list of EUPS products to be built
+	
+	   :ivar products: topologically sorted list of `Product`s
+	   :ivar buildID:  unique build identifier
+	"""
+
 	def __init__(self, productsList, buildID=None):
+		"""Construct the manifest
+		
+		Args:
+		    productList (list): A topologically sorted list of `Product`s
+		    buildID (str): A unique identifier for this build
+		
+		"""
 		self.buildID = buildID
 		self.products = productsList
 
 	def toFile(self, fileObject):
-		# Write out the build manifest
+		""" Serialize the manifest to a file object """
 		print >>fileObject, '# %-23s %-41s %-30s' % ("product", "SHA1", "Version")
 		print >>fileObject, 'BUILD=%s' % self.buildID
 		for prod in self.products:
@@ -37,11 +52,18 @@ class Manifest(object):
 
 	@staticmethod
 	def fromFile(fileObject):
-		pass;
+		raise NotImplementedError()
 
 	@staticmethod
 	def fromProductDict(productDict):
-		# Topologically sort the list of products
+		""" Create a `Manifest` by topologically sorting the dict of `Product`s 
+		
+		Args:
+		    productDict (dict): A productName -> `Product` dictionary of products
+
+		Returns:
+		    The created `Manifest`.
+		"""
 		deps = [ (dep.name, prod.name) for prod in productDict.itervalues() for dep in prod.dependencies ];
 		topoSortedProductNames = tsort.tsort(deps)
 
@@ -54,6 +76,15 @@ class Manifest(object):
 		return Manifest( [productDict[name] for name in topoSortedProductNames], None)
 
 class ProductFetcher(object):
+	""" Fetches products from remote git repositories and checks out matching refs.
+
+	    See `fetch` for further documentation.
+	    
+	    :ivar build_dir: The product will be cloned to build_dir/productName
+	    :ivar repository_patterns: A list of str.format() patterns used discover the URL of the remote git repository.
+	    :ivar refs: A list of refs to attempt to git-checkout
+	    :ivar no_fetch: If true, don't fetch, just checkout the first matching ref.
+	"""
 	def __init__(self, build_dir, repository_patterns, refs, no_fetch):
 		self.build_dir = os.path.abspath(build_dir)
 		self.refs = refs
@@ -66,7 +97,27 @@ class ProductFetcher(object):
 		return [ pat % data for pat in self.repository_patterns ]
 
 	def fetch(self, product):
-		""" Mirror the product repository into the build directory and extract the appropriate ref """
+		""" Clone the product repository and checkout the first matching ref.
+		
+		Args:
+		    product (str): the product to fetch
+		    
+		Returns:
+		    (ref, sha1) tuple where::
+		    
+		         ref -- the checked out ref (e.g., 'master')
+		         sha1 -- the corresponding commit's SHA1
+
+		If $build_dir/$product does not exist, discovers the product
+		repository by attempting a git clone from the list of URLs
+		constructed by running str.format() with { 'product': product}
+		on self.repository_patterns. Otherwise, intelligently fetches
+		any new commits.
+
+		Next, attempts to check out the refs listed in self.ref,
+		until the first one succeeds.
+
+		"""
 
 		t0 = time.time()
 		sys.stderr.write("%20s: " % product)
@@ -130,11 +181,28 @@ class ProductFetcher(object):
 		return ref, sha1
 
 class VersionMaker(object):
+	""" Construct a full XXX+YYY version for a product.
+	
+	    :ivar verdb: A database of defined versions (a subclass of VersionDb)
+	    
+	    The implementation of VersionDb determines how +YYY will be computed,
+	    while the XXX part is computed by running EUPS' pkgautoversion.
+	"""
 	def __init__(self, verdb):
 		self.verdb = verdb
 
 	def version(self, productName, productdir, ref, dependencies):
-		""" Return a standardized XXX+YYY EUPS version, that includes the dependencies. """
+		""" Return a standardized XXX+YYY EUPS version, that includes the dependencies.
+		
+		    Args:
+		        productName (str): name of the product to version
+		        productdir (str): the directory with product source code
+		        ref (str): the git ref that has been checked out into productdir (e.g., 'master')
+		        dependencies (list): A list of `Product`s that are the immediate dependencies of productName
+
+		    Returns:
+		        str. the XXX+YYY version string.
+		"""
 		q = pipes.quote
 		cmd ="cd %s && pkgautoversion %s" % (q(productdir), q(ref))
 		ver = subprocess.check_output(cmd, shell=True).strip()
@@ -145,7 +213,40 @@ class VersionMaker(object):
 		else:
 			return ver
 
+class VersionDb(object):
+	"""Abstract class for a database mapping the product dependencies to +YYY suffixes"""
+
+	__metaclass__ = abc.ABCMeta
+	
+	@abc.abstractmethod
+	def getSuffix(self, productName, dependencies):
+		"""Return a unique +YYY version suffix for a product given its dependencies
+		
+		    Args:
+		        productName (str): name of the product
+		        dependencies (list): A list of `Product`s that are the immediate dependencies of productName
+		        
+		    Returns:
+		        str. the +YYY suffix (w/o the + sign).
+		"""
+		pass
+		
+	@abc.abstractmethod
+	def commit(self, manifest):
+		"""Commit the changes to the version database
+		
+		   Args:
+		       manifest (`Manifest`): a manifest of products from this run
+		       
+		   A subclass should override this method to commit to
+		   permanent storage any changes to the underlying database
+		   caused by getSuffix() invocations.
+		"""
+		pass
+
 class VersionDbHash(object):
+	"""Subclass of `VersionDb` that generates +YYY suffixes by hashing the dependency names and versions"""
+
 	def __init__(self, sha_abbrev_len):
 		self.sha_abbrev_len = sha_abbrev_len
 
@@ -163,10 +264,14 @@ class VersionDbHash(object):
 		suffix = hash[:self.sha_abbrev_len]
 		return suffix
 
-	def commit(self, msg):
+	def commit(self, manifest):
 		pass
 
 class VersionDbGit(VersionDbHash):
+	"""Subclass of `VersionDb` that generates +YYY suffixes by assigning a unique +N integer to
+	   each set of dependencies, and tracking the assignments in a git repository.	
+	"""
+
 	class VersionMap(object):
 		def __init__(self):
 			self.hash2suffix = dict()
@@ -287,6 +392,10 @@ class VersionDbGit(VersionDbHash):
 		git.commit('-m', msg)
 
 class ExclusionResolver(object):
+	"""A class to determine whether a dependency should be excluded from
+	   build for a product, based on matching against a list of regular
+	   expression rules.
+	"""
 	def __init__(self, exclusion_patterns):
 		self.exclusions = [
 			(re.compile(dep_re), re.compile(prod_re)) for (dep_re, prod_re) in exclusion_patterns
@@ -322,7 +431,8 @@ class ExclusionResolver(object):
 		return ExclusionResolver(exclusion_patterns)
 
 def allocateNextAvailableEupsBuildTag(eupsObj):
-	# Generate a build ID
+	"""Allocate the next unused EUPS tag that matches the bNNNN pattern"""
+
 	tags = eups.tags.Tags()
 	tags.loadFromEupsPath(eupsObj.path)
 
@@ -337,6 +447,9 @@ def allocateNextAvailableEupsBuildTag(eupsObj):
 	return tag
 
 class BuildDirectoryConstructor(object):
+	"""A class that, given one or more top level packages, recursively
+	clones them to a build directory thus preparing them to be built."""
+	
 	def __init__(self, build_dir, eups, product_fetcher, version_maker, exclusion_resolver):
 		self.build_dir = os.path.abspath(build_dir)
 
