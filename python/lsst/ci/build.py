@@ -23,14 +23,64 @@ def declareEupsTag(tag, eupsObj):
 		tags.registerTag(tag)
 		tags.saveGlobalTags(e.path[0])
 
+class ProgressReporter(object):
+	# progress reporter: display the version string as progress bar, character by character
+	def __init__(self, outFileObj):
+		self.out = outFileObj
+
+	def buildStarted(self, product):
+		self.product = product
+
+		self.out.write('%20s: ' % self.product.name)
+		self.progress_bar = self.product.version + " "
+		self.t0 = self.t = time.time()
+
+	def reportProgress(self, product):
+		# throttled progress reporting
+		#
+		# Write out the version string as a progress bar, character by character, and
+		# then continue with dots.
+		#
+		# Throttle updates to one character every 2 seconds
+		t1 = time.time()
+		while self.t <= t1:
+			if self.progress_bar:
+				self.out.write(self.progress_bar[0])
+				self.progress_bar = self.progress_bar[1:]
+			else:
+				self.out.write('.')
+
+			self.out.flush()
+			self.t += 2
+
+	def buildFinished(self, product, retcode, logfile):
+		# Make sure we write out the full version string, even if the build ended quickly
+		if self.progress_bar:
+			self.out.write(self.progress_bar)
+
+		elapsedTime = time.time() - self.t0
+		if retcode:
+			print >>self.out, "ERROR (%d sec)." % elapsedTime
+			print >>self.out, "*** error building product %s." % self.product.name
+			print >>self.out, "*** exit code = %d" % retcode
+			print >>self.out, "*** log is in %s" % logfile
+			print >>self.out, "*** last few lines:"
+
+			os.system("tail -n 10 %s | sed -e 's/^/:::::  /'" % pipes.quote(logfile))
+		else:
+			print >>self.out, "ok (%.1f sec)." % elapsedTime
+			
+		self.product = None
+
 class Builder(object):
 	"""Class that builds and installs all products in a manifest.
 	
 	   The result is tagged with the `Manifest`s build ID, if any.
 	"""
-	def __init__(self, build_dir, manifest, eups):
+	def __init__(self, build_dir, manifest, progress, eups):
 		self.build_dir = build_dir
 		self.manifest = manifest
+		self.progress = progress
 		self.eups = eups
 
 	def _tag_product(self, name, version, tag):
@@ -104,49 +154,26 @@ class Builder(object):
 		os.chmod(buildscript, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 		# Run the build script
-		sys.stderr.write('%20s: ' % product.name)
-		progress_bar = product.version + " "	# cute attack: display the version string as progress bar, character by character
+		self.progress.buildStarted(product)
+
 		with open(logfile, 'w') as logfp:
 			# execute the build file from the product directory, capturing the output and return code
-			t0 = t = time.time()
 			process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir)
 			for line in iter(process.stdout.readline, ''):
 				logfp.write(line)
-				
-				# throttle progress reporting
-				t1 = time.time()
-				while t <= t1:
-					if progress_bar:
-						sys.stderr.write(progress_bar[0])
-						progress_bar = progress_bar[1:]
-					else:
-						sys.stderr.write('.')
-					t += 2
-		if progress_bar:
-			sys.stderr.write(progress_bar)
+				self.progress.reportProgress(product)
 
 		retcode = process.poll()
-		if retcode:
-			print >>sys.stderr, "ERROR (%d sec)." % (time.time() - t0)
-			print >>sys.stderr, "*** error building product %s." % product.name
-			print >>sys.stderr, "*** exit code = %d" % retcode
-			print >>sys.stderr, "*** log is in %s" % logfile
-			print >>sys.stderr, "*** last few lines:"
-
-			os.system("tail -n 10 %s | sed -e 's/^/:::::  /'" % pipes.quote(logfile))
-
-			return False
-		else:
+		if not retcode:
 			# copy the log file to product directory
-			
 			productDir = self.eups.getProduct(product.name, product.version).dir
 			shutil.copy2(logfile, productDir)
 
 			self._tag_product(product.name, product.version, self.manifest.buildID)
 
-			print >>sys.stderr, "ok (%.1f sec)." % (time.time() - t0)
+		self.progress.buildFinished(product, retcode, logfile)
 
-		return True
+		return retcode == 0
 
 	def _build_product_if_needed(self, product):
 		# test if the product is already installed, skip build if so.
@@ -181,9 +208,11 @@ class Builder(object):
 		# Build products
 		eupsObj = eups.Eups()
 
+		progress = ProgressReporter(sys.stderr)
+
 		manifestFn = os.path.join(build_dir, 'manifest.txt')
 		with open(manifestFn) as fp:
 			manifest = Manifest.fromFile(fp)
 
-		b = Builder(build_dir, manifest, eupsObj)
+		b = Builder(build_dir, manifest, progress, eupsObj)
 		b.build()
