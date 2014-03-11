@@ -11,82 +11,33 @@ import time
 import eups, eups.tags
 import re
 
-Product = collections.namedtuple('Product', ['name', 'sha1', 'version', 'dependencies'])
+from .prepare import Product, Manifest
 
-e = eups.Eups()
+def declareEupsTag(tag, eupsObj):
+	""" Declare a new EUPS tag
+	    FIXME: Not sure if this is the right way to programmatically
+	           define and persist a new tag. Ask RHL.
+	"""
+	tags = eupsObj.tags
+	if tag not in tags.getTagNames():
+		tags.registerTag(tag)
+		tags.saveGlobalTags(e.path[0])
 
 class Builder(object):
-	def __init__(self, build_dir, manifest):
-		# Parse the manifest
-		# FIXME: the constructor should taka a _parsed_ manifest
-		
+	"""Class that builds and installs all products in a manifest.
+	
+	   The result is tagged with the `Manifest`s build ID, if any.
+	"""
+	def __init__(self, build_dir, manifest, eups):
 		self.build_dir = build_dir
-		self.BUILD = None
-
-		self.products = collections.OrderedDict()
-		with open(manifest) as fp:
-			varre = re.compile('^(\w+)=(.*)$')
-			for line in fp:
-				line = line.strip()
-				if not line:
-					continue
-				if line.startswith('#'):
-					continue
-
-				# Look for variable assignments
-				m = varre.match(line)
-				if m:
-					setattr(self, m.group(1), m.group(2))
-					continue
-
-				arr = line.split()
-				if len(arr) == 4:
-					(name, sha1, version, deps) = arr
-					deps = deps.split(',')
-				else:
-					(name, sha1, version) = arr
-					deps = []
-
-				self.products[name] = Product(name, sha1, version, deps)
-
-	def build_all(self):
-		# Make sure EUPS knows about the BUILD tag
-		if self.BUILD:
-			global e
-			tags = eups.tags.Tags()
-			tags.loadFromEupsPath(e.path)
-			if self.BUILD not in tags.getTagNames():
-				tags.registerTag(self.BUILD)
-				tags.saveGlobalTags(e.path[0])
-				e = eups.Eups()			# reload new tags
-
-		# Build all products
-		for name in self.products:
-			if not self._build(name):
-				return False
-
-	def _flatten_dependencies(self, product, res=set()):
-		res.update(product.dependencies)
-		for dep in product.dependencies:
-			self._flatten_dependencies(self.products[dep], res)
-		return res
+		self.manifest = manifest
+		self.eups = eups
 
 	def _tag_product(self, name, version, tag):
 		if tag:
-			e.declare(name, version, tag=tag)
+			self.eups.declare(name, version, tag=tag)
 
-	def _build(self, name):
-		product = self.products[name]
-
-		# test if the product is already installed, skip build if so.
-		try:
-			e.getProduct(product.name, product.version)
-			sys.stderr.write('%20s: %s (already installed).\n' % (product.name, product.version))
-			self._tag_product(product.name, product.version, self.BUILD)
-			return True
-		except eups.ProductNotFound:
-			pass
-
+	def _build_product(self, product):
 		# run the eupspkg sequence for the product
 		productdir = os.path.abspath(os.path.join(self.build_dir, product.name))
 		buildscript = os.path.join(productdir, '_build.sh')
@@ -94,8 +45,8 @@ class Builder(object):
 
 		# construct the tags file with exact dependencies
 		setups = [ 
-			"\t%(name)-20s %(version)s" % self.products[dep]._asdict()
-				for dep in self._flatten_dependencies(product)
+			"\t%-20s %s" % (dep.name, dep.version)
+				for dep in product.flat_dependencies()
 		]
 
 		# create the buildscript
@@ -153,13 +104,13 @@ class Builder(object):
 		os.chmod(buildscript, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 		# Run the build script
-		sys.stderr.write('%20s: ' % name)
+		sys.stderr.write('%20s: ' % product.name)
 		progress_bar = product.version + " "	# cute attack: display the version string as progress bar, character by character
 		with open(logfile, 'w') as logfp:
 			# execute the build file from the product directory, capturing the output and return code
 			t0 = t = time.time()
 			process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir)
-			for line in iter(process.stdout.readline,''):
+			for line in iter(process.stdout.readline, ''):
 				logfp.write(line)
 				
 				# throttle progress reporting
@@ -188,14 +139,37 @@ class Builder(object):
 		else:
 			# copy the log file to product directory
 			
-			productDir = e.getProduct(product.name, product.version).dir
+			productDir = self.eups.getProduct(product.name, product.version).dir
 			shutil.copy2(logfile, productDir)
 
-			self._tag_product(product.name, product.version, self.BUILD)
+			self._tag_product(product.name, product.version, self.manifest.buildID)
 
 			print >>sys.stderr, "ok (%.1f sec)." % (time.time() - t0)
 
 		return True
+
+	def _build_product_if_needed(self, product):
+		# test if the product is already installed, skip build if so.
+		try:
+			self.eups.getProduct(product.name, product.version)
+			sys.stderr.write('%20s: %s (already installed).\n' % (product.name, product.version))
+			self._tag_product(product.name, product.version, self.manifest.buildID)
+
+			return True
+		except eups.ProductNotFound:
+			pass
+
+		return self._build_product(product)
+
+	def build(self):
+		# Make sure EUPS knows about the buildID tag
+		if self.manifest.buildID:
+			declareEupsTag(self.manifest.buildID, self.eups)
+
+		# Build all products
+		for product in self.manifest.products.itervalues():
+			if not self._build_product_if_needed(product):
+				return False
 
 	@staticmethod
 	def run(args):
@@ -205,6 +179,11 @@ class Builder(object):
 			raise Exception("Directory '%s' does not exist or isn't writable." % build_dir)
 
 		# Build products
+		eupsObj = eups.Eups()
+
 		manifestFn = os.path.join(build_dir, 'manifest.txt')
-		b = Builder(build_dir, manifestFn)
-		b.build_all()
+		with open(manifestFn) as fp:
+			manifest = Manifest.fromFile(fp)
+
+		b = Builder(build_dir, manifest, eupsObj)
+		b.build()

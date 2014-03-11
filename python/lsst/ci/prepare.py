@@ -25,6 +25,19 @@ class Product(object):
 		self.version = version
 		self.dependencies = dependencies
 
+	def flat_dependencies(self):
+		"""Return a flat list of dependencies for the product.
+		
+		    Returns:
+		        list of `Product`s.
+		"""
+		res = set(self.dependencies)
+
+		for dep in self.dependencies:
+			res.update(dep.flat_dependencies())
+
+		return res
+
 class Manifest(object):
 	"""A representation of topologically ordered list of EUPS products to be built
 	
@@ -36,7 +49,7 @@ class Manifest(object):
 		"""Construct the manifest
 		
 		Args:
-		    productList (list): A topologically sorted list of `Product`s
+		    productList (OrderedDict): A topologically sorted dict of `Product`s
 		    buildID (str): A unique identifier for this build
 		
 		"""
@@ -47,12 +60,42 @@ class Manifest(object):
 		""" Serialize the manifest to a file object """
 		print >>fileObject, '# %-23s %-41s %-30s' % ("product", "SHA1", "Version")
 		print >>fileObject, 'BUILD=%s' % self.buildID
-		for prod in self.products:
+		for prod in self.products.itervalues():
 			print >>fileObject, '%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version, ','.join(dep.name for dep in prod.dependencies))
 
 	@staticmethod
 	def fromFile(fileObject):
-		raise NotImplementedError()
+		varre = re.compile('^(\w+)=(.*)$')
+
+		products = collections.OrderedDict()
+		buildId = None
+		for line in fileObject:
+			line = line.strip()
+			if not line:
+				continue
+			if line.startswith('#'):
+				continue
+
+			# Look for variable assignments
+			m = varre.match(line)
+			if m:
+				varName = m.group(1)
+				varValue = m.group(2)
+				if varName == "BUILD":
+					buildId = varValue
+				continue
+
+			arr = line.split()
+			if len(arr) == 4:
+				(name, sha1, version, deps) = arr
+				deps = [ products[dep_name] for dep_name in deps.split(',') ]
+			else:
+				(name, sha1, version) = arr
+				deps = []
+
+			products[name] = Product(name, sha1, version, deps)
+
+		return Manifest(products, buildId)
 
 	@staticmethod
 	def fromProductDict(productDict):
@@ -73,7 +116,10 @@ class Manifest(object):
 			if name not in _p:
 				topoSortedProductNames.append(name)
 
-		return Manifest( [productDict[name] for name in topoSortedProductNames], None)
+		products = collections.OrderedDict()
+		for name in topoSortedProductNames:
+			products[name] = productDict[name]
+		return Manifest(products, None)
 
 class ProductFetcher(object):
 	""" Fetches products from remote git repositories and checks out matching refs.
