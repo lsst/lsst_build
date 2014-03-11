@@ -1,0 +1,12 @@
+lsst-build, a builder and continuous integration tool for LSST
+==============================================================
+
+Provides the following capabilities:
+
+  * Given one or more top-level packages, intelligently clone their git
+    repositores and check out the requested branches into a build directory
+
+  * Given that build directory, and an EUPS stack, intelligently build and
+    install those packages.
+
+See doc/rebuild.sh in the absence of more detailed documentation.
