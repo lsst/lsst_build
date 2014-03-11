@@ -557,7 +557,7 @@ class BuildDirectoryConstructor(object):
 		# Run the construction
 		#
 		manifest = p.construct(args.products)
-		manifest.buildID = version_db.getBuildId()
+		manifest.buildID = version_db.getBuildId() if not args.build_id else args.build_id
 		version_db.commit(manifest)
 
 		#
