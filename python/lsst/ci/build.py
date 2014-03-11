@@ -10,6 +10,7 @@ import pipes
 import time
 import eups, eups.tags
 import re
+import contextlib
 
 from .prepare import Product, Manifest
 
@@ -25,52 +26,72 @@ def declareEupsTag(tag, eupsObj):
 
 class ProgressReporter(object):
 	# progress reporter: display the version string as progress bar, character by character
+
+	class ProductProgressReporter(object):
+		def __init__(self, outFileObj, product):
+			self.out = outFileObj
+			self.product = product
+
+		def _buildStarted(self):
+			self.out.write('%20s: ' % self.product.name)
+			self.progress_bar = self.product.version + " "
+			self.t0 = self.t = time.time()
+
+		def reportProgress(self):
+			# throttled progress reporting
+			#
+			# Write out the version string as a progress bar, character by character, and
+			# then continue with dots.
+			#
+			# Throttle updates to one character every 2 seconds
+			t1 = time.time()
+			while self.t <= t1:
+				if self.progress_bar:
+					self.out.write(self.progress_bar[0])
+					self.progress_bar = self.progress_bar[1:]
+				else:
+					self.out.write('.')
+
+				self.out.flush()
+				self.t += 2
+
+		def reportResult(self, retcode, logfile):
+			# Make sure we write out the full version string, even if the build ended quickly
+			if self.progress_bar:
+				self.out.write(self.progress_bar)
+
+			# If logfile is None, the product was already installed
+			if logfile is None:
+				sys.stderr.write('(already installed).\n')
+			else:
+				elapsedTime = time.time() - self.t0
+				if retcode:
+					print >>self.out, "ERROR (%d sec)." % elapsedTime
+					print >>self.out, "*** error building product %s." % self.product.name
+					print >>self.out, "*** exit code = %d" % retcode
+					print >>self.out, "*** log is in %s" % logfile
+					print >>self.out, "*** last few lines:"
+
+					os.system("tail -n 10 %s | sed -e 's/^/:::::  /'" % pipes.quote(logfile))
+				else:
+					print >>self.out, "ok (%.1f sec)." % elapsedTime
+
+			self.product = None
+
+		def _finalize(self):
+			# Usually called only when an exception is thrown
+			if self.product is not None:
+				self.out.write("\n")
+
 	def __init__(self, outFileObj):
 		self.out = outFileObj
 
-	def buildStarted(self, product):
-		self.product = product
-
-		self.out.write('%20s: ' % self.product.name)
-		self.progress_bar = self.product.version + " "
-		self.t0 = self.t = time.time()
-
-	def reportProgress(self, product):
-		# throttled progress reporting
-		#
-		# Write out the version string as a progress bar, character by character, and
-		# then continue with dots.
-		#
-		# Throttle updates to one character every 2 seconds
-		t1 = time.time()
-		while self.t <= t1:
-			if self.progress_bar:
-				self.out.write(self.progress_bar[0])
-				self.progress_bar = self.progress_bar[1:]
-			else:
-				self.out.write('.')
-
-			self.out.flush()
-			self.t += 2
-
-	def buildFinished(self, product, retcode, logfile):
-		# Make sure we write out the full version string, even if the build ended quickly
-		if self.progress_bar:
-			self.out.write(self.progress_bar)
-
-		elapsedTime = time.time() - self.t0
-		if retcode:
-			print >>self.out, "ERROR (%d sec)." % elapsedTime
-			print >>self.out, "*** error building product %s." % self.product.name
-			print >>self.out, "*** exit code = %d" % retcode
-			print >>self.out, "*** log is in %s" % logfile
-			print >>self.out, "*** last few lines:"
-
-			os.system("tail -n 10 %s | sed -e 's/^/:::::  /'" % pipes.quote(logfile))
-		else:
-			print >>self.out, "ok (%.1f sec)." % elapsedTime
-			
-		self.product = None
+	@contextlib.contextmanager
+	def newBuild(self, product):
+		progress = ProgressReporter.ProductProgressReporter(self.out, product)
+		progress._buildStarted()
+		yield progress
+		progress._finalize()
 
 class Builder(object):
 	"""Class that builds and installs all products in a manifest.
@@ -87,8 +108,9 @@ class Builder(object):
 		if tag:
 			self.eups.declare(name, version, tag=tag)
 
-	def _build_product(self, product):
+	def _build_product(self, product, progress):
 		# run the eupspkg sequence for the product
+		#
 		productdir = os.path.abspath(os.path.join(self.build_dir, product.name))
 		buildscript = os.path.join(productdir, '_build.sh')
 		logfile = os.path.join(productdir, '_build.log')
@@ -154,14 +176,12 @@ class Builder(object):
 		os.chmod(buildscript, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 		# Run the build script
-		self.progress.buildStarted(product)
-
 		with open(logfile, 'w') as logfp:
 			# execute the build file from the product directory, capturing the output and return code
 			process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir)
 			for line in iter(process.stdout.readline, ''):
 				logfp.write(line)
-				self.progress.reportProgress(product)
+				progress.reportProgress()
 
 		retcode = process.poll()
 		if not retcode:
@@ -171,22 +191,24 @@ class Builder(object):
 
 			self._tag_product(product.name, product.version, self.manifest.buildID)
 
-		self.progress.buildFinished(product, retcode, logfile)
-
-		return retcode == 0
+		return (retcode, logfile)
 
 	def _build_product_if_needed(self, product):
-		# test if the product is already installed, skip build if so.
-		try:
-			self.eups.getProduct(product.name, product.version)
-			sys.stderr.write('%20s: %s (already installed).\n' % (product.name, product.version))
-			self._tag_product(product.name, product.version, self.manifest.buildID)
+		# Build a product if it hasn't been installed already
+		#
+		with self.progress.newBuild(product) as progress:
+			try:
+				# skip the build if the product has been installed
+				self.eups.getProduct(product.name, product.version)
+				self._tag_product(product.name, product.version, self.manifest.buildID)
 
-			return True
-		except eups.ProductNotFound:
-			pass
+				retcode, logfile = 0, None
+			except eups.ProductNotFound:
+				retcode, logfile = self._build_product(product, progress)
 
-		return self._build_product(product)
+			progress.reportResult(retcode, logfile)
+
+		return retcode == 0
 
 	def build(self):
 		# Make sure EUPS knows about the buildID tag
