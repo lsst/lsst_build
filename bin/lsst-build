@@ -3,20 +3,16 @@
 # lsst-build [build|prepare] <build_directory> [ref]
 #
 
-#export REPOSITORY_PATTERN="git://git.lsstcorp.org/LSST/DMS/%(product)s.git|git://git.lsstcorp.org/LSST/DMS/devenv/%(product)s.git|git://git.lsstcorp.org/personal/mjuric/eupspkg/external/%(product)s"
-#export PRODUCTS="base"
-#./bin/lsst-build prepare build $PRODUCTS
-
 import argparse, os
 
 from lsst.ci.prepare import BuildDirectoryConstructor
 from lsst.ci.build import Builder
 
 parser = argparse.ArgumentParser(description='Build LSST Software Stack from git source',
-	formatter_class=argparse.RawDescriptionHelpFormatter,
-	epilog="""Examples:
-	lsst-build prepare <build_directory> [ref1 [ref2 [...]]]
-	lsst-build build <build_directory>
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    epilog="""Examples:
+    lsst-build prepare <build_directory> [ref1 [ref2 [...]]]
+    lsst-build build <build_directory>
 .
 """)
 subparsers = parser.add_subparsers()
