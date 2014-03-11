@@ -22,7 +22,7 @@ def declareEupsTag(tag, eupsObj):
 	tags = eupsObj.tags
 	if tag not in tags.getTagNames():
 		tags.registerTag(tag)
-		tags.saveGlobalTags(e.path[0])
+		tags.saveGlobalTags(eupsObj.path[0])
 
 class ProgressReporter(object):
 	# progress reporter: display the version string as progress bar, character by character
