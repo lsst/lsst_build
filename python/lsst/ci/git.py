@@ -64,3 +64,6 @@ class Git:
 
 	def add(self, *args, **kwargs):
 		return self('add', *args, **kwargs)
+
+	def tag(self, *args, **kwargs):
+		return self('tag', *args, **kwargs)

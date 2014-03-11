@@ -230,7 +230,12 @@ class VersionDb(object):
 		        str. the +YYY suffix (w/o the + sign).
 		"""
 		pass
-		
+
+	@abc.abstractmethod
+	def getBuildId(self):
+		"""Return a unique build ID identifying this build"""
+		pass
+
 	@abc.abstractmethod
 	def commit(self, manifest):
 		"""Commit the changes to the version database
@@ -247,8 +252,9 @@ class VersionDb(object):
 class VersionDbHash(object):
 	"""Subclass of `VersionDb` that generates +YYY suffixes by hashing the dependency names and versions"""
 
-	def __init__(self, sha_abbrev_len):
+	def __init__(self, sha_abbrev_len, eups):
 		self.sha_abbrev_len = sha_abbrev_len
+		self.eups = eups
 
 	def _hash_dependencies(self, dependencies):
 		m = hashlib.sha1()
@@ -263,6 +269,19 @@ class VersionDbHash(object):
 		hash = self._hash_dependencies(dependencies)
 		suffix = hash[:self.sha_abbrev_len]
 		return suffix
+
+	def getBuildId(self):
+		"""Allocate the next unused EUPS tag that matches the bNNNN pattern"""
+
+		tags = eups.tags.Tags()
+		tags.loadFromEupsPath(self.eups.path)
+
+		btre = re.compile('^b[0-9]+$')
+		btags = [ 0 ]
+		btags += [ int(tag[1:]) for tag in tags.getTagNames() if btre.match(tag) ]
+		tag = "b%s" % (max(btags) + 1)
+
+		return tag
 
 	def commit(self, manifest):
 		pass
@@ -326,7 +345,7 @@ class VersionDbGit(VersionDbHash):
 			return vm
 
 	def __init__(self, dbdir):
-		super(VersionDbGit, self).__init__(None)
+		super(VersionDbGit, self).__init__(None, None)
 		self.dbdir = dbdir
 
 		self.versionMaps = dict()
@@ -359,6 +378,19 @@ class VersionDbGit(VersionDbHash):
 
 		return suffix
 
+	def getBuildId(self):
+		"""Find the next unused git tag that matches the bNNNN pattern"""
+		git = Git(self.dbdir)
+
+		tags = git.tag('-l', 'b[0-9]*').split()
+
+		btre = re.compile('^b[0-9]+$')
+		btags = [ 0 ]
+		btags += [ int(tag[1:]) for tag in tags if btre.match(tag) ]
+		tag = "b%s" % (max(btags) + 1)
+
+		return tag
+
 	def commit(self, manifest):
 		git = Git(self.dbdir)
 
@@ -390,6 +422,10 @@ class VersionDbGit(VersionDbHash):
 		# git-commit
 		msg = "Updates for build %s." % manifest.buildID
 		git.commit('-m', msg)
+
+		# git-tag
+		msg = "Build ID %s" % manifest.buildID
+		git.tag('-a', '-m', msg, manifest.buildID)
 
 class ExclusionResolver(object):
 	"""A class to determine whether a dependency should be excluded from
@@ -430,21 +466,6 @@ class ExclusionResolver(object):
 
 		return ExclusionResolver(exclusion_patterns)
 
-def allocateNextAvailableEupsBuildTag(eupsObj):
-	"""Allocate the next unused EUPS tag that matches the bNNNN pattern"""
-
-	tags = eups.tags.Tags()
-	tags.loadFromEupsPath(eupsObj.path)
-
-	btre = re.compile('^b[0-9]+$')
-	btags = [ 0 ]
-	btags += [ int(tag[1:]) for tag in tags.getTagNames() if btre.match(tag) ]
-	tag = "b%s" % (max(btags) + 1)
-
-	tags.registerTag(tag)
-	tags.saveGlobalTags(eupsObj.path[0])
-
-	return tag
 
 class BuildDirectoryConstructor(object):
 	"""A class that, given one or more top level packages, recursively
@@ -515,6 +536,8 @@ class BuildDirectoryConstructor(object):
 		#
 		# Wire-up the BuildDirectoryConstructor constructor
 		#
+		eupsObj = eups.Eups()
+
 		if args.exclusion_map:
 			with open(args.exclusion_map) as fp:
 				exclusion_resolver = ExclusionResolver.fromFile(fp)
@@ -524,18 +547,17 @@ class BuildDirectoryConstructor(object):
 		if args.version_git_repo:
 			version_db = VersionDbGit(args.version_git_repo)
 		else:
-			version_db = VersionDbHash(args.sha_abbrev_len)
+			version_db = VersionDbHash(args.sha_abbrev_len, eupsObj)
 
 		product_fetcher = ProductFetcher(build_dir, args.repository_pattern, refs, args.no_fetch)
 		version_maker = VersionMaker(version_db)
-		eupsObj = eups.Eups()
 		p = BuildDirectoryConstructor(build_dir, eupsObj, product_fetcher, version_maker, exclusion_resolver)
 
 		#
 		# Run the construction
 		#
 		manifest = p.construct(args.products)
-		manifest.buildID = allocateNextAvailableEupsBuildTag(eupsObj)
+		manifest.buildID = version_db.getBuildId()
 		version_db.commit(manifest)
 
 		#
