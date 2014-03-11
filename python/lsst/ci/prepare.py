@@ -180,41 +180,12 @@ class ProductFetcher(object):
 		print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
 		return ref, sha1
 
-class VersionMaker(object):
+class VersionDb(object):
 	""" Construct a full XXX+YYY version for a product.
 	
-	    :ivar verdb: A database of defined versions (a subclass of VersionDb)
-	    
-	    The implementation of VersionDb determines how +YYY will be computed,
-	    while the XXX part is computed by running EUPS' pkgautoversion.
+	    The subclasses of VersionDb determine how +YYY will be computed.
+	    The XXX part is computed by running EUPS' pkgautoversion.
 	"""
-	def __init__(self, verdb):
-		self.verdb = verdb
-
-	def version(self, productName, productdir, ref, dependencies):
-		""" Return a standardized XXX+YYY EUPS version, that includes the dependencies.
-		
-		    Args:
-		        productName (str): name of the product to version
-		        productdir (str): the directory with product source code
-		        ref (str): the git ref that has been checked out into productdir (e.g., 'master')
-		        dependencies (list): A list of `Product`s that are the immediate dependencies of productName
-
-		    Returns:
-		        str. the XXX+YYY version string.
-		"""
-		q = pipes.quote
-		cmd ="cd %s && pkgautoversion %s" % (q(productdir), q(ref))
-		ver = subprocess.check_output(cmd, shell=True).strip()
-
-		if dependencies:
-			deps_sha1 = self.verdb.getSuffix(productName, dependencies)
-			return "%s+%s" % (ver, deps_sha1)
-		else:
-			return ver
-
-class VersionDb(object):
-	"""Abstract class for a database mapping the product dependencies to +YYY suffixes"""
 
 	__metaclass__ = abc.ABCMeta
 	
@@ -249,7 +220,30 @@ class VersionDb(object):
 		"""
 		pass
 
-class VersionDbHash(object):
+	def version(self, productName, productdir, ref, dependencies):
+		""" Return a standardized XXX+YYY EUPS version, that includes the dependencies.
+		
+		    Args:
+		        productName (str): name of the product to version
+		        productdir (str): the directory with product source code
+		        ref (str): the git ref that has been checked out into productdir (e.g., 'master')
+		        dependencies (list): A list of `Product`s that are the immediate dependencies of productName
+
+		    Returns:
+		        str. the XXX+YYY version string.
+		"""
+		q = pipes.quote
+		cmd ="cd %s && pkgautoversion %s" % (q(productdir), q(ref))
+		ver = subprocess.check_output(cmd, shell=True).strip()
+
+		if dependencies:
+			deps_sha1 = self.getSuffix(productName, dependencies)
+			return "%s+%s" % (ver, deps_sha1)
+		else:
+			return ver
+
+
+class VersionDbHash(VersionDb):
 	"""Subclass of `VersionDb` that generates +YYY suffixes by hashing the dependency names and versions"""
 
 	def __init__(self, sha_abbrev_len, eups):
@@ -471,12 +465,12 @@ class BuildDirectoryConstructor(object):
 	"""A class that, given one or more top level packages, recursively
 	clones them to a build directory thus preparing them to be built."""
 	
-	def __init__(self, build_dir, eups, product_fetcher, version_maker, exclusion_resolver):
+	def __init__(self, build_dir, eups, product_fetcher, version_db, exclusion_resolver):
 		self.build_dir = os.path.abspath(build_dir)
 
 		self.eups = eups
 		self.product_fetcher = product_fetcher
-		self.version_maker = version_maker
+		self.version_db = version_db
 		self.exclusion_resolver = exclusion_resolver
 
 	def _add_product_tree(self, products, productName):
@@ -504,7 +498,7 @@ class BuildDirectoryConstructor(object):
 				dependencies.append( self._add_product_tree(products, dprod.name) )
 
 		# Construct EUPS version
-		version = self.version_maker.version(productName, productdir, ref, dependencies)
+		version = self.version_db.version(productName, productdir, ref, dependencies)
 
 		# Add the result to products, return it for convenience
 		products[productName] = Product(productName, sha1, version, dependencies)
@@ -550,8 +544,7 @@ class BuildDirectoryConstructor(object):
 			version_db = VersionDbHash(args.sha_abbrev_len, eupsObj)
 
 		product_fetcher = ProductFetcher(build_dir, args.repository_pattern, refs, args.no_fetch)
-		version_maker = VersionMaker(version_db)
-		p = BuildDirectoryConstructor(build_dir, eupsObj, product_fetcher, version_maker, exclusion_resolver)
+		p = BuildDirectoryConstructor(build_dir, eupsObj, product_fetcher, version_db, exclusion_resolver)
 
 		#
 		# Run the construction
