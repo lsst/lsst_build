@@ -37,8 +37,7 @@ parser_prepare.add_argument('--version-git-repo', type=str, help="Working direct
 # Parser for the 'build' command
 parser_prepare = subparsers.add_parser('build', help='Build the source tree given the manifest')
 parser_prepare.set_defaults(func=Builder.run)
-parser_prepare.add_argument('build_dir', type=str, help='Build directory')
-parser_prepare.add_argument('manifest', type=str, help='Manifest of products to build')
+parser_prepare.add_argument('build_dir', type=str, help="Build directory with manifest.txt built by the `prepare' subcommand")
 
 args = parser.parse_args()
 

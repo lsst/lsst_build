@@ -536,6 +536,11 @@ class BuildDirectoryConstructor(object):
 		#
 		manifest = p.construct(args.products)
 		manifest.buildID = allocateNextAvailableEupsBuildTag(eupsObj)
-		version_db.commit(manifest, )
+		version_db.commit(manifest)
 
-		manifest.toFile(sys.stdout)
+		#
+		# Store the result in build_dir/manifest.txt
+		#
+		manifestFn = os.path.join(build_dir, 'manifest.txt')
+		with open(manifestFn, 'w') as fp:
+			manifest.toFile(fp)

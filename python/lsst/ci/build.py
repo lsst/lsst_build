@@ -205,8 +205,6 @@ class Builder(object):
 			raise Exception("Directory '%s' does not exist or isn't writable." % build_dir)
 
 		# Build products
-		b = Builder(build_dir, args.manifest)
+		manifestFn = os.path.join(build_dir, 'manifest.txt')
+		b = Builder(build_dir, manifestFn)
 		b.build_all()
-
-	pass
-
