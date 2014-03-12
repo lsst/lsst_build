@@ -186,12 +186,12 @@ class Builder(object):
         retcode = process.poll()
         if not retcode:
             # copy the log file to product directory
-            productDir = self.eups.getProduct(product.name, product.version).dir
-            shutil.copy2(logfile, productDir)
+            eupsProd = self.eups.getProduct(product.name, product.version)
+            shutil.copy2(logfile, eupsProd.dir)
+        else:
+            eupsProd = None
 
-            self._tag_product(product.name, product.version, self.manifest.buildID)
-
-        return (retcode, logfile)
+        return (eupsProd, retcode, logfile)
 
     def _build_product_if_needed(self, product):
         # Build a product if it hasn't been installed already
@@ -199,12 +199,12 @@ class Builder(object):
         with self.progress.newBuild(product) as progress:
             try:
                 # skip the build if the product has been installed
-                self.eups.getProduct(product.name, product.version)
-                self._tag_product(product.name, product.version, self.manifest.buildID)
-
-                retcode, logfile = 0, None
+                eupsProd, retcode, logfile = self.eups.getProduct(product.name, product.version), 0, None
             except eups.ProductNotFound:
-                retcode, logfile = self._build_product(product, progress)
+                eupsProd, retcode, logfile = self._build_product(product, progress)
+
+            if eupsProd is not None and self.manifest.buildID not in eupsProd.tags:
+                self._tag_product(product.name, product.version, self.manifest.buildID)
 
             progress.reportResult(retcode, logfile)
 
