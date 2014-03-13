@@ -27,16 +27,12 @@ class Git:
         return_status = kwargs.get("return_status", False)
 
         cmd = ('git',) + args
-        #print "---> ", " ".join(cmd)
 
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.cwd)
         (stdout, stderr) = process.communicate()
         retcode = process.poll()
 
         if retcode and not return_status:
-            #print cmd
-            #print stdout
-            #print stderr
             raise GitError(retcode, cmd, stdout, stderr)
 
         return stdout.rstrip() if not return_status else (stdout.rstrip(), retcode)

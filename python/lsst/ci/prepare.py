@@ -196,7 +196,7 @@ class ProductFetcher(object):
         # find a ref that matches, checkout it
         for ref in self.refs:
             sha1, _ = git.rev_parse("-q", "--verify", "refs/remotes/origin/" + ref, return_status=True)
-            #print ref, "branch=", sha1
+
             branch = sha1 != ""
             if not sha1:
                 sha1, _ = git.rev_parse("-q", "--verify", "refs/tags/" + ref + "^0", return_status=True)
@@ -213,7 +213,6 @@ class ProductFetcher(object):
                 # we'll just reset it
                 git.reset("--hard", sha1)
 
-            #print "HEAD=", git.rev_parse("HEAD")
             assert(git.rev_parse("HEAD") == sha1)
             break
         else:
