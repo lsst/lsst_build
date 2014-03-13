@@ -63,3 +63,6 @@ class Git:
 
     def tag(self, *args, **kwargs):
         return self('tag', *args, **kwargs)
+
+    def describe(self, *args, **kwargs):
+        return self('describe', *args, **kwargs)

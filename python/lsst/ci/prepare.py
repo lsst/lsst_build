@@ -63,6 +63,15 @@ class Manifest(object):
         for prod in self.products.itervalues():
             print >>fileObject, '%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version, ','.join(dep.name for dep in prod.dependencies))
 
+    def content_hash(self):
+        """ Return a hash of the manifest, based on the products it contains. """
+        m = hashlib.sha1()
+        for prod in self.products.itervalues():
+            s = '%s\t%s\t%s\n' % (prod.name, prod.sha1, prod.version)
+            m.update(s)
+
+        return m.hexdigest()
+
     @staticmethod
     def fromFile(fileObject):
         varre = re.compile('^(\w+)=(.*)$')
@@ -248,20 +257,17 @@ class VersionDb(object):
         pass
 
     @abc.abstractmethod
-    def getBuildId(self):
-        """Return a unique build ID identifying this build"""
-        pass
-
-    @abc.abstractmethod
-    def commit(self, manifest):
+    def commit(self, manifest, build_id):
         """Commit the changes to the version database
         
            Args:
                manifest (`Manifest`): a manifest of products from this run
+               build_id (str): the build identifier
                
-           A subclass should override this method to commit to
+           A subclass must override this method to commit to
            permanent storage any changes to the underlying database
-           caused by getSuffix() invocations.
+           caused by getSuffix() invocations, and to assign the
+           build_id to manifest.buildID.
         """
         pass
 
@@ -309,7 +315,7 @@ class VersionDbHash(VersionDb):
         suffix = hash[:self.sha_abbrev_len]
         return suffix
 
-    def getBuildId(self):
+    def __getBuildId(self):
         """Allocate the next unused EUPS tag that matches the bNNNN pattern"""
 
         tags = eups.tags.Tags()
@@ -322,8 +328,8 @@ class VersionDbHash(VersionDb):
 
         return tag
 
-    def commit(self, manifest):
-        pass
+    def commit(self, manifest, build_id):
+        manifest.buildID = self.__getBuildId() if build_id is None else build_id
 
 class VersionDbGit(VersionDbHash):
     """Subclass of `VersionDb` that generates +YYY suffixes by assigning a unique +N integer to
@@ -383,9 +389,10 @@ class VersionDbGit(VersionDbHash):
 
             return vm
 
-    def __init__(self, dbdir):
+    def __init__(self, dbdir, eupsObj):
         super(VersionDbGit, self).__init__(None, None)
         self.dbdir = dbdir
+        self.eups = eupsObj
 
         self.versionMaps = dict()
 
@@ -394,6 +401,9 @@ class VersionDbGit(VersionDbHash):
 
     def __depfn(self, productName):
         return os.path.join("dep_db", productName + '.txt')
+
+    def __shafn(self):
+        return os.path.join("manifests", 'content_sha.db.txt')
 
     def getSuffix(self, productName, dependencies):
         hash = self._hash_dependencies(dependencies)
@@ -417,21 +427,40 @@ class VersionDbGit(VersionDbHash):
 
         return suffix
 
-    def getBuildId(self):
-        """Find the next unused git tag that matches the bNNNN pattern"""
+    def __getBuildId(self, manifest, manifestSha):
+        """Return a build ID unique to this manifest. If a matching manifest already
+           exists in the database, its build ID will be used.
+        """
+        with open(os.path.join(self.dbdir, 'manifests', 'content_sha.db.txt'), 'a+') as fp:
+                # Try to find a manifest with existing matching content
+                for line in fp:
+                        (sha1, tag) = line.strip().split()
+                        if sha1 == manifestSha:
+                                return tag
+
+                # Find the next unused tag that matches the bNNNN pattern
+                # and isn't defined in EUPS yet
+                git = Git(self.dbdir)
+                tags = git.tag('-l', 'b[0-9]*').split()
+                btre = re.compile('^b[0-9]+$')
+                btags = [ 0 ]
+                btags += [ int(tag[1:]) for tag in tags if btre.match(tag) ]
+                btag = max(btags)
+
+                definedTags = self.eups.tags.getTagNames()
+                while True:
+                    btag += 1
+                    tag = "b%s" % btag
+                    if tag not in definedTags:
+                        break
+
+                return tag
+
+    def commit(self, manifest, build_id):
         git = Git(self.dbdir)
 
-        tags = git.tag('-l', 'b[0-9]*').split()
-
-        btre = re.compile('^b[0-9]+$')
-        btags = [ 0 ]
-        btags += [ int(tag[1:]) for tag in tags if btre.match(tag) ]
-        tag = "b%s" % (max(btags) + 1)
-
-        return tag
-
-    def commit(self, manifest):
-        git = Git(self.dbdir)
+        manifestSha = manifest.content_hash()
+        manifest.buildID = self.__getBuildId(manifest, manifestSha) if build_id is None else build_id
 
         # Write files
         dirty = False
@@ -456,15 +485,29 @@ class VersionDbGit(VersionDbHash):
         absmanfn = os.path.join(self.dbdir, manfn)
         with open(absmanfn, 'w') as fp:
             manifest.toFile(fp)
-        git.add(manfn)
 
-        # git-commit
-        msg = "Updates for build %s." % manifest.buildID
-        git.commit('-m', msg)
+        if git.tag("-l", manifest.buildID) == manifest.buildID:
+            # If the buildID/manifest are being reused, VersionDB repository must be clean
+            if git.describe('--always', '--dirty=-prljavonakraju').endswith("-prljavonakraju"):
+                raise Exception("Trying to reuse the buildID, but the versionDB repository is dirty!")
+        else:
+            # add the manifest file
+            git.add(manfn)
 
-        # git-tag
-        msg = "Build ID %s" % manifest.buildID
-        git.tag('-a', '-m', msg, manifest.buildID)
+            # add the new manifest<->buildID mapping
+            shafn = self.__shafn()
+            absshafn = os.path.join(self.dbdir, shafn)
+            with open(absshafn, 'a+') as fp:
+                fp.write("%s\t%s\n" % (manifestSha, manifest.buildID))
+            git.add(shafn)
+
+            # git-commit
+            msg = "Updates for build %s." % manifest.buildID
+            git.commit('-m', msg)
+
+            # git-tag
+            msg = "Build ID %s" % manifest.buildID
+            git.tag('-a', '-m', msg, manifest.buildID)
 
 class ExclusionResolver(object):
     """A class to determine whether a dependency should be excluded from
@@ -584,7 +627,7 @@ class BuildDirectoryConstructor(object):
             exclusion_resolver = ExclusionResolver([])
 
         if args.version_git_repo:
-            version_db = VersionDbGit(args.version_git_repo)
+            version_db = VersionDbGit(args.version_git_repo, eupsObj)
         else:
             version_db = VersionDbHash(args.sha_abbrev_len, eupsObj)
 
@@ -595,8 +638,7 @@ class BuildDirectoryConstructor(object):
         # Run the construction
         #
         manifest = p.construct(args.products)
-        manifest.buildID = version_db.getBuildId() if not args.build_id else args.build_id
-        version_db.commit(manifest)
+        version_db.commit(manifest, args.build_id)
 
         #
         # Store the result in build_dir/manifest.txt

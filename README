@@ -197,7 +197,10 @@ It consists of three subdirectories:
     A directory where build manifests are stored. Each manifest is named
     $BUILD.txt, where $BUILD is the unique build ID.  Every time lsst-build
     is run with --version-git-repo, it will add the resulting manifest to
-    this directory, git-commit it, and tag it with the build ID.
+    this directory, git-commit it, and tag it with the build ID, unless a
+    manifest with matching content already exists. In the latter case,
+    that build ID will be reused and no new commits will be added to
+    VersionDB.
 
 Note that it is not necessary to understand this internal format to use this
 repository; in fact, one should *not* depend on its internal format, as it
