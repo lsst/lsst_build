@@ -21,7 +21,8 @@
 
 set -e
 
-PRODUCTS="lsst_distrib git anaconda"
+# PRODUCTS="lsst_distrib git anaconda"
+PRODUCTS="sconsUtils"
 
 #
 # Set the type of package to be created, and repository locations
@@ -48,13 +49,13 @@ echo "*************** BUILD = $BUILD: "
 #
 # Create the distribution packages
 #
-for product in $PRODUCTS; do
-	eups distrib create --server-dir=$EUPS_PKGROOT -f generic -d eupspkg -t $BUILD $product
-done
+#for product in $PRODUCTS; do
+#	eups distrib create --server-dir=$EUPS_PKGROOT -f generic -d eupspkg -t $BUILD $product
+#done
 
 #
 # Declare the build tag, and declare it current
 #
-eups distrib declare --server-dir=$EUPS_PKGROOT -t $BUILD
-sed -r 's|EUPS distribution [^ ]+ version list. Version 1.0|EUPS distribution current version list. Version 1.0|' \
-	$EUPS_PKGROOT/tags/$BUILD.list > $EUPS_PKGROOT/tags/current.list
+#eups distrib declare --server-dir=$EUPS_PKGROOT -t $BUILD
+#sed -r 's|EUPS distribution [^ ]+ version list. Version 1.0|EUPS distribution current version list. Version 1.0|' \
+#	$EUPS_PKGROOT/tags/$BUILD.list > $EUPS_PKGROOT/tags/current.list
