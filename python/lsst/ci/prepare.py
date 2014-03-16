@@ -289,8 +289,10 @@ class VersionDb(object):
         productVersion = subprocess.check_output(cmd, shell=True).strip()
 
         if dependencies:
-            deps_sha1 = self.getSuffix(productName, productVersion, dependencies)
-            return "%s+%s" % (productVersion, deps_sha1)
+            suffix = self.getSuffix(productName, productVersion, dependencies)
+            assert suffix.__class__ == str
+            suffix = "+%s" % (suffix) if suffix != "0" else ""
+            return "%s%s" % (productVersion, suffix)
         else:
             return productVersion
 
@@ -430,7 +432,7 @@ class VersionDbGit(VersionDbHash):
         except KeyError:
             suffix = vm.new_suffix(productVersion, hash, dependencies)
 
-        return suffix
+        return str(suffix)
 
     def __getBuildId(self, manifest, manifestSha):
         """Return a build ID unique to this manifest. If a matching manifest already

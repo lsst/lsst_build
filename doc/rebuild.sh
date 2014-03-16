@@ -22,7 +22,7 @@
 set -e
 
 # PRODUCTS="lsst_distrib git anaconda"
-PRODUCTS="sconsUtils"
+PRODUCTS="pex_exceptions"
 
 #
 # Set the type of package to be created, and repository locations
