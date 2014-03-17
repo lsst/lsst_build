@@ -182,15 +182,17 @@ It consists of three subdirectories:
  * ver_db/
 
     A directory of text files, one per product, with space-separated
-    (N, deps_sha1) pairs. Used by lsst-build to always assign the same +N
-    suffix to same set of dependencies (both products and their versions).
+    (product_version, N, deps_sha1) pairs.  Used by lsst-build to always
+    assign the same +N suffix to same set of dependencies (both products and
+    their versions).
 
  * dep_db/
 
     A directory of text files, one per product, with space-separated list of
-    (N, dep_name, dep_version) tuples. May be used by the user to quickly
-    look up a set of dependencies corresponding to some +N suffix. Note that
-    this information is also available in the product's expanded table file.
+    (product_version, N, dep_name, dep_version) tuples.  May be used by the
+    user to quickly look up a set of dependencies corresponding to some +N
+    suffix.  Note that this information is also available in the product's
+    expanded table file.
 
  * manifests/
 

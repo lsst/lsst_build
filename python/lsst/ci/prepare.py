@@ -244,11 +244,12 @@ class VersionDb(object):
     __metaclass__ = abc.ABCMeta
     
     @abc.abstractmethod
-    def getSuffix(self, productName, dependencies):
+    def getSuffix(self, productName, productVersion, dependencies):
         """Return a unique +YYY version suffix for a product given its dependencies
         
             Args:
                 productName (str): name of the product
+                productVersion (str): primary version of the product
                 dependencies (list): A list of `Product`s that are the immediate dependencies of productName
                 
             Returns:
@@ -285,13 +286,15 @@ class VersionDb(object):
         """
         q = pipes.quote
         cmd ="cd %s && pkgautoversion %s" % (q(productdir), q(ref))
-        ver = subprocess.check_output(cmd, shell=True).strip()
+        productVersion = subprocess.check_output(cmd, shell=True).strip()
 
         if dependencies:
-            deps_sha1 = self.getSuffix(productName, dependencies)
-            return "%s+%s" % (ver, deps_sha1)
+            suffix = self.getSuffix(productName, productVersion, dependencies)
+            assert suffix.__class__ == str
+            suffix = "+%s" % (suffix) if suffix != "0" else ""
+            return "%s%s" % (productVersion, suffix)
         else:
-            return ver
+            return productVersion
 
 
 class VersionDbHash(VersionDb):
@@ -309,7 +312,7 @@ class VersionDbHash(VersionDb):
 
         return m.hexdigest()
 
-    def getSuffix(self, productName, dependencies):
+    def getSuffix(self, productName, productVersion, dependencies):
         """ Return a hash of the sorted list of printed (dep_name, dep_version) tuples """
         hash = self._hash_dependencies(dependencies)
         suffix = hash[:self.sha_abbrev_len]
@@ -338,44 +341,48 @@ class VersionDbGit(VersionDbHash):
 
     class VersionMap(object):
         def __init__(self):
-            self.hash2suffix = dict()
-            self.suffix2hash = dict()
+            self.verhash2suffix = dict()	# (version, dep_sha) -> suffix
+            self.versuffix2hash = dict()	# (version, suffix) -> depsha
 
-            self.added_entries = dict()
+            self.added_entries = dict()		# (version, suffix) -> [ (depName, depVersion) ]
 
             self.dirty = False
 
-        def __just_add(self, hash, suffix):
+        def __just_add(self, version, hash, suffix):
             assert isinstance(suffix, int)
 
-            self.hash2suffix[hash] = suffix
-            self.suffix2hash[suffix] = hash
+            self.verhash2suffix[(version, hash)] = suffix
+            self.versuffix2hash[(version, suffix)] = hash
 
-        def __add(self, hash, suffix, dependencies):
-            self.__just_add(hash, suffix)
+        def __add(self, version, hash, suffix, dependencies):
+            self.__just_add(version, hash, suffix)
 
             # Record additions to know what needs to be appended
-            self.added_entries[suffix] = [ (product.name, product.version) for product in dependencies ]
+            self.added_entries[(version, suffix)] = [ (product.name, product.version) for product in dependencies ]
 
             self.dirty = True
 
-        def suffix(self, hash):
-            return self.hash2suffix[hash]
+        def suffix(self, version, hash):
+            return self.verhash2suffix[(version, hash)]
 
-        def hash(self, suffix):
-            return self.suffix2hash[suffix]
+        def hash(self, version, suffix):
+            return self.versuffix2hash[(version, suffix)]
 
-        def new_suffix(self, hash, dependencies):
-            suffix = max(self.suffix2hash.iterkeys()) + 1 if self.suffix2hash else 0
-            self.__add(hash, suffix, dependencies)
+        def new_suffix(self, version, hash, dependencies):
+            suffix = 0
+            try:
+                suffix = max(_suffix for _version, _suffix in self.versuffix2hash if _version == version) + 1
+            except ValueError:
+                suffix = 0
+            self.__add(version, hash, suffix, dependencies)
             return suffix
 
         def appendAdditionsToFile(self, fileObjectVer, fileObjectDep):
-            # write hash<->suffix and dependency table updates
-            for suffix, dependencies in self.added_entries.iteritems():
-                fileObjectVer.write("%s\t%d\n" % (self.hash(suffix), suffix))
-                for name, version in dependencies:
-                    fileObjectDep.write("%d\t%s\t%s\n" % (suffix, name, version))
+            # write (version, hash)<->suffix and dependency table updates
+            for (version, suffix), dependencies in self.added_entries.iteritems():
+                fileObjectVer.write("%s\t%s\t%d\n" % (version, self.hash(version, suffix), suffix))
+                for depName, depVersion in dependencies:
+                    fileObjectDep.write("%s\t%d\t%s\t%s\n" % (version, suffix, depName, depVersion))
 
             self.added_entries = []
             self.dirty = False
@@ -384,8 +391,8 @@ class VersionDbGit(VersionDbHash):
         def fromFile(fileObject):
             vm = VersionDbGit.VersionMap()
             for line in iter(fileObject.readline, ''):
-                (hash, suffix) = line.strip().split()[:2]
-                vm.__just_add(hash, int(suffix))
+                (version, hash, suffix) = line.strip().split()[:3]
+                vm.__just_add(version, hash, int(suffix))
 
             return vm
 
@@ -405,7 +412,7 @@ class VersionDbGit(VersionDbHash):
     def __shafn(self):
         return os.path.join("manifests", 'content_sha.db.txt')
 
-    def getSuffix(self, productName, dependencies):
+    def getSuffix(self, productName, productVersion, dependencies):
         hash = self._hash_dependencies(dependencies)
 
         # Lazy-load/create
@@ -421,11 +428,11 @@ class VersionDbGit(VersionDbHash):
 
         # get or create a new suffix
         try:
-            suffix = vm.suffix(hash)
+            suffix = vm.suffix(productVersion, hash)
         except KeyError:
-            suffix = vm.new_suffix(hash, dependencies)
+            suffix = vm.new_suffix(productVersion, hash, dependencies)
 
-        return suffix
+        return str(suffix)
 
     def __getBuildId(self, manifest, manifestSha):
         """Return a build ID unique to this manifest. If a matching manifest already
