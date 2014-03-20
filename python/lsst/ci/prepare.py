@@ -288,13 +288,12 @@ class VersionDb(object):
         cmd ="cd %s && pkgautoversion %s" % (q(productdir), q(ref))
         productVersion = subprocess.check_output(cmd, shell=True).strip()
 
-        if dependencies:
-            suffix = self.getSuffix(productName, productVersion, dependencies)
-            assert suffix.__class__ == str
-            suffix = "+%s" % (suffix) if suffix != "0" else ""
-            return "%s%s" % (productVersion, suffix)
-        else:
-            return productVersion
+        # add +XXXX suffix, if any
+        suffix = self.getSuffix(productName, productVersion, dependencies)
+        assert suffix.__class__ == str
+        suffix = "+%s" % suffix if suffix else ""
+        return "%s%s" % (productVersion, suffix)
+
 
 
 class VersionDbHash(VersionDb):
@@ -431,6 +430,10 @@ class VersionDbGit(VersionDbHash):
             suffix = vm.suffix(productVersion, hash)
         except KeyError:
             suffix = vm.new_suffix(productVersion, hash, dependencies)
+
+        assert isinstance(suffix, int)
+        if suffix == 0:
+            suffix = ""
 
         return str(suffix)
 
