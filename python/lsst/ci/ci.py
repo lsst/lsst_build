@@ -14,6 +14,7 @@ import subprocess
 import collections
 import abc
 import contextlib
+import textwrap
 
 from . import tsort
 
@@ -137,13 +138,13 @@ class ProductFetcher(object):
 
         See `fetch` for further documentation.
         
-        :ivar build_dir: The product will be cloned to build_dir/productName
+        :ivar source_dir: The product will be cloned to source_dir/productName
         :ivar repository_patterns: A list of str.format() patterns used discover the URL of the remote git repository.
         :ivar refs: A list of refs to attempt to git-checkout
         :ivar no_fetch: If true, don't fetch, just checkout the first matching ref.
     """
-    def __init__(self, build_dir, repository_patterns, refs, no_fetch):
-        self.build_dir = os.path.abspath(build_dir)
+    def __init__(self, source_dir, repository_patterns, refs, no_fetch):
+        self.source_dir = os.path.abspath(source_dir)
         self.refs = refs
         self.repository_patterns = repository_patterns.split('|')
         self.no_fetch = no_fetch
@@ -165,7 +166,7 @@ class ProductFetcher(object):
                  ref -- the checked out ref (e.g., 'master')
                  sha1 -- the corresponding commit's SHA1
 
-        If $build_dir/$product does not exist, discovers the product
+        If $source_dir/$product does not exist, discovers the product
         repository by attempting a git clone from the list of URLs
         constructed by running str.format() with { 'product': product}
         on self.repository_patterns. Otherwise, intelligently fetches
@@ -179,7 +180,7 @@ class ProductFetcher(object):
         t0 = time.time()
         sys.stderr.write("%20s: " % product)
 
-        productdir = os.path.join(self.build_dir, product)
+        productdir = os.path.join(self.source_dir, product)
         git = Git(productdir)
 
         # verify the URL of origin hasn't changed
@@ -565,8 +566,8 @@ class BuildDirectoryConstructor(object):
     """A class that, given one or more top level packages, recursively
     clones them to a build directory thus preparing them to be built."""
     
-    def __init__(self, build_dir, eups, product_fetcher, version_db, exclusion_resolver):
-        self.build_dir = os.path.abspath(build_dir)
+    def __init__(self, source_dir, eups, product_fetcher, version_db, exclusion_resolver):
+        self.source_dir = os.path.abspath(source_dir)
 
         self.eups = eups
         self.product_fetcher = product_fetcher
@@ -582,7 +583,7 @@ class BuildDirectoryConstructor(object):
 
         # Parse the table file to discover dependencies
         dependencies = []
-        productdir = os.path.join(self.build_dir, productName)
+        productdir = os.path.join(self.source_dir, productName)
         table_fn = os.path.join(productdir, 'ups', '%s.table' % productName)
         if os.path.isfile(table_fn):
             # Prepare the non-excluded dependencies
@@ -616,9 +617,9 @@ class BuildDirectoryConstructor(object):
         #
         # Ensure build directory exists and is writable
         #
-        build_dir = args.build_dir
-        if not os.access(build_dir, os.W_OK):
-            raise Exception("Directory '%s' does not exist or isn't writable." % build_dir)
+        source_dir = args.dir
+        if not os.access(source_dir, os.W_OK):
+            raise Exception("Directory '%s' does not exist or isn't writable." % source_dir)
 
         #
         # Add 'master' to list of refs, if not there already
@@ -643,8 +644,8 @@ class BuildDirectoryConstructor(object):
         else:
             version_db = VersionDbHash(args.sha_abbrev_len, eupsObj)
 
-        product_fetcher = ProductFetcher(build_dir, args.repository_pattern, refs, args.no_fetch)
-        p = BuildDirectoryConstructor(build_dir, eupsObj, product_fetcher, version_db, exclusion_resolver)
+        product_fetcher = ProductFetcher(source_dir, args.repository_pattern, refs, args.no_fetch)
+        p = BuildDirectoryConstructor(source_dir, eupsObj, product_fetcher, version_db, exclusion_resolver)
 
         #
         # Run the construction
@@ -653,9 +654,9 @@ class BuildDirectoryConstructor(object):
         version_db.commit(manifest, args.build_id)
 
         #
-        # Store the result in build_dir/manifest.txt
+        # Store the result in source_dir/manifest.txt
         #
-        manifestFn = os.path.join(build_dir, 'manifest.txt')
+        manifestFn = os.path.join(source_dir, 'manifest.txt')
         with open(manifestFn, 'w') as fp:
             manifest.toFile(fp)
 
@@ -746,8 +747,8 @@ class Builder(object):
     
        The result is tagged with the `Manifest`s build ID, if any.
     """
-    def __init__(self, build_dir, manifest, progress, eups):
-        self.build_dir = build_dir
+    def __init__(self, source_dir, manifest, progress, eups):
+        self.source_dir = source_dir
         self.manifest = manifest
         self.progress = progress
         self.eups = eups
@@ -759,7 +760,7 @@ class Builder(object):
     def _build_product(self, product, progress):
         # run the eupspkg sequence for the product
         #
-        productdir = os.path.abspath(os.path.join(self.build_dir, product.name))
+        productdir = os.path.abspath(os.path.join(self.source_dir, product.name))
         buildscript = os.path.join(productdir, '_build.sh')
         logfile = os.path.join(productdir, '_build.log')
 
@@ -871,18 +872,18 @@ class Builder(object):
     @staticmethod
     def run(args):
         # Ensure build directory exists and is writable
-        build_dir = args.build_dir
-        if not os.access(build_dir, os.W_OK):
-            raise Exception("Directory '%s' does not exist or isn't writable." % build_dir)
+        source_dir = args.dir
+        if not os.access(source_dir, os.W_OK):
+            raise Exception("Directory '%s' does not exist or isn't writable." % source_dir)
 
         # Build products
         eupsObj = eups.Eups()
 
         progress = ProgressReporter(sys.stderr)
 
-        manifestFn = os.path.join(build_dir, 'manifest.txt')
+        manifestFn = os.path.join(source_dir, 'manifest.txt')
         with open(manifestFn) as fp:
             manifest = Manifest.fromFile(fp)
 
-        b = Builder(build_dir, manifest, progress, eupsObj)
+        b = Builder(source_dir, manifest, progress, eupsObj)
         b.build()
