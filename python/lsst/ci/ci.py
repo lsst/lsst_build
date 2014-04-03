@@ -302,8 +302,9 @@ class VersionDb(object):
 class VersionDbHash(VersionDb):
     """Subclass of `VersionDb` that generates +YYY suffixes by hashing the dependency names and versions"""
 
-    def __init__(self, sha_abbrev_len, eups):
+    def __init__(self, build_id_prefix, eups, sha_abbrev_len):
         self.sha_abbrev_len = sha_abbrev_len
+        self.build_id_prefix = build_id_prefix
         self.eups = eups
 
     def _hash_dependencies(self, dependencies):
@@ -326,10 +327,11 @@ class VersionDbHash(VersionDb):
         tags = eups.tags.Tags()
         tags.loadFromEupsPath(self.eups.path)
 
-        btre = re.compile('^b[0-9]+$')
+        prefix_len = len(self.build_id_prefix)
+        btre = re.compile('^%s[0-9]+$' % self.build_id_prefix)
         btags = [ 0 ]
-        btags += [ int(tag[1:]) for tag in tags.getTagNames() if btre.match(tag) ]
-        tag = "b%s" % (max(btags) + 1)
+        btags += [ int(tag[prefix_len:]) for tag in tags.getTagNames() if btre.match(tag) ]
+        tag = "%s%s" % (self.build_id_prefix, max(btags) + 1)
 
         return tag
 
@@ -398,10 +400,9 @@ class VersionDbGit(VersionDbHash):
 
             return vm
 
-    def __init__(self, dbdir, eupsObj):
-        super(VersionDbGit, self).__init__(None, None)
+    def __init__(self, build_id_prefix, eupsObj, dbdir):
+        super(VersionDbGit, self).__init__(build_id_prefix, eupsObj, None)
         self.dbdir = dbdir
-        self.eups = eupsObj
 
         self.versionMaps = dict()
 
@@ -451,19 +452,20 @@ class VersionDbGit(VersionDbHash):
                         if sha1 == manifestSha:
                                 return tag
 
-                # Find the next unused tag that matches the bNNNN pattern
+                # Find the next unused tag that matches the ${build_id_prefix}NNNN pattern
                 # and isn't defined in EUPS yet
                 git = Git(self.dbdir)
-                tags = git.tag('-l', 'b[0-9]*').split()
-                btre = re.compile('^b[0-9]+$')
+                tags = git.tag('-l', '%s[0-9]*' % self.build_id_prefix).split()
+                btre = re.compile('^%s[0-9]+$' % self.build_id_prefix)
+                prefix_len = len(self.build_id_prefix)
                 btags = [ 0 ]
-                btags += [ int(tag[1:]) for tag in tags if btre.match(tag) ]
+                btags += [ int(tag[prefix_len:]) for tag in tags if btre.match(tag) ]
                 btag = max(btags)
 
                 definedTags = self.eups.tags.getTagNames()
                 while True:
                     btag += 1
-                    tag = "b%s" % btag
+                    tag = "%s%s" % (self.build_id_prefix, btag)
                     if tag not in definedTags:
                         break
 
@@ -640,9 +642,9 @@ class BuildDirectoryConstructor(object):
             exclusion_resolver = ExclusionResolver([])
 
         if args.version_git_repo:
-            version_db = VersionDbGit(args.version_git_repo, eupsObj)
+            version_db = VersionDbGit(args.build_id_prefix, eupsObj, args.version_git_repo)
         else:
-            version_db = VersionDbHash(args.sha_abbrev_len, eupsObj)
+            version_db = VersionDbHash(args.build_id_prefix, eupsObj, args.sha_abbrev_len)
 
         product_fetcher = ProductFetcher(source_dir, args.repository_pattern, refs, args.no_fetch)
         p = BuildDirectoryConstructor(source_dir, eupsObj, product_fetcher, version_db, exclusion_resolver)
