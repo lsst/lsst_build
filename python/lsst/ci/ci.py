@@ -332,7 +332,7 @@ class VersionDbHash(VersionDb):
         suffix = hash[:self.sha_abbrev_len]
         return suffix
 
-    def __getBuildId(self):
+    def __getFreeBuildId(self):
         """Allocate the next unused EUPS tag that matches the bNNNN pattern"""
 
         tags = eups.tags.Tags()
@@ -346,8 +346,32 @@ class VersionDbHash(VersionDb):
 
         return tag
 
+    def __getBuildId(self, manifest):
+        """If a tag exists, with the requested prefix, that covers exactly this manifest, use it."""
+
+        # Find all candidate tags
+        btre = re.compile('^%s[0-9]+$' % self.build_id_prefix)
+        tags = None
+        for product in manifest.products.itervalues():
+            prodTags = [ tag for tag in self.eups.getProduct(product.name, product.version).tags if btre.match(tag) ]
+            tags = tags.intersection(prodTags) if tags is not None else set(prodTags)
+            if not tags:
+                return self.__getFreeBuildId()
+
+        # Make sure the current manifest is not a subset of products tagged
+        # with one of those tags
+        products = self.eups.findProducts(tags=[tag for tag in tags])
+        if len(products) != len(manifest.products):
+            for product in products:
+                if product.name not in manifest.products:
+                    tags = tags.difference(product.tags)
+                if not tags:
+                    return self.__getFreeBuildId()
+
+        return max(tags)
+
     def commit(self, manifest, build_id):
-        manifest.buildID = self.__getBuildId() if build_id is None else build_id
+        manifest.buildID = self.__getBuildId(manifest) if build_id is None else build_id
 
 class VersionDbGit(VersionDbHash):
     """Subclass of `VersionDb` that generates +YYY suffixes by assigning a unique +N integer to
@@ -773,6 +797,8 @@ class ProgressReporter(object):
         progress._finalize()
 
 def version_manifest(source_dir, manifest, version_db, build_id, ref_store):
+    """ For products in manifest, find or compute sha1, checked out ref,
+        and version """
     for product in manifest.products.itervalues():
         productdir = os.path.join(source_dir, product.name)
 
@@ -937,8 +963,6 @@ class Builder(object):
             version_db = VersionDbHash(args.build_id_prefix, eupsObj, args.sha_abbrev_len)
         ref_store = CheckedOutRefStore(source_dir)
         version_manifest(source_dir, manifest, version_db, args.build_id, ref_store)
-#        print manifest
-#        return
 
         # Build products
         progress = ProgressReporter(sys.stderr)
@@ -952,8 +976,6 @@ class Builder(object):
 #        with open(manifestFn, 'w') as fp:
 #            manifest.toFile(fp)
 #
-#        # Construct EUPS version
-#        version = self.version_db.version(productName, productdir, ref, dependencies)
 
 #        manifestFn = os.path.join(source_dir, 'manifest.txt')
 #        with open(manifestFn) as fp:
