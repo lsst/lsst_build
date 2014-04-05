@@ -15,6 +15,7 @@ import collections
 import abc
 import contextlib
 import textwrap
+import cStringIO
 
 from . import tsort
 
@@ -22,11 +23,12 @@ from .git import Git, GitError
 
 class Product(object):
     """Class representing an EUPS product to be built"""
-    def __init__(self, name, sha1, version, dependencies):
+    def __init__(self, name, dependencies, sha1=None, version=None):
         self.name = name
+        self.dependencies = dependencies
+
         self.sha1 = sha1
         self.version = version
-        self.dependencies = dependencies
 
     def flat_dependencies(self):
         """Return a flat list of dependencies for the product.
@@ -65,6 +67,11 @@ class Manifest(object):
         print >>fileObject, 'BUILD=%s' % self.buildID
         for prod in self.products.itervalues():
             print >>fileObject, '%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version, ','.join(dep.name for dep in prod.dependencies))
+
+    def __repr__(self):
+        output = cStringIO.StringIO()
+        self.toFile(output)
+        return output.getvalue()
 
     def content_hash(self):
         """ Return a hash of the manifest, based on the products it contains. """
@@ -105,7 +112,7 @@ class Manifest(object):
                 (name, sha1, version) = arr
                 deps = []
 
-            products[name] = Product(name, sha1, version, deps)
+            products[name] = Product(name, deps, sha1=sha1, version=version)
 
         return Manifest(products, buildId)
 
@@ -133,6 +140,7 @@ class Manifest(object):
             products[name] = productDict[name]
         return Manifest(products, None)
 
+
 class ProductFetcher(object):
     """ Fetches products from remote git repositories and checks out matching refs.
 
@@ -143,11 +151,12 @@ class ProductFetcher(object):
         :ivar refs: A list of refs to attempt to git-checkout
         :ivar no_fetch: If true, don't fetch, just checkout the first matching ref.
     """
-    def __init__(self, source_dir, repository_patterns, refs, no_fetch):
+    def __init__(self, source_dir, repository_patterns, refs, no_fetch, ref_store):
         self.source_dir = os.path.abspath(source_dir)
         self.refs = refs
         self.repository_patterns = repository_patterns.split('|')
         self.no_fetch = no_fetch
+        self.ref_store = ref_store
 
     def _origin_candidates(self, product):
         """ Expand repository_patterns into URLs. """
@@ -233,6 +242,8 @@ class ProductFetcher(object):
         # clean up the working directory (eg., remove remnants of
         # previous builds)
         git.clean("-d", "-f", "-q")
+
+	self.ref_store.set(product, sha1, ref)
 
         print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
         return ref, sha1
@@ -563,26 +574,20 @@ class ExclusionResolver(object):
 
         return ExclusionResolver(exclusion_patterns)
 
+def make_exclusion_resolver(exclusion_map_fn):
+    if not exclusion_map_fn:
+        return ExclusionResolver([])
 
-class BuildDirectoryConstructor(object):
-    """A class that, given one or more top level packages, recursively
-    clones them to a build directory thus preparing them to be built."""
-    
-    def __init__(self, source_dir, eups, product_fetcher, version_db, exclusion_resolver):
-        self.source_dir = os.path.abspath(source_dir)
+    with open(exclusion_map_fn) as fp:
+        return ExclusionResolver.fromFile(fp)
 
-        self.eups = eups
-        self.product_fetcher = product_fetcher
-        self.version_db = version_db
+class ProductDependencyLoader(object):
+    def __init__(self, source_dir, eupsObj, exclusion_resolver):
         self.exclusion_resolver = exclusion_resolver
-
-    def _add_product_tree(self, products, productName):
-        if productName in products:
-            return products[productName]
-
-        # Mirror the product into the build directory (clone or git-pull it)
-        ref, sha1 = self.product_fetcher.fetch(productName)
-
+        self.source_dir = source_dir
+        self.eups = eupsObj
+        
+    def get_dependencies(self, productName):
         # Parse the table file to discover dependencies
         dependencies = []
         productdir = os.path.join(self.source_dir, productName)
@@ -598,22 +603,59 @@ class BuildDirectoryConstructor(object):
                 if dprod.name == "implicitProducts":
                     continue;
 
-                dependencies.append( self._add_product_tree(products, dprod.name) )
+                dependencies.append( dprod.name )
+        return dependencies
 
-        # Construct EUPS version
-        version = self.version_db.version(productName, productdir, ref, dependencies)
+class CheckedOutRefStore(object):
+    def __init__(self, source_dir):
+        self._rootdir = os.path.join(source_dir, '.bt', 'refstore')
+
+    def set(self, productName, sha1, ref):
+        if not os.path.isdir(self._rootdir):
+            os.makedirs(self._rootdir)
+        with open(os.path.join(self._rootdir, productName), "w") as fp:
+            fp.write("%s\t%s\n" % (sha1, ref))
+
+    def get(self, productName):
+        fn = os.path.join(self._rootdir, productName)
+        try:
+            with open(fn) as fp:
+                return fp.readline().strip().split()
+        except IOError:
+            return None, ""
+
+    def commit(self):
+        pass
+
+class ProductDictBuilder(object):
+    """A class that, given one or more top level packages, recursively
+    clones them to a build directory thus preparing them to be built."""
+    
+    def __init__(self, source_dir, product_fetcher, dependency_loader):
+        self.source_dir = os.path.abspath(source_dir)
+
+        self.fetch_product = product_fetcher.fetch if product_fetcher is not None else lambda x: None;
+        self.dependency_loader = dependency_loader
+
+    def _do_walk(self, products, productName):
+        if productName in products:
+            return products[productName]
+
+        # Load the product components
+	self.fetch_product(productName)
+        dependencies = [ self._do_walk(products, depName) for depName in self.dependency_loader.get_dependencies(productName) ]
 
         # Add the result to products, return it for convenience
-        products[productName] = Product(productName, sha1, version, dependencies)
+        products[productName] = Product(productName, dependencies)
         return products[productName]
 
-    def construct(self, productNames):
+    def walk(self, productNames):
         products = dict()
         for name in productNames:
-            self._add_product_tree(products, name)
+            self._do_walk(products, name)
+        return products
 
-        return Manifest.fromProductDict(products)
-
+class BuildDirectoryConstructor(object):
     @staticmethod
     def run(args):
         #
@@ -631,36 +673,22 @@ class BuildDirectoryConstructor(object):
             refs.append('master')
 
         #
-        # Wire-up the BuildDirectoryConstructor constructor
+        # Wire-up the ProductDictBuilder
         #
         eupsObj = eups.Eups()
-
-        if args.exclusion_map:
-            with open(args.exclusion_map) as fp:
-                exclusion_resolver = ExclusionResolver.fromFile(fp)
-        else:
-            exclusion_resolver = ExclusionResolver([])
-
-        if args.version_git_repo:
-            version_db = VersionDbGit(args.build_id_prefix, eupsObj, args.version_git_repo)
-        else:
-            version_db = VersionDbHash(args.build_id_prefix, eupsObj, args.sha_abbrev_len)
-
-        product_fetcher = ProductFetcher(source_dir, args.repository_pattern, refs, args.no_fetch)
-        p = BuildDirectoryConstructor(source_dir, eupsObj, product_fetcher, version_db, exclusion_resolver)
+        exclusion_resolver = make_exclusion_resolver(args.exclusion_map)
+        dependency_loader = ProductDependencyLoader(source_dir, eupsObj, exclusion_resolver)
+        ref_store = CheckedOutRefStore(source_dir)
+        product_fetcher = ProductFetcher(source_dir, args.repository_pattern, refs, args.no_fetch, ref_store)
+        p = ProductDictBuilder(source_dir, product_fetcher, dependency_loader)
 
         #
         # Run the construction
         #
-        manifest = p.construct(args.products)
-        version_db.commit(manifest, args.build_id)
+        p.walk(args.products)
 
-        #
-        # Store the result in source_dir/manifest.txt
-        #
-        manifestFn = os.path.join(source_dir, 'manifest.txt')
-        with open(manifestFn, 'w') as fp:
-            manifest.toFile(fp)
+
+
 
 #############################################################################
 # Builder
@@ -743,6 +771,22 @@ class ProgressReporter(object):
         progress._buildStarted()
         yield progress
         progress._finalize()
+
+def version_manifest(source_dir, manifest, version_db, build_id, ref_store):
+    for product in manifest.products.itervalues():
+        productdir = os.path.join(source_dir, product.name)
+
+        git = Git(productdir)
+        product.sha1 = git.rev_parse("HEAD")
+
+        sha1, ref = ref_store.get(product.name)
+        if sha1 is not None and sha1 != product.sha1:
+            ref = ""
+            print >>sys.stderr, "warning: sha1 stored in the ref store differs from current sha1 for %s." % (product.name)
+
+        product.version = version_db.version(product.name, productdir, ref, product.dependencies)
+
+    return version_db.commit(manifest, build_id)
 
 class Builder(object):
     """Class that builds and installs all products in a manifest.
@@ -878,14 +922,40 @@ class Builder(object):
         if not os.access(source_dir, os.W_OK):
             raise Exception("Directory '%s' does not exist or isn't writable." % source_dir)
 
-        # Build products
         eupsObj = eups.Eups()
 
+        # Construct the manifest of products to build
+        exclusion_resolver = make_exclusion_resolver(args.exclusion_map)
+        dependency_loader = ProductDependencyLoader(source_dir, eupsObj, exclusion_resolver)
+        productDict = ProductDictBuilder(source_dir, None, dependency_loader).walk(args.products)
+        manifest = Manifest.fromProductDict(productDict)
+
+        # Version products
+        if args.version_git_repo:
+            version_db = VersionDbGit(args.build_id_prefix, eupsObj, args.version_git_repo)
+        else:
+            version_db = VersionDbHash(args.build_id_prefix, eupsObj, args.sha_abbrev_len)
+        ref_store = CheckedOutRefStore(source_dir)
+        version_manifest(source_dir, manifest, version_db, args.build_id, ref_store)
+#        print manifest
+#        return
+
+        # Build products
         progress = ProgressReporter(sys.stderr)
-
-        manifestFn = os.path.join(source_dir, 'manifest.txt')
-        with open(manifestFn) as fp:
-            manifest = Manifest.fromFile(fp)
-
         b = Builder(source_dir, manifest, progress, eupsObj)
         b.build()
+
+#        #
+#        # Store the result in source_dir/manifest.txt
+#        #
+#        manifestFn = os.path.join(source_dir, 'manifest.txt')
+#        with open(manifestFn, 'w') as fp:
+#            manifest.toFile(fp)
+#
+#        # Construct EUPS version
+#        version = self.version_db.version(productName, productdir, ref, dependencies)
+
+#        manifestFn = os.path.join(source_dir, 'manifest.txt')
+#        with open(manifestFn) as fp:
+#            manifest = Manifest.fromFile(fp)
+
