@@ -622,6 +622,13 @@ class ProductDependencyLoader(object):
         return dependencies
 
 class CheckedOutRefStore(object):
+    """ Remembers which ref was checked out for a product, and
+        its associated SHA1. Primarily for later use in versioning.
+        
+        This implementation is obsolete now, and ReflogRefStore,
+        which gets the information from the reflog, should be used
+        instead.
+    """
     def __init__(self, source_dir):
         self._rootdir = os.path.join(source_dir, '.bt', 'refstore')
 
@@ -638,6 +645,35 @@ class CheckedOutRefStore(object):
                 return fp.readline().strip().split()
         except IOError:
             return None, ""
+
+    def commit(self):
+        pass
+
+class ReflogRefStore(object):
+    def __init__(self, source_dir):
+        self._sourcedir = source_dir
+
+    def set(self, productName, sha1, ref):
+        # noop; we deduce the reference from git reflog
+        pass
+
+    def get(self, productName):
+        git = Git(os.path.join(self._sourcedir, productName))
+
+        # trying to match: [[7e60993 HEAD@{10}: checkout: moving from master to u/mjuric/next]]
+        r = re.compile(r'^([0-9a-f]+) HEAD@\{\d+\}: checkout: moving from [^ ]+ to ([^ ]+)$')
+
+        sha1, ref = None, ""
+        for line in git.reflog("HEAD").splitlines():
+            m = r.match(line)
+            if not m:
+                continue
+            sha1abbrev = m.group(1)
+            ref = m.group(2)
+            sha1 = git.rev_parse(sha1abbrev)
+            break
+
+        return sha1, ref
 
     def commit(self):
         pass
@@ -693,7 +729,7 @@ class BuildDirectoryConstructor(object):
         eupsObj = eups.Eups()
         exclusion_resolver = make_exclusion_resolver(args.exclusion_map)
         dependency_loader = ProductDependencyLoader(source_dir, eupsObj, exclusion_resolver)
-        ref_store = CheckedOutRefStore(source_dir)
+        ref_store = ReflogRefStore(source_dir)
         product_fetcher = ProductFetcher(source_dir, args.repository_pattern, refs, args.no_fetch, ref_store)
         p = ProductDictBuilder(source_dir, product_fetcher, dependency_loader)
 
@@ -797,6 +833,7 @@ def version_manifest(source_dir, manifest, version_db, build_id, ref_store):
         product.sha1 = git.rev_parse("HEAD")
 
         sha1, ref = ref_store.get(product.name)
+        print >>sys.stderr, sha1, ref
         if sha1 is not None and sha1 != product.sha1:
             ref = ""
             print >>sys.stderr, "warning: sha1 stored in the ref store differs from current sha1 for %s." % (product.name)
@@ -953,7 +990,7 @@ class Builder(object):
             version_db = VersionDbGit(args.build_id_prefix, eupsObj, args.version_git_repo)
         else:
             version_db = VersionDbHash(args.build_id_prefix, eupsObj, args.sha_abbrev_len)
-        ref_store = CheckedOutRefStore(source_dir)
+        ref_store = ReflogRefStore(source_dir)
         build_id = version_manifest(source_dir, manifest, version_db, args.build_id, ref_store)
         print >>sys.stderr, "build id: %s" % build_id
 

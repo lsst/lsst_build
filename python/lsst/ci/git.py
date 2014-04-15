@@ -43,6 +43,9 @@ class Git:
     def rev_parse(self, *args, **kwargs):
         return self('rev-parse', *args, **kwargs)
 
+    def reflog(self, *args, **kwargs):
+        return self('reflog', *args, **kwargs)
+
     def reset(self, *args, **kwargs):
         return self('reset', *args, **kwargs)
 
