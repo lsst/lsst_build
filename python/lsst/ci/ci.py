@@ -144,12 +144,11 @@ class ProductFetcher(object):
         :ivar refs: A list of refs to attempt to git-checkout
         :ivar no_fetch: If true, don't fetch, just checkout the first matching ref.
     """
-    def __init__(self, source_dir, repository_patterns, refs, no_fetch, ref_store):
+    def __init__(self, source_dir, repository_patterns, refs, no_fetch):
         self.source_dir = os.path.abspath(source_dir)
         self.refs = refs
         self.repository_patterns = repository_patterns.split('|')
         self.no_fetch = no_fetch
-        self.ref_store = ref_store
 
     def _origin_candidates(self, product):
         """ Expand repository_patterns into URLs. """
@@ -236,10 +235,24 @@ class ProductFetcher(object):
         # previous builds)
         git.clean("-d", "-f", "-q")
 
-        self.ref_store.set(product, sha1, ref)
-
         print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
         return ref, sha1
+
+def get_checked_out_ref_name(git):
+    # n.b.: we do it by grepping the reflog and not simply by
+    # inspecting the contents of HEAD because the rev used to perform
+    # the checkout may have been a tag (in which case HEAD would just
+    # record the SHA1)
+
+    # trying to match a pattern like: [[7e60993 HEAD@{10}: checkout: moving from master to u/mjuric/next]]
+    r = re.compile(r'^[0-9a-f]+ HEAD@\{\d+\}: checkout: moving from [^ ]+ to ([^ ]+)$')
+
+    for line in git.reflog("HEAD").splitlines():
+        m = r.match(line)
+        if m:
+            return(m.group(1))
+
+    return ""
 
 class VersionDb(object):
     """ Construct a full XXX+YYY version for a product.
@@ -279,18 +292,20 @@ class VersionDb(object):
         """
         pass
 
-    def version(self, productName, productdir, ref, dependencies):
+    def version(self, productName, productdir, git, dependencies):
         """ Return a standardized XXX+YYY EUPS version, that includes the dependencies.
         
             Args:
                 productName (str): name of the product to version
                 productdir (str): the directory with product source code
-                ref (str): the git ref that has been checked out into productdir (e.g., 'master')
+                git (Git): the Git object for productdir
                 dependencies (list): A list of `Product`s that are the immediate dependencies of productName
 
             Returns:
                 str. the XXX+YYY version string.
         """
+        ref = get_checked_out_ref_name(git)
+
         q = pipes.quote
         cmd ="cd %s && pkgautoversion %s" % (q(productdir), q(ref))
         productVersion = subprocess.check_output(cmd, shell=True).strip()
@@ -300,8 +315,6 @@ class VersionDb(object):
         assert suffix.__class__ == str
         suffix = "+%s" % suffix if suffix else ""
         return "%s%s" % (productVersion, suffix)
-
-
 
 class VersionDbHash(VersionDb):
     """Subclass of `VersionDb` that generates +YYY suffixes by hashing the dependency names and versions"""
@@ -621,63 +634,6 @@ class ProductDependencyLoader(object):
                 dependencies.append( dprod.name )
         return dependencies
 
-class CheckedOutRefStore(object):
-    """ Remembers which ref was checked out for a product, and
-        its associated SHA1. Primarily for later use in versioning.
-        
-        This implementation is obsolete now, and ReflogRefStore,
-        which gets the information from the reflog, should be used
-        instead.
-    """
-    def __init__(self, source_dir):
-        self._rootdir = os.path.join(source_dir, '.bt', 'refstore')
-
-    def set(self, productName, sha1, ref):
-        if not os.path.isdir(self._rootdir):
-            os.makedirs(self._rootdir)
-        with open(os.path.join(self._rootdir, productName), "w") as fp:
-            fp.write("%s\t%s\n" % (sha1, ref))
-
-    def get(self, productName):
-        fn = os.path.join(self._rootdir, productName)
-        try:
-            with open(fn) as fp:
-                return fp.readline().strip().split()
-        except IOError:
-            return None, ""
-
-    def commit(self):
-        pass
-
-class ReflogRefStore(object):
-    def __init__(self, source_dir):
-        self._sourcedir = source_dir
-
-    def set(self, productName, sha1, ref):
-        # noop; we deduce the reference from git reflog
-        pass
-
-    def get(self, productName):
-        git = Git(os.path.join(self._sourcedir, productName))
-
-        # trying to match: [[7e60993 HEAD@{10}: checkout: moving from master to u/mjuric/next]]
-        r = re.compile(r'^([0-9a-f]+) HEAD@\{\d+\}: checkout: moving from [^ ]+ to ([^ ]+)$')
-
-        sha1, ref = None, ""
-        for line in git.reflog("HEAD").splitlines():
-            m = r.match(line)
-            if not m:
-                continue
-            sha1abbrev = m.group(1)
-            ref = m.group(2)
-            sha1 = git.rev_parse(sha1abbrev)
-            break
-
-        return sha1, ref
-
-    def commit(self):
-        pass
-
 class ProductDictBuilder(object):
     """A class that, given one or more top level packages, recursively
     clones them to a build directory thus preparing them to be built."""
@@ -729,8 +685,7 @@ class BuildDirectoryConstructor(object):
         eupsObj = eups.Eups()
         exclusion_resolver = make_exclusion_resolver(args.exclusion_map)
         dependency_loader = ProductDependencyLoader(source_dir, eupsObj, exclusion_resolver)
-        ref_store = ReflogRefStore(source_dir)
-        product_fetcher = ProductFetcher(source_dir, args.repository_pattern, refs, args.no_fetch, ref_store)
+        product_fetcher = ProductFetcher(source_dir, args.repository_pattern, refs, args.no_fetch)
         p = ProductDictBuilder(source_dir, product_fetcher, dependency_loader)
 
         #
@@ -823,22 +778,15 @@ class ProgressReporter(object):
         yield progress
         progress._finalize()
 
-def version_manifest(source_dir, manifest, version_db, build_id, ref_store):
+def version_manifest(source_dir, manifest, version_db, build_id):
     """ For products in manifest, find or compute sha1, checked out ref,
         and version """
     for product in manifest.products.itervalues():
         productdir = os.path.join(source_dir, product.name)
-
         git = Git(productdir)
+
         product.sha1 = git.rev_parse("HEAD")
-
-        sha1, ref = ref_store.get(product.name)
-        print >>sys.stderr, sha1, ref
-        if sha1 is not None and sha1 != product.sha1:
-            ref = ""
-            print >>sys.stderr, "warning: sha1 stored in the ref store differs from current sha1 for %s." % (product.name)
-
-        product.version = version_db.version(product.name, productdir, ref, product.dependencies)
+        product.version = version_db.version(product.name, productdir, git, product.dependencies)
 
     return version_db.commit(manifest, build_id)
 
@@ -990,8 +938,7 @@ class Builder(object):
             version_db = VersionDbGit(args.build_id_prefix, eupsObj, args.version_git_repo)
         else:
             version_db = VersionDbHash(args.build_id_prefix, eupsObj, args.sha_abbrev_len)
-        ref_store = ReflogRefStore(source_dir)
-        build_id = version_manifest(source_dir, manifest, version_db, args.build_id, ref_store)
+        build_id = version_manifest(source_dir, manifest, version_db, args.build_id)
         print >>sys.stderr, "build id: %s" % build_id
 
         # Build products
