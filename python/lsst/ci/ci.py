@@ -50,21 +50,18 @@ class Manifest(object):
        :ivar buildID:  unique build identifier
     """
 
-    def __init__(self, productsList, buildID=None):
+    def __init__(self, productsList):
         """Construct the manifest
         
         Args:
             productList (OrderedDict): A topologically sorted dict of `Product`s
-            buildID (str): A unique identifier for this build
         
         """
-        self.buildID = buildID
         self.products = productsList
 
     def toFile(self, fileObject):
         """ Serialize the manifest to a file object """
         print >>fileObject, '# %-23s %-41s %-30s' % ("product", "SHA1", "Version")
-        print >>fileObject, 'BUILD=%s' % self.buildID
         for prod in self.products.itervalues():
             print >>fileObject, '%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version, ','.join(dep.name for dep in prod.dependencies))
 
@@ -85,9 +82,7 @@ class Manifest(object):
     @staticmethod
     def fromFile(fileObject):
         varre = re.compile('^(\w+)=(.*)$')
-
         products = collections.OrderedDict()
-        buildId = None
         for line in fileObject:
             line = line.strip()
             if not line:
@@ -95,14 +90,12 @@ class Manifest(object):
             if line.startswith('#'):
                 continue
 
-            # Look for variable assignments
+            # --- backwards compatibility ---
+            # We don't use store variables in manifests any more
             m = varre.match(line)
             if m:
-                varName = m.group(1)
-                varValue = m.group(2)
-                if varName == "BUILD":
-                    buildId = varValue
                 continue
+            # --- backwards compatibility ---
 
             arr = line.split()
             if len(arr) == 4:
@@ -114,7 +107,7 @@ class Manifest(object):
 
             products[name] = Product(name, deps, sha1=sha1, version=version)
 
-        return Manifest(products, buildId)
+        return Manifest(products)
 
     @staticmethod
     def fromProductDict(productDict):
@@ -138,7 +131,7 @@ class Manifest(object):
         products = collections.OrderedDict()
         for name in topoSortedProductNames:
             products[name] = productDict[name]
-        return Manifest(products, None)
+        return Manifest(products)
 
 
 class ProductFetcher(object):
@@ -243,7 +236,7 @@ class ProductFetcher(object):
         # previous builds)
         git.clean("-d", "-f", "-q")
 
-	self.ref_store.set(product, sha1, ref)
+        self.ref_store.set(product, sha1, ref)
 
         print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
         return ref, sha1
@@ -281,8 +274,8 @@ class VersionDb(object):
                
            A subclass must override this method to commit to
            permanent storage any changes to the underlying database
-           caused by getSuffix() invocations, and to assign the
-           build_id to manifest.buildID.
+           caused by getSuffix() invocations, and to return a
+           locally unique build_id.
         """
         pass
 
@@ -327,51 +320,49 @@ class VersionDbHash(VersionDb):
         return m.hexdigest()
 
     def getSuffix(self, productName, productVersion, dependencies):
-        """ Return a hash of the sorted list of printed (dep_name, dep_version) tuples """
+        """ Return a hash of the sorted list of printed (dep_name, dep_version) tuples 
+            Don't return a suffix if there are no dependencies.
+        """
+        if not dependencies:
+            return ""
+
         hash = self._hash_dependencies(dependencies)
         suffix = hash[:self.sha_abbrev_len]
         return suffix
 
-    def __getFreeBuildId(self):
-        """Allocate the next unused EUPS tag that matches the bNNNN pattern"""
+    def __getBuildId(self, manifest):
+        """Find and re-use an existing tag with the requested prefix that
+           tags the largest subset of this manifest and no products outside
+           of it."""
 
         tags = eups.tags.Tags()
         tags.loadFromEupsPath(self.eups.path)
 
+        # Tags are in the form <prefix><N>; find the maximal <N>
         prefix_len = len(self.build_id_prefix)
         btre = re.compile('^%s[0-9]+$' % self.build_id_prefix)
-        btags = [ 0 ]
-        btags += [ int(tag[prefix_len:]) for tag in tags.getTagNames() if btre.match(tag) ]
-        tag = "%s%s" % (self.build_id_prefix, max(btags) + 1)
-
-        return tag
-
-    def __getBuildId(self, manifest):
-        """If a tag exists, with the requested prefix, that covers exactly this manifest, use it."""
-
-        # Find all candidate tags
-        btre = re.compile('^%s[0-9]+$' % self.build_id_prefix)
-        tags = None
-        for product in manifest.products.itervalues():
-            prodTags = [ tag for tag in self.eups.getProduct(product.name, product.version).tags if btre.match(tag) ]
-            tags = tags.intersection(prodTags) if tags is not None else set(prodTags)
-            if not tags:
-                return self.__getFreeBuildId()
-
-        # Make sure the current manifest is not a subset of products tagged
-        # with one of those tags
-        products = self.eups.findProducts(tags=[tag for tag in tags])
-        if len(products) != len(manifest.products):
-            for product in products:
-                if product.name not in manifest.products:
-                    tags = tags.difference(product.tags)
-                if not tags:
-                    return self.__getFreeBuildId()
-
-        return max(tags)
+        btags = [ int(tag[prefix_len:]) for tag in tags.getTagNames() if btre.match(tag) ]
+        if btags:
+            candidate = max(btags)
+        
+            # See if the products tagged with the candidate tag are a subset of the manifest
+            # If yes, reuse the tag; if not, increment <N> by one and use that.
+            products = self.eups.findProducts(tags="%s%s" % (self.build_id_prefix, candidate))
+            if len(products) != len(manifest.products):
+                for product in products:
+                    print "%s-%s" % (product.name, product.version)
+                    if product.name not in manifest.products or \
+                       product.version != manifest.products[product.name].version:
+                        candidate += 1
+                        return "%s%s" % (self.build_id_prefix, candidate)
+        else:
+            candidate = 1
+        
+        # reuse the tag
+        return "%s%s" % (self.build_id_prefix, candidate)
 
     def commit(self, manifest, build_id):
-        manifest.buildID = self.__getBuildId(manifest) if build_id is None else build_id
+        return self.__getBuildId(manifest) if build_id is None else build_id
 
 class VersionDbGit(VersionDbHash):
     """Subclass of `VersionDb` that generates +YYY suffixes by assigning a unique +N integer to
@@ -510,7 +501,7 @@ class VersionDbGit(VersionDbHash):
         git = Git(self.dbdir)
 
         manifestSha = manifest.content_hash()
-        manifest.buildID = self.__getBuildId(manifest, manifestSha) if build_id is None else build_id
+        build_id = self.__getBuildId(manifest, manifestSha) if build_id is None else build_id
 
         # Write files
         dirty = False
@@ -531,33 +522,33 @@ class VersionDbGit(VersionDbHash):
             dirty = True
 
         # Store a copy of the manifest
-        manfn = os.path.join('manifests', "%s.txt" % manifest.buildID)
+        manfn = os.path.join('manifests', "%s.txt" % build_id)
         absmanfn = os.path.join(self.dbdir, manfn)
         with open(absmanfn, 'w') as fp:
             manifest.toFile(fp)
 
-        if git.tag("-l", manifest.buildID) == manifest.buildID:
+        if git.tag("-l", build_id) == build_id:
             # If the buildID/manifest are being reused, VersionDB repository must be clean
             if git.describe('--always', '--dirty=-prljavonakraju').endswith("-prljavonakraju"):
-                raise Exception("Trying to reuse the buildID, but the versionDB repository is dirty!")
+                raise Exception("Trying to reuse the build ID, but the versionDB repository is dirty!")
         else:
             # add the manifest file
             git.add(manfn)
 
-            # add the new manifest<->buildID mapping
+            # add the new manifest<->build_id mapping
             shafn = self.__shafn()
             absshafn = os.path.join(self.dbdir, shafn)
             with open(absshafn, 'a+') as fp:
-                fp.write("%s\t%s\n" % (manifestSha, manifest.buildID))
+                fp.write("%s\t%s\n" % (manifestSha, build_id))
             git.add(shafn)
 
             # git-commit
-            msg = "Updates for build %s." % manifest.buildID
+            msg = "Updates for build %s." % build_id
             git.commit('-m', msg)
 
             # git-tag
-            msg = "Build ID %s" % manifest.buildID
-            git.tag('-a', '-m', msg, manifest.buildID)
+            msg = "Build ID %s" % build_id
+            git.tag('-a', '-m', msg, build_id)
 
 class ExclusionResolver(object):
     """A class to determine whether a dependency should be excluded from
@@ -666,7 +657,7 @@ class ProductDictBuilder(object):
             return products[productName]
 
         # Load the product components
-	self.fetch_product(productName)
+        self.fetch_product(productName)
         dependencies = [ self._do_walk(products, depName) for depName in self.dependency_loader.get_dependencies(productName) ]
 
         # Add the result to products, return it for convenience
@@ -819,9 +810,10 @@ class Builder(object):
     
        The result is tagged with the `Manifest`s build ID, if any.
     """
-    def __init__(self, source_dir, manifest, progress, eups):
+    def __init__(self, source_dir, manifest, build_id, progress, eups):
         self.source_dir = source_dir
         self.manifest = manifest
+        self.build_id = build_id
         self.progress = progress
         self.eups = eups
 
@@ -924,17 +916,17 @@ class Builder(object):
             except eups.ProductNotFound:
                 eupsProd, retcode, logfile = self._build_product(product, progress)
 
-            if eupsProd is not None and self.manifest.buildID not in eupsProd.tags:
-                self._tag_product(product.name, product.version, self.manifest.buildID)
+            if eupsProd is not None and self.build_id not in eupsProd.tags:
+                self._tag_product(product.name, product.version, self.build_id)
 
             progress.reportResult(retcode, logfile)
 
         return retcode == 0
 
     def build(self):
-        # Make sure EUPS knows about the buildID tag
-        if self.manifest.buildID:
-            declareEupsTag(self.manifest.buildID, self.eups)
+        # Make sure EUPS knows about the build_id tag
+        if self.build_id is not None:
+            declareEupsTag(self.build_id, self.eups)
 
         # Build all products
         for product in self.manifest.products.itervalues():
@@ -962,20 +954,20 @@ class Builder(object):
         else:
             version_db = VersionDbHash(args.build_id_prefix, eupsObj, args.sha_abbrev_len)
         ref_store = CheckedOutRefStore(source_dir)
-        version_manifest(source_dir, manifest, version_db, args.build_id, ref_store)
+        build_id = version_manifest(source_dir, manifest, version_db, args.build_id, ref_store)
+        print >>sys.stderr, "build id: %s" % build_id
 
         # Build products
         progress = ProgressReporter(sys.stderr)
-        b = Builder(source_dir, manifest, progress, eupsObj)
+        b = Builder(source_dir, manifest, build_id, progress, eupsObj)
         b.build()
 
-#        #
-#        # Store the result in source_dir/manifest.txt
-#        #
-#        manifestFn = os.path.join(source_dir, 'manifest.txt')
-#        with open(manifestFn, 'w') as fp:
-#            manifest.toFile(fp)
-#
+        #
+        # Store the result in source_dir/manifest.txt
+        #
+        manifestFn = os.path.join(source_dir, '%s.manifest.txt' % build_id)
+        with open(manifestFn, 'w') as fp:
+            manifest.toFile(fp)
 
 #        manifestFn = os.path.join(source_dir, 'manifest.txt')
 #        with open(manifestFn) as fp:
