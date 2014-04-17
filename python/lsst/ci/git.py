@@ -58,6 +58,12 @@ class Git:
     def pull(self, *args, **kwargs):
         return self('pull', *args, **kwargs)
 
+    def merge(self, *args, **kwargs):
+        return self('merge', *args, **kwargs)
+
+    def push(self, *args, **kwargs):
+        return self('push', *args, **kwargs)
+
     def commit(self, *args, **kwargs):
         return self('commit', *args, **kwargs)
 
@@ -69,3 +75,6 @@ class Git:
 
     def describe(self, *args, **kwargs):
         return self('describe', *args, **kwargs)
+
+    def isclean(self):
+        return not self.describe('--always', '--dirty=-prljavonakraju').endswith("-prljavonakraju")

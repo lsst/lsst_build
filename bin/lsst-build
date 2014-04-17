@@ -3,7 +3,7 @@
 # lsst-build [build|clone] <build_directory> [ref]
 #
 
-import argparse, os, getpass
+import argparse, os
 
 from lsst.ci import PullCommand, Builder
 

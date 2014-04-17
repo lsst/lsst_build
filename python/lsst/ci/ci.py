@@ -12,7 +12,6 @@ import re
 import pipes
 import subprocess
 import collections
-import abc
 import contextlib
 import textwrap
 import cStringIO
@@ -297,95 +296,8 @@ def get_checked_out_ref_name(git):
 
     return ""
 
-class VersionDb(object):
-    """ Construct a full XXX+YYY version for a product.
-    
-        The subclasses of VersionDb determine how +YYY will be computed.
-        The XXX part is computed by running EUPS' pkgautoversion.
-    """
 
-    __metaclass__ = abc.ABCMeta
-    
-    @abc.abstractmethod
-    def getSuffix(self, productName, productVersion, dependencies):
-        """Return a unique +YYY version suffix for a product given its dependencies
-        
-            Args:
-                productName (str): name of the product
-                productVersion (str): primary version of the product
-                dependencies (list): A list of `Product`s that are the immediate dependencies of productName
-                
-            Returns:
-                str. the +YYY suffix (w/o the + sign).
-        """
-        pass
-
-    @abc.abstractmethod
-    def commit(self, manifest, build_id):
-        """Commit the changes to the version database
-        
-           Args:
-               manifest (`Manifest`): a manifest of products from this run
-               build_id (str): the build identifier
-               
-           A subclass must override this method to commit to
-           permanent storage any changes to the underlying database
-           caused by getSuffix() invocations, and to return a
-           locally unique build_id.
-        """
-        pass
-
-    def version(self, productName, productdir, git, dependencies):
-        """ Return a standardized XXX+YYY EUPS version, that includes the dependencies.
-        
-            Args:
-                productName (str): name of the product to version
-                productdir (str): the directory with product source code
-                git (Git): the Git object for productdir
-                dependencies (list): A list of `Product`s that are the immediate dependencies of productName
-
-            Returns:
-                str. the XXX+YYY version string.
-        """
-        ref = get_checked_out_ref_name(git)
-
-        q = pipes.quote
-        cmd ="cd %s && pkgautoversion %s" % (q(productdir), q(ref))
-        productVersion = subprocess.check_output(cmd, shell=True).strip()
-
-        # add +XXXX suffix, if any
-        suffix = self.getSuffix(productName, productVersion, dependencies)
-        assert suffix.__class__ == str
-        suffix = "+%s" % suffix if suffix else ""
-        return "%s%s" % (productVersion, suffix)
-
-class VersionDbHash(VersionDb):
-    """Subclass of `VersionDb` that generates +YYY suffixes by hashing the dependency names and versions"""
-
-    def __init__(self, build_id_prefix, eups, sha_abbrev_len):
-        self.sha_abbrev_len = sha_abbrev_len
-        self.build_id_prefix = build_id_prefix
-        self.eups = eups
-
-    def _hash_dependencies(self, dependencies):
-        m = hashlib.sha1()
-        for dep in sorted(dependencies, lambda a, b: cmp(a.name, b.name)):
-            s = '%s\t%s\n' % (dep.name, dep.version)
-            m.update(s)
-
-        return m.hexdigest()
-
-    def getSuffix(self, productName, productVersion, dependencies):
-        """ Return a hash of the sorted list of printed (dep_name, dep_version) tuples 
-            Don't return a suffix if there are no dependencies.
-        """
-        if not dependencies:
-            return ""
-
-        hash = self._hash_dependencies(dependencies)
-        suffix = hash[:self.sha_abbrev_len]
-        return suffix
-
+class BuildIdGenerator(object):
     def __getBuildId(self, manifest):
         """Find and re-use an existing tag with the requested prefix that
            tags the largest subset of this manifest and no products outside
@@ -417,10 +329,37 @@ class VersionDbHash(VersionDb):
         # reuse the tag
         return "%s%s" % (self.build_id_prefix, candidate)
 
-    def commit(self, manifest, build_id):
-        return self.__getBuildId(manifest) if build_id is None else build_id
+    def __getBuildId(self, manifest, manifestSha):
+        """Return a build ID unique to this manifest. If a matching manifest already
+           exists in the database, its build ID will be used.
+        """
+        with open(os.path.join(self.dbdir, 'manifests', 'content_sha.db.txt'), 'a+') as fp:
+                # Try to find a manifest with existing matching content
+                for line in fp:
+                        (sha1, tag) = line.strip().split()
+                        if sha1 == manifestSha:
+                                return tag
 
-class VersionDbGit(VersionDbHash):
+                # Find the next unused tag that matches the ${build_id_prefix}NNNN pattern
+                # and isn't defined in EUPS yet
+                git = Git(self.dbdir)
+                tags = git.tag('-l', '%s[0-9]*' % self.build_id_prefix).split()
+                btre = re.compile('^%s[0-9]+$' % self.build_id_prefix)
+                prefix_len = len(self.build_id_prefix)
+                btags = [ 0 ]
+                btags += [ int(tag[prefix_len:]) for tag in tags if btre.match(tag) ]
+                btag = max(btags)
+
+                definedTags = self.eups.tags.getTagNames()
+                while True:
+                    btag += 1
+                    tag = "%s%s" % (self.build_id_prefix, btag)
+                    if tag not in definedTags:
+                        break
+
+                return tag
+
+class VersionDB(object):
     """Subclass of `VersionDb` that generates +YYY suffixes by assigning a unique +N integer to
        each set of dependencies, and tracking the assignments in a git repository.    
     """
@@ -465,28 +404,40 @@ class VersionDbGit(VersionDbHash):
 
         def appendAdditionsToFile(self, fileObjectVer, fileObjectDep):
             # write (version, hash)<->suffix and dependency table updates
+            # returns the number of additions written
+            
             for (version, suffix), dependencies in self.added_entries.iteritems():
                 fileObjectVer.write("%s\t%s\t%d\n" % (version, self.hash(version, suffix), suffix))
                 for depName, depVersion in dependencies:
                     fileObjectDep.write("%s\t%d\t%s\t%s\n" % (version, suffix, depName, depVersion))
 
+            n = len(self.added_entries)
             self.added_entries = []
             self.dirty = False
 
+            return n
+
         @staticmethod
         def fromFile(fileObject):
-            vm = VersionDbGit.VersionMap()
+            vm = VersionDB.VersionMap()
             for line in iter(fileObject.readline, ''):
                 (version, hash, suffix) = line.strip().split()[:3]
                 vm.__just_add(version, hash, int(suffix))
 
             return vm
 
-    def __init__(self, build_id_prefix, eupsObj, dbdir):
-        super(VersionDbGit, self).__init__(build_id_prefix, eupsObj, None)
+    def __init__(self, dbdir, eupsObj, writable, sha_abbrev_len, no_fetch):
+        self.eups = eupsObj
         self.dbdir = dbdir
+        self.writable = writable
+        self.sha_abbrev_len = sha_abbrev_len
+        self.no_fetch = no_fetch
 
-        self.versionMaps = dict()
+        self.versionMaps = {}
+        self.git = Git(self.dbdir)
+        
+        if not self.git.isclean():
+            raise Exception('versiondb is not clean, refusing to proceed.')
 
     def __verfn(self, productName):
         return os.path.join("ver_db", productName + '.txt')
@@ -497,8 +448,18 @@ class VersionDbGit(VersionDbHash):
     def __shafn(self):
         return os.path.join("manifests", 'content_sha.db.txt')
 
-    def getSuffix(self, productName, productVersion, dependencies):
-        hash = self._hash_dependencies(dependencies)
+    def _hash_product_list(self, dependencies):
+        """ Return a hash of (product name, product version) tuples """
+        m = hashlib.sha1()
+
+        for dep in sorted(dependencies, lambda a, b: cmp(a.name, b.name)):
+            s = '%s\t%s\n' % (dep.name, dep.version)
+            m.update(s)
+
+        return m.hexdigest()
+
+    def _getSuffix(self, productName, productVersion, dependencies):
+        hash = self._hash_product_list(dependencies)
 
         # Lazy-load/create
         try:
@@ -506,64 +467,91 @@ class VersionDbGit(VersionDbHash):
         except KeyError:
             absverfn = os.path.join(self.dbdir, self.__verfn(productName))
             try:
-                vm = VersionDbGit.VersionMap.fromFile(file(absverfn))
+                vm = VersionDB.VersionMap.fromFile(open(absverfn))
             except IOError:
-                vm = VersionDbGit.VersionMap()
+                vm = VersionDB.VersionMap()
             self.versionMaps[productName] = vm
 
-        # get or create a new suffix
+        # get or create a new suffix. If the database is read-only,
+        # return the dependency hash as the suffix.
         try:
-            suffix = vm.suffix(productVersion, hash)
+            suffix = str(vm.suffix(productVersion, hash))
         except KeyError:
-            suffix = vm.new_suffix(productVersion, hash, dependencies)
+            if self.writable:
+                suffix = vm.new_suffix(productVersion, hash, dependencies)
 
-        assert isinstance(suffix, int)
-        if suffix == 0:
+                assert isinstance(suffix, int)
+                suffix = str(suffix)
+            else:
+                suffix = hash[:self.sha_abbrev_len]
+
+        if suffix == "0":
             suffix = ""
 
-        return str(suffix)
+        return suffix
 
-    def __getBuildId(self, manifest, manifestSha):
-        """Return a build ID unique to this manifest. If a matching manifest already
-           exists in the database, its build ID will be used.
+    def version(self, productName, productdir, git, dependencies):
+        """ Return a standardized XXX+YYY EUPS version, that includes the dependencies.
+        
+            Args:
+                productName (str): name of the product to version
+                productdir (str): the directory with product source code
+                git (Git): the Git object for productdir
+                dependencies (list): A list of `Product`s that are the immediate dependencies of productName
+
+            Returns:
+                str. the XXX+YYY version string.
         """
-        with open(os.path.join(self.dbdir, 'manifests', 'content_sha.db.txt'), 'a+') as fp:
-                # Try to find a manifest with existing matching content
-                for line in fp:
-                        (sha1, tag) = line.strip().split()
-                        if sha1 == manifestSha:
-                                return tag
+        ref = get_checked_out_ref_name(git)
 
-                # Find the next unused tag that matches the ${build_id_prefix}NNNN pattern
-                # and isn't defined in EUPS yet
-                git = Git(self.dbdir)
-                tags = git.tag('-l', '%s[0-9]*' % self.build_id_prefix).split()
-                btre = re.compile('^%s[0-9]+$' % self.build_id_prefix)
-                prefix_len = len(self.build_id_prefix)
-                btags = [ 0 ]
-                btags += [ int(tag[prefix_len:]) for tag in tags if btre.match(tag) ]
-                btag = max(btags)
+        q = pipes.quote
+        cmd ="cd %s && pkgautoversion %s" % (q(productdir), q(ref))
+        productVersion = subprocess.check_output(cmd, shell=True).strip()
 
-                definedTags = self.eups.tags.getTagNames()
-                while True:
-                    btag += 1
-                    tag = "%s%s" % (self.build_id_prefix, btag)
-                    if tag not in definedTags:
-                        break
+        # add +XXXX suffix, if any
+        suffix = self._getSuffix(productName, productVersion, dependencies)
+        assert type(suffix) is str, "suffix must be a string, instead it's a %s" % (suffix.__class__)
+        suffix = "+%s" % suffix if suffix else ""
+        return "%s%s" % (productVersion, suffix)
 
-                return tag
+    @contextlib.contextmanager
+    def transaction(self):
+        if not self.no_fetch:
+            t0 = time.time()
+            sys.stderr.write("%20s: " % "[versiondb pull]")
+            # pull heads and tags in one go
+            self.git.pull("--ff-only", "-p", "origin", "refs/heads/*:refs/heads/*", "refs/tags/*:refs/tags/*")
+            print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
 
-    def commit(self, manifest, build_id):
-        git = Git(self.dbdir)
+        # implementation note: nothing is written to disk until _commit()
+        # is executed, so there's no need to wrap yield in try/except/finally
+        # to handle any exceptions (e.g., for transaction rollback).
+        yield
 
-        manifestSha = manifest.content_hash()
-        build_id = self.__getBuildId(manifest, manifestSha) if build_id is None else build_id
+        self._commit()
 
-        # Write files
+    def version_manifest(self, workdir, manifest):
+        """ For products in manifest, find or compute sha1, checked out ref,
+            and version """
+
+        with self.transaction():
+            for product in manifest.products.itervalues():
+                productdir = os.path.join(workdir, product.name)
+                git = Git(productdir)
+
+                product.sha1 = git.rev_parse("HEAD")
+                product.version = self.version(product.name, productdir, git, product.dependencies)
+
+    def _commit(self):
         dirty = False
+        n = 0
         for (productName, vm) in self.versionMaps.iteritems():
             if not vm.dirty:
                 continue
+
+            # if we wrote a new version when the database has been marked
+            # as read-only, there's a coding error somewhere in here.
+            assert self.writable, "versiondb.writable=false but the entry for %s has been modified" % productName
 
             verfn = self.__verfn(productName)
             depfn = self.__depfn(productName)
@@ -572,39 +560,23 @@ class VersionDbGit(VersionDbHash):
 
             with open(absverfn, 'a') as fpVer:
                 with open(absdepfn, 'a') as fpDep:
-                    vm.appendAdditionsToFile(fpVer, fpDep)
+                    n += vm.appendAdditionsToFile(fpVer, fpDep)
 
-            git.add(verfn, depfn)
+            self.git.add(verfn, depfn)
             dirty = True
 
-        # Store a copy of the manifest
-        manfn = os.path.join('manifests', "%s.txt" % build_id)
-        absmanfn = os.path.join(self.dbdir, manfn)
-        with open(absmanfn, 'w') as fp:
-            manifest.toFile(fp)
+        if dirty:
+            # Commit
+            msg = "%d new versions added on %s." % (n, time.strftime("%c"))
+            self.git.commit('-m', msg)
 
-        if git.tag("-l", build_id) == build_id:
-            # If the buildID/manifest are being reused, VersionDB repository must be clean
-            if git.describe('--always', '--dirty=-prljavonakraju').endswith("-prljavonakraju"):
-                raise Exception("Trying to reuse the build ID, but the versionDB repository is dirty!")
-        else:
-            # add the manifest file
-            git.add(manfn)
+            # Push
+            if not self.no_fetch:
+                t0 = time.time()
+                sys.stderr.write("%20s: " % "[versiondb push]")
+                self.git.push()
+                print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
 
-            # add the new manifest<->build_id mapping
-            shafn = self.__shafn()
-            absshafn = os.path.join(self.dbdir, shafn)
-            with open(absshafn, 'a+') as fp:
-                fp.write("%s\t%s\n" % (manifestSha, build_id))
-            git.add(shafn)
-
-            # git-commit
-            msg = "Updates for build %s." % build_id
-            git.commit('-m', msg)
-
-            # git-tag
-            msg = "Build ID %s" % build_id
-            git.tag('-a', '-m', msg, build_id)
 
 class ExclusionResolver(object):
     """A class to determine whether a dependency should be excluded from
@@ -787,19 +759,13 @@ class PullCommand(object):
 
         # Run the construction
         productDict = p.walk(products)
-
-        # Build and version the manifest
         manifest = Manifest.fromProductDict(productDict)
 
-        # Version products
-        eupsObj = eups.Eups()
-        if bt.config["versiondb.writable"] == "true":
-            version_db = VersionDbGit(bt.config["build.prefix"], eupsObj, bt.config["versiondb.dir"])
-        else:
-            version_db = VersionDbHash(bt.config["build.prefix"], eupsObj, bt.config["versiondb.sha-abbrev-len"])
-        build_id = version_manifest(bt.workdir, manifest, version_db, args.build_id)
-        print >>sys.stderr, "build id: %s" % build_id
+        # Version the manifest
+        versiondb = VersionDB(bt.config["versiondb.dir"], eupsObj, bt.config["versiondb.writable"], bt.config["versiondb.sha-abbrev-len"], args.no_fetch)
+        versiondb.version_manifest(bt.workdir, manifest)
 
+        # Save the current manifest into .bt/manifest
         bt.save_manifest(manifest)
 
 
@@ -884,18 +850,6 @@ class ProgressReporter(object):
         progress._buildStarted()
         yield progress
         progress._finalize()
-
-def version_manifest(source_dir, manifest, version_db, build_id):
-    """ For products in manifest, find or compute sha1, checked out ref,
-        and version """
-    for product in manifest.products.itervalues():
-        productdir = os.path.join(source_dir, product.name)
-        git = Git(productdir)
-
-        product.sha1 = git.rev_parse("HEAD")
-        product.version = version_db.version(product.name, productdir, git, product.dependencies)
-
-    return version_db.commit(manifest, build_id)
 
 class Builder(object):
     """Class that builds and installs all products in a manifest.
