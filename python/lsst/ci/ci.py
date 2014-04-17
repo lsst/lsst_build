@@ -16,10 +16,32 @@ import abc
 import contextlib
 import textwrap
 import cStringIO
+import ConfigParser
 
 from . import tsort
 
 from .git import Git, GitError
+
+class Config(dict):
+    """ Class holding the build-tool configuration (a simple dict)
+        
+        Config files are ConfigParser parsable, and converted to
+        <section>.<key> = <value> keys in the dict.
+    """
+
+    @staticmethod
+    def fromFile(fileObject):
+        cp = ConfigParser.ConfigParser()
+        cp.readfp(fileObject)
+        
+        config = Config()
+        for section in cp.sections():
+            for (key, value) in cp.items(section, raw=True):
+                k = "%s.%s" % (section, key)
+                config[k] = value
+
+        return config
+
 
 class Product(object):
     """Class representing an EUPS product to be built"""
@@ -662,15 +684,63 @@ class ProductDictBuilder(object):
             self._do_walk(products, name)
         return products
 
-class BuildDirectoryConstructor(object):
+class BT(object):
+    def __init__(self, workdir, btdir, config, products):
+        self.workdir = workdir
+        self.btdir = btdir
+        self.config = config
+        self.products = products
+
+    def save_products(self, products):
+        productsFile = os.path.join(self.btdir, 'products')
+        with open(productsFile, 'w') as fp:
+            fp.write(' '.join(products))
+            fp.write('\n')
+        self.products = products
+
+    @staticmethod
+    def fromDir(workdir, btdir=None):
+        # Ensure build directory exists, is initialized, and writable
+        if btdir is None:
+            btdir = os.path.join(workdir, '.bt')
+
+        if not os.access(workdir, os.W_OK):
+            raise Exception("Directory '%s' does not exist or isn't writable." % workdir)
+
+        if not os.path.isdir(btdir):
+            raise Exception("Directory '%s' doesn't have a .bt subdirectory. Did you forget to run 'bt init'?" % workdir)
+
+        # Load the configuration
+        with open(os.path.join(btdir, 'config')) as fp:
+            config = Config.fromFile(fp)
+        
+        # Load the current product list, if any
+        productsFile = os.path.join(btdir, 'products')
+        products = []
+        if os.path.exists(productsFile):
+            with open(productsFile) as fp:
+                products = fp.read().strip().split()
+
+        return BT(workdir, btdir, config, products)
+
+
+class PullCommand(object):
     @staticmethod
     def run(args):
-        #
-        # Ensure build directory exists and is writable
-        #
-        source_dir = args.dir
-        if not os.access(source_dir, os.W_OK):
-            raise Exception("Directory '%s' does not exist or isn't writable." % source_dir)
+        bt = BT.fromDir(args.work_dir, args.bt_dir)
+
+        # Use default args.produts if empty
+        if args.products:
+            products = args.products
+            bt.save_products(products)
+        else:
+            products = bt.products
+
+        if not products:
+            raise Exception("Need to specify products the first time you run 'bt pull'.")
+
+        # Apply any command-line overrides
+        # -- none so far --
 
         #
         # Add 'master' to list of refs, if not there already
@@ -683,17 +753,13 @@ class BuildDirectoryConstructor(object):
         # Wire-up the ProductDictBuilder
         #
         eupsObj = eups.Eups()
-        exclusion_resolver = make_exclusion_resolver(args.exclusion_map)
-        dependency_loader = ProductDependencyLoader(source_dir, eupsObj, exclusion_resolver)
-        product_fetcher = ProductFetcher(source_dir, args.repository_pattern, refs, args.no_fetch)
-        p = ProductDictBuilder(source_dir, product_fetcher, dependency_loader)
+        exclusion_resolver = make_exclusion_resolver(bt.config['core.exclusions'])
+        dependency_loader = ProductDependencyLoader(bt.workdir, eupsObj, exclusion_resolver)
+        product_fetcher = ProductFetcher(bt.workdir, bt.config['upstream.pattern'], refs, args.no_fetch)
+        p = ProductDictBuilder(bt.workdir, product_fetcher, dependency_loader)
 
-        #
         # Run the construction
-        #
-        p.walk(args.products)
-
-
+        p.walk(products)
 
 
 #############################################################################
