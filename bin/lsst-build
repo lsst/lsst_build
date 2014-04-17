@@ -25,6 +25,7 @@ parser_clone.set_defaults(func=PullCommand.run)
 parser_clone.add_argument('products', type=str, help='Top-level products to pull', nargs='*')
 parser_clone.add_argument('--ref', default=[], action='append', type=str, help='An ordered list of refs to check out')
 parser_clone.add_argument('--no-fetch', action='store_true', help="Don't git-fetch any products")
+parser_clone.add_argument('--build-id', default=None, type=str, help='Build ID (default: autodetected from existing EUPS or git tags)')
 
 # Parser for the 'build' command
 parser_build = subparsers.add_parser('build', help='Build the source tree given the manifest')

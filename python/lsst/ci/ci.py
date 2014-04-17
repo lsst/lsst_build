@@ -711,13 +711,19 @@ class BT(object):
         self.btdir = btdir
         self.config = config
         self.products = products
-
+        
     def save_products(self, products):
         productsFile = os.path.join(self.btdir, 'products')
         with open(productsFile, 'w') as fp:
             fp.write(' '.join(products))
             fp.write('\n')
         self.products = products
+
+    def save_manifest(self, manifest):
+        # Store the result in .bt/manifest
+        manifestFn = os.path.join(self.btdir, 'manifest')
+        with open(manifestFn, 'w') as fp:
+            manifest.toFile(fp)
 
     @staticmethod
     def fromDir(workdir, btdir=None):
@@ -780,7 +786,21 @@ class PullCommand(object):
         p = ProductDictBuilder(bt.workdir, product_fetcher, dependency_loader)
 
         # Run the construction
-        p.walk(products)
+        productDict = p.walk(products)
+
+        # Build and version the manifest
+        manifest = Manifest.fromProductDict(productDict)
+
+        # Version products
+        eupsObj = eups.Eups()
+        if bt.config["versiondb.writable"] == "true":
+            version_db = VersionDbGit(bt.config["build.prefix"], eupsObj, bt.config["versiondb.dir"])
+        else:
+            version_db = VersionDbHash(bt.config["build.prefix"], eupsObj, bt.config["versiondb.sha-abbrev-len"])
+        build_id = version_manifest(bt.workdir, manifest, version_db, args.build_id)
+        print >>sys.stderr, "build id: %s" % build_id
+
+        bt.save_manifest(manifest)
 
 
 #############################################################################
