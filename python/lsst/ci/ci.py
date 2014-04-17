@@ -17,31 +17,52 @@ import contextlib
 import textwrap
 import cStringIO
 import ConfigParser
+import getpass
 
 from . import tsort
 
 from .git import Git, GitError
 
-class Config(dict):
-    """ Class holding the build-tool configuration (a simple dict)
+def load_config(fileObject):
+    """ Load the build-tool configuration, returning it in a dict
         
         Config files are ConfigParser parsable, and converted to
-        <section>.<key> = <value> keys in the dict.
+        <section>.<key> = <value> keys in the returned dict.
     """
 
-    @staticmethod
-    def fromFile(fileObject):
-        cp = ConfigParser.ConfigParser()
-        cp.readfp(fileObject)
-        
-        config = Config()
-        for section in cp.sections():
-            for (key, value) in cp.items(section, raw=True):
-                k = "%s.%s" % (section, key)
-                config[k] = value
+    def str_to_bool(strval):
+        if strval.lower() in ["true", "1"]:
+            return True
+        if strval.lower() in ["false", "0"]:
+            return False
+        raise Exception("Error converting string '%s' to boolean value." % strval)
 
-        return config
+    schema = {
+        # key : (default value, type_converter)
+        'core.exclusions': (None, str),
 
+        'upstream.pattern': (None, str),
+
+        'versiondb.url': (None, str),
+        'versiondb.dir': ('.bt/versiondb', str),
+        'versiondb.writable': (False, str_to_bool),
+        'versiondb.sha-abbrev-len': (10, int),
+
+        'build.prefix': (getpass.getuser(), str)
+    }
+
+    config = dict((key, default_value) for (key, (default_value, _)) in schema.iteritems())
+
+    # Load from file
+    cp = ConfigParser.ConfigParser()
+    cp.readfp(fileObject)
+    for section in cp.sections():
+        for (key, value) in cp.items(section, raw=True):
+            k = "%s.%s" % (section, key)
+            _, type_converter = schema[k]
+            config[k] = type_converter(value)
+
+    return config
 
 class Product(object):
     """Class representing an EUPS product to be built"""
@@ -712,7 +733,7 @@ class BT(object):
 
         # Load the configuration
         with open(os.path.join(btdir, 'config')) as fp:
-            config = Config.fromFile(fp)
+            config = load_config(fp)
         
         # Load the current product list, if any
         productsFile = os.path.join(btdir, 'products')
