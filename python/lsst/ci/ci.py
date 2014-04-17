@@ -697,6 +697,11 @@ class BT(object):
         with open(manifestFn, 'w') as fp:
             manifest.toFile(fp)
 
+    def load_manifest(self):
+        manifestFn = os.path.join(self.btdir, 'manifest')
+        with open(manifestFn, 'r') as fp:
+            return Manifest.fromFile(fp)
+
     @staticmethod
     def fromDir(workdir, btdir=None):
         # Ensure build directory exists, is initialized, and writable
@@ -844,6 +849,9 @@ class ProgressReporter(object):
     def __init__(self, outFileObj):
         self.out = outFileObj
 
+    def message(self, msg):
+        print >>self.out, msg
+
     @contextlib.contextmanager
     def newBuild(self, product):
         progress = ProgressReporter.ProductProgressReporter(self.out, product)
@@ -970,6 +978,8 @@ class Builder(object):
         return retcode == 0
 
     def build(self):
+        self.progress.message("Running build %s:" % self.build_id)
+
         # Make sure EUPS knows about the build_id tag
         if self.build_id is not None:
             declareEupsTag(self.build_id, self.eups)
@@ -981,38 +991,32 @@ class Builder(object):
 
     @staticmethod
     def run(args):
-        # Ensure build directory exists and is writable
-        source_dir = args.dir
-        if not os.access(source_dir, os.W_OK):
-            raise Exception("Directory '%s' does not exist or isn't writable." % source_dir)
+        bt = BT.fromDir(args.work_dir, args.bt_dir)
 
-        eupsObj = eups.Eups()
+        manifest = bt.load_manifest()
 
-        # Construct the manifest of products to build
-        exclusion_resolver = make_exclusion_resolver(args.exclusion_map)
-        dependency_loader = ProductDependencyLoader(source_dir, eupsObj, exclusion_resolver)
-        productDict = ProductDictBuilder(source_dir, None, dependency_loader).walk(args.products)
-        manifest = Manifest.fromProductDict(productDict)
-
-        # Version products
-        if args.version_git_repo:
-            version_db = VersionDbGit(args.build_id_prefix, eupsObj, args.version_git_repo)
-        else:
-            version_db = VersionDbHash(args.build_id_prefix, eupsObj, args.sha_abbrev_len)
-        build_id = version_manifest(source_dir, manifest, version_db, args.build_id)
-        print >>sys.stderr, "build id: %s" % build_id
+        build_id = 'x' + manifest.content_hash()[:10]
 
         # Build products
         progress = ProgressReporter(sys.stderr)
-        b = Builder(source_dir, manifest, build_id, progress, eupsObj)
+        eupsObj = eups.Eups()
+        b = Builder(bt.workdir, manifest, build_id, progress, eupsObj)
         b.build()
 
-        #
-        # Store the result in source_dir/manifest.txt
-        #
-        manifestFn = os.path.join(source_dir, '%s.manifest.txt' % build_id)
-        with open(manifestFn, 'w') as fp:
-            manifest.toFile(fp)
+#        # Construct the manifest of products to build
+#        exclusion_resolver = make_exclusion_resolver(args.exclusion_map)
+#        dependency_loader = ProductDependencyLoader(source_dir, eupsObj, exclusion_resolver)
+#        productDict = ProductDictBuilder(source_dir, None, dependency_loader).walk(args.products)
+#        manifest = Manifest.fromProductDict(productDict)
+#
+#        # Version products
+#        if args.version_git_repo:
+#            version_db = VersionDbGit(args.build_id_prefix, eupsObj, args.version_git_repo)
+#        else:
+#            version_db = VersionDbHash(args.build_id_prefix, eupsObj, args.sha_abbrev_len)
+#        build_id = version_manifest(source_dir, manifest, version_db, args.build_id)
+#        print >>sys.stderr, "build id: %s" % build_id
+
 
 #        manifestFn = os.path.join(source_dir, 'manifest.txt')
 #        with open(manifestFn) as fp:
