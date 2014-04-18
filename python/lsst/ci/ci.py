@@ -20,7 +20,7 @@ import getpass
 
 from . import tsort
 
-from .git import Git, GitError
+from .git import Git, GitError, transaction as git_transaction
 
 def load_config(fileObject):
     """ Load the build-tool configuration, returning it in a dict
@@ -523,33 +523,19 @@ class VersionDB(object):
         suffix = "+%s" % suffix if suffix else ""
         return "%s%s" % (productVersion, suffix)
 
-    @contextlib.contextmanager
-    def transaction(self):
-        if not self.no_fetch:
-            t0 = time.time()
-            sys.stderr.write("%20s: " % "[versiondb pull]")
-            # pull heads and tags in one go
-            self.git.pull("--ff-only", "-p", "origin", "refs/heads/*:refs/heads/*", "refs/tags/*:refs/tags/*")
-            print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
-
-        # implementation note: nothing is written to disk until _commit()
-        # is executed, so there's no need to wrap yield in try/except/finally
-        # to handle any exceptions (e.g., for transaction rollback).
-        yield
-
-        self._commit()
-
     def version_manifest(self, workdir, manifest):
         """ For products in manifest, find or compute sha1, checked out ref,
             and version """
 
-        with self.transaction():
+        with git_transaction(self.git, '--ff-only', pull=not self.no_fetch, push=not self.no_fetch):
             for product in manifest.products.itervalues():
                 productdir = os.path.join(workdir, product.name)
                 git = Git(productdir)
 
                 product.sha1 = git.rev_parse("HEAD")
                 product.version = self.version(product.name, productdir, git, product.dependencies)
+
+            self._commit()
 
     def _commit(self):
         dirty = False
@@ -578,14 +564,6 @@ class VersionDB(object):
             # Commit
             msg = "%d new versions added on %s." % (n, time.strftime("%c"))
             self.git.commit('-m', msg)
-
-            # Push
-            if not self.no_fetch:
-                t0 = time.time()
-                sys.stderr.write("%20s: " % "[versiondb push]")
-                self.git.push()
-                print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
-
 
 class ExclusionResolver(object):
     """A class to determine whether a dependency should be excluded from
@@ -868,12 +846,7 @@ class ProgressReporter(object):
         yield progress
         progress._finalize()
 
-class Namespace(object):
-    """ A generic namespace that can have arbitrary attributes attached to it """
-    pass
-
 class ManifestDB(object):
-
     def __init__(self, dbdir, sha_abbrev_len, no_fetch):
         self.dbdir = dbdir
         self.sha_abbrev_len = sha_abbrev_len
@@ -884,66 +857,36 @@ class ManifestDB(object):
         if not self.git.isclean():
             raise Exception('manifestdb is not clean, refusing to proceed.')
 
-    @contextlib.contextmanager
-    def transaction(self):
-        if not self.git.isclean():
-            raise Exception('manifestdb is not clean, refusing to proceed.')
-
-        sha1 = self.git.rev_parse("HEAD")
-
-        try:
-            tr = Namespace()
-            yield tr
-
-            # Commit locally
-            self.git.commit('-m', tr.msg)
-
-            # Push
-            if not self.no_fetch:
-                t0 = time.time()
-                print >>sys.stderr, "[manifestdb push ...",
-                self.git.push()
-                print >>sys.stderr, "ok (%.1f sec).]" % (time.time() - t0)
-        except:
-            # rebase to saved hash, and clean up the working directory
-            self.git.reset("--hard", sha1)
-            self.git.clean("-d", "-f", "-q")
-
-            raise
+    def __manifestPath(self, build_id):
+        return os.path.abspath(os.path.join(self.dbdir, 'manifests', '%s.manifest.txt' % build_id))
 
     def add_manifest(self, manifest):
-        # refresh the git repository
-        if not self.no_fetch:
-            t0 = time.time()
-            print >>sys.stderr, "[manifestdb pull ...",
-            self.git.pull("--ff-only")
-            print >>sys.stderr, "ok (%.1f sec).]" % (time.time() - t0)
-
         # generate new build ID
         build_id = 'x' + manifest.hash()[:self.sha_abbrev_len]
 
-        # see if the manifest is already in the database
-        try:
-            if self.get_manifest(build_id) != manifest:
-                raise Exception("Database corruption detected -- stored manifest for %s is not the same as the one you're trying to add." % (build_id))
-            return build_id
-        except IOError:
-            pass
+        with git_transaction(self.git, '--rebase', pull=not self.no_fetch, push=not self.no_fetch) as tr:
+            manifestPath = self.__manifestPath(build_id)
 
-        # add the manifest to the repository
-        with self.transaction() as tr:
-            manifestPath = os.path.abspath(os.path.join(self.dbdir, 'manifests', '%s.manifest.txt' % build_id))
+            # is it already in the repository?
+            if os.path.exists(manifestPath):
+                with open(manifestPath) as fp:
+                    if Manifest.fromFile(fp) != manifest:   # quick sanity check
+                        raise Exception("Database corruption detected -- stored manifest for %s is not the same as the one you're trying to add." % (build_id))
+                return build_id
+
+            # add it
             with open(manifestPath, 'w') as fp:
                 manifest.toFile(fp)
             self.git.add(manifestPath)
 
-            tr.msg = "Manifest for %s added by %s (%d products)." % (build_id, getpass.getuser(), len(manifest.products))
+            # commit locally
+            msg = "Manifest for %s added by %s (%d products)." % (build_id, getpass.getuser(), len(manifest.products))
+            self.git.commit('-m', msg)
 
         return build_id
 
     def get_manifest(self, build_id):
-        # note: throws IOError if the manifest doesn't exist or can't be read
-        manifestPath = os.path.abspath(os.path.join(self.dbdir, 'manifests', '%s.manifest.txt' % build_id))
+        manifestPath = self.__manifestPath(build_id)
         with open(manifestPath) as fp:
             return Manifest.fromFile(fp)
 

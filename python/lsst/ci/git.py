@@ -2,6 +2,9 @@
 # Git support
 
 import subprocess
+import time
+import sys, os
+import contextlib
 
 class GitError:
     def __init__(self, returncode, cmd, output, stderr):
@@ -80,3 +83,43 @@ class Git:
 	dirty = self.describe('--always', '--dirty=-prljavonakraju').endswith("-prljavonakraju")
 	untracked = self('ls-files', '--others', '--exclude-standard') != ""
         return not dirty and not untracked
+
+@contextlib.contextmanager
+def transaction(git, *args, **kwargs):
+    pull = kwargs.get('pull', True)
+    push = kwargs.get('push', True)
+
+	# refuse to	run if the working directory is not clean
+    if not git.isclean():
+        raise Exception('working directory is not clean, refusing to proceed [%s].' % git.cwd)
+
+    # record the original branch and sha1 that we're on
+    ref0 = git('symbolic-ref', 'HEAD')
+    if not ref0.startswith('refs/heads/'):
+        raise Exception('working directory HEAD is not a branch (%s).' % ref)
+    ref = ref0[11:]
+    sha1 = git.rev_parse("HEAD")
+
+    try:
+        if pull:
+            print "pulling %s" % os.path.basename(git.cwd)
+            git.pull(*args)
+
+        yield
+
+        # push only if there's something new to be pushed
+        if push and (ref0 != git('symbolic-ref', 'HEAD') or sha1 != git.rev_parse("HEAD")):
+            print "pushing %s" % os.path.basename(git.cwd)
+            git.push()
+    except:
+        # check out the original branch, rebase to saved hash,
+        # and clean up the working directory
+        git.reset("--hard")
+        git.checkout(ref)
+        git.reset("--hard", sha1)
+        git.clean("-d", "-f", "-q")
+
+        raise
+    finally:
+        # Code using transactions must leave the repository clean
+        assert git.isclean()
