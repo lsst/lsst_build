@@ -47,6 +47,10 @@ def load_config(fileObject):
         'versiondb.writable': (False, str_to_bool),
         'versiondb.sha-abbrev-len': (10, int),
 
+        'manifestdb.url': (None, str),
+        'manifestdb.dir': ('.bt/manifestdb', str),
+        'manifestdb.sha-abbrev-len': (10, int),
+
         'build.prefix': (getpass.getuser(), str)
     }
 
@@ -112,7 +116,7 @@ class Manifest(object):
         self.toFile(output)
         return output.getvalue()
 
-    def content_hash(self):
+    def hash(self):
         """ Return a hash of the manifest, based on the products it contains. """
         m = hashlib.sha1()
         for prod in self.products.itervalues():
@@ -120,6 +124,11 @@ class Manifest(object):
             m.update(s)
 
         return m.hexdigest()
+
+    def __eq__(self, other):
+        return self.hash() == other.hash()
+    def __ne__(self, other):
+        return not self == other
 
     @staticmethod
     def fromFile(fileObject):
@@ -859,6 +868,85 @@ class ProgressReporter(object):
         yield progress
         progress._finalize()
 
+class Namespace(object):
+    """ A generic namespace that can have arbitrary attributes attached to it """
+    pass
+
+class ManifestDB(object):
+
+    def __init__(self, dbdir, sha_abbrev_len, no_fetch):
+        self.dbdir = dbdir
+        self.sha_abbrev_len = sha_abbrev_len
+        self.no_fetch = no_fetch
+
+        self.git = Git(self.dbdir)
+
+        if not self.git.isclean():
+            raise Exception('manifestdb is not clean, refusing to proceed.')
+
+    @contextlib.contextmanager
+    def transaction(self):
+        if not self.git.isclean():
+            raise Exception('manifestdb is not clean, refusing to proceed.')
+
+        sha1 = self.git.rev_parse("HEAD")
+
+        try:
+            tr = Namespace()
+            yield tr
+
+            # Commit locally
+            self.git.commit('-m', tr.msg)
+
+            # Push
+            if not self.no_fetch:
+                t0 = time.time()
+                print >>sys.stderr, "[manifestdb push ...",
+                self.git.push()
+                print >>sys.stderr, "ok (%.1f sec).]" % (time.time() - t0)
+        except:
+            # rebase to saved hash, and clean up the working directory
+            self.git.reset("--hard", sha1)
+            self.git.clean("-d", "-f", "-q")
+
+            raise
+
+    def add_manifest(self, manifest):
+        # refresh the git repository
+        if not self.no_fetch:
+            t0 = time.time()
+            print >>sys.stderr, "[manifestdb pull ...",
+            self.git.pull("--ff-only")
+            print >>sys.stderr, "ok (%.1f sec).]" % (time.time() - t0)
+
+        # generate new build ID
+        build_id = 'x' + manifest.hash()[:self.sha_abbrev_len]
+
+        # see if the manifest is already in the database
+        try:
+            if self.get_manifest(build_id) != manifest:
+                raise Exception("Database corruption detected -- stored manifest for %s is not the same as the one you're trying to add." % (build_id))
+            return build_id
+        except IOError:
+            pass
+
+        # add the manifest to the repository
+        with self.transaction() as tr:
+            manifestPath = os.path.abspath(os.path.join(self.dbdir, 'manifests', '%s.manifest.txt' % build_id))
+            with open(manifestPath, 'w') as fp:
+                manifest.toFile(fp)
+            self.git.add(manifestPath)
+
+            tr.msg = "Manifest for %s added by %s (%d products)." % (build_id, getpass.getuser(), len(manifest.products))
+
+        return build_id
+
+    def get_manifest(self, build_id):
+        # note: throws IOError if the manifest doesn't exist or can't be read
+        manifestPath = os.path.abspath(os.path.join(self.dbdir, 'manifests', '%s.manifest.txt' % build_id))
+        with open(manifestPath) as fp:
+            return Manifest.fromFile(fp)
+
 class Builder(object):
     """Class that builds and installs all products in a manifest.
     
@@ -978,7 +1066,7 @@ class Builder(object):
         return retcode == 0
 
     def build(self):
-        self.progress.message("Running build %s:" % self.build_id)
+        self.progress.message("Building %s (%d products):" % (self.build_id, len(self.manifest.products)) )
 
         # Make sure EUPS knows about the build_id tag
         if self.build_id is not None:
@@ -991,11 +1079,13 @@ class Builder(object):
 
     @staticmethod
     def run(args):
+        # Get the manifest
         bt = BT.fromDir(args.work_dir, args.bt_dir)
-
         manifest = bt.load_manifest()
 
-        build_id = 'x' + manifest.content_hash()[:10]
+        # Generate new build ID by adding the manifest to the manifestdb database
+        bl = ManifestDB(bt.config["manifestdb.dir"], bt.config["manifestdb.sha-abbrev-len"], args.no_fetch)
+        build_id = bl.add_manifest(manifest)
 
         # Build products
         progress = ProgressReporter(sys.stderr)

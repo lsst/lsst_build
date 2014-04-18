@@ -32,6 +32,7 @@ parser_build = subparsers.add_parser('build', help='Build the source tree given 
 parser_build.set_defaults(func=Builder.run)
 parser_build.add_argument('products', type=str, help='Top-level products to build', nargs='*')
 parser_build.add_argument('--build-id', default=None, type=str, help='Build ID (default: autodetected from existing EUPS or git tags)')
+parser_build.add_argument('--no-fetch', action='store_true', help="Don't git-fetch any products")
 
 args = parser.parse_args()
 

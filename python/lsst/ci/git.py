@@ -77,4 +77,6 @@ class Git:
         return self('describe', *args, **kwargs)
 
     def isclean(self):
-        return not self.describe('--always', '--dirty=-prljavonakraju').endswith("-prljavonakraju")
+	dirty = self.describe('--always', '--dirty=-prljavonakraju').endswith("-prljavonakraju")
+	untracked = self('ls-files', '--others', '--exclude-standard') != ""
+        return not dirty and not untracked
