@@ -1026,6 +1026,17 @@ class Builder(object):
         bt = BT.fromDir(args.work_dir, args.bt_dir)
         manifest = bt.load_manifest()
 
+        # Verify the manifest is still valid
+        failed = False
+        for product in manifest.products.itervalues():
+            productdir = os.path.join(bt.workdir, product.name)
+            sha1 = Git(productdir).rev_parse("HEAD")
+            if sha1 != product.sha1:
+                print >>sys.stderr, "%s: sha1 of working directory differs from one in the manifest (%s != %s)." % (product.name, sha1, product.sha1)
+                failed = True
+        if failed:
+            raise Exception("Inconsistent manifest and working directory. Regenerate manifest with 'bt pull', or 'bt build -a'")
+
         # Generate new build ID by adding the manifest to the manifestdb database
         bl = ManifestDB(bt.config["manifestdb.dir"], bt.config["manifestdb.sha-abbrev-len"], args.no_fetch)
         build_id = bl.add_manifest(manifest)
@@ -1035,23 +1046,3 @@ class Builder(object):
         eupsObj = eups.Eups()
         b = Builder(bt.workdir, manifest, build_id, progress, eupsObj)
         b.build()
-
-#        # Construct the manifest of products to build
-#        exclusion_resolver = make_exclusion_resolver(args.exclusion_map)
-#        dependency_loader = ProductDependencyLoader(source_dir, eupsObj, exclusion_resolver)
-#        productDict = ProductDictBuilder(source_dir, None, dependency_loader).walk(args.products)
-#        manifest = Manifest.fromProductDict(productDict)
-#
-#        # Version products
-#        if args.version_git_repo:
-#            version_db = VersionDbGit(args.build_id_prefix, eupsObj, args.version_git_repo)
-#        else:
-#            version_db = VersionDbHash(args.build_id_prefix, eupsObj, args.sha_abbrev_len)
-#        build_id = version_manifest(source_dir, manifest, version_db, args.build_id)
-#        print >>sys.stderr, "build id: %s" % build_id
-
-
-#        manifestFn = os.path.join(source_dir, 'manifest.txt')
-#        with open(manifestFn) as fp:
-#            manifest = Manifest.fromFile(fp)
-
