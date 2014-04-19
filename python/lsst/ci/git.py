@@ -64,6 +64,9 @@ class Git:
     def merge(self, *args, **kwargs):
         return self('merge', *args, **kwargs)
 
+    def log(self, *args, **kwargs):
+        return self('log', *args, **kwargs)
+
     def push(self, *args, **kwargs):
         return self('push', *args, **kwargs)
 

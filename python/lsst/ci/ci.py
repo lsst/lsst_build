@@ -230,7 +230,7 @@ class ProductFetcher(object):
         """
 
         t0 = time.time()
-        sys.stderr.write("%20s: " % product)
+        sys.stderr.write("%-25s: " % product)
 
         productdir = os.path.join(self.source_dir, product)
         git = Git(productdir)
@@ -286,7 +286,9 @@ class ProductFetcher(object):
         # previous builds)
         git.clean("-d", "-f", "-q")
 
-        print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
+	sys.stderr.write( "[%s] " % git('symbolic-ref', 'HEAD').split("refs/heads/").pop().split("refs/tags/").pop() )
+	sys.stderr.write( git.log('--oneline', '-n1') )
+        sys.stderr.write( " (%.1f sec).\n" % (time.time() - t0) )
         return ref, sha1
 
 def get_checked_out_ref_name(git):
@@ -783,7 +785,7 @@ class ProgressReporter(object):
             self.product = product
 
         def _buildStarted(self):
-            self.out.write('%20s: ' % self.product.name)
+            self.out.write('%-25s: ' % self.product.name)
             self.progress_bar = self.product.version + " "
             self.t0 = self.t = time.time()
 
