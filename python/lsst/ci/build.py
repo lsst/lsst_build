@@ -237,4 +237,5 @@ class Builder(object):
             manifest = Manifest.fromFile(fp)
 
         b = Builder(build_dir, manifest, progress, eupsObj)
-        b.build()
+        retcode = b.build()
+        exit(retcode == 0)
