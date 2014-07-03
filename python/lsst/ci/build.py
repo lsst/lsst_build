@@ -153,11 +153,10 @@ class Builder(object):
             # build
             eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic config
             eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic build
-            if [ -e  $PRODUCT_DIR/tests/.tests ]; then
-                ( ls $PRODUCT_DIR/tests/.tests | grep "\.fail$" ) && \
-                ( echo "*** Failed unit tests in $PRODUCT_DIR/tests/.tests"; exit 2 )
-            else
-                echo "+++ Warning: Missing $PRODUCT_DIR/tests/.tests directory"
+            if [ -d  $PRODUCT_DIR/tests/.tests ] && \
+                [ "`ls $PRODUCT_DIR/tests/.tests/*\.failed 2> /dev/null | wc -l`" != "0" ]; then
+                echo "*** Failed unit tests in $PRODUCT_DIR/tests/.tests"; 
+                exit 1 
             fi
             eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic install
 
