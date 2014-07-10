@@ -153,9 +153,9 @@ class Builder(object):
             # build
             eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic config
             eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic build
-            if [ -d  $PRODUCT_DIR/tests/.tests ] && \
-                [ "`ls $PRODUCT_DIR/tests/.tests/*\.failed 2> /dev/null | wc -l`" != "0" ]; then
-                echo "*** Failed unit tests in $PRODUCT_DIR/tests/.tests"; 
+            if [ -d  tests/.tests ] && \
+                [ "`ls tests/.tests/*\.failed 2> /dev/null | wc -l`" != "0" ]; then
+                echo "*** Failed unit tests."; 
                 exit 1 
             fi
             eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic install
