@@ -2,17 +2,15 @@
 # Builder
 import eups
 
-import collections
 import subprocess
 import textwrap
 import os, stat, sys, shutil
 import pipes
 import time
-import eups, eups.tags
-import re
+import eups.tags
 import contextlib
 
-from .prepare import Product, Manifest
+from .prepare import Manifest
 
 def declareEupsTag(tag, eupsObj):
     """ Declare a new EUPS tag
