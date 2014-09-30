@@ -154,7 +154,7 @@ class Builder(object):
             eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic config
             eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic build
             if [ -d  tests/.tests ] && \
-                [ "`ls tests/.tests/*\.failed 2> /dev/null | wc -l`" != "0" ]; then
+                [ "`ls tests/.tests/*\.failed 2> /dev/null | wc -l`" -ne 0 ]; then
                 echo "*** Failed unit tests."; 
                 exit 1 
             fi
