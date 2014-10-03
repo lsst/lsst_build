@@ -15,7 +15,7 @@ import abc
 
 import tsort
 
-from .git import Git, GitError
+from .git import Git
 
 class Product(object):
     """Class representing an EUPS product to be built"""
