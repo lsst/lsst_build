@@ -12,6 +12,7 @@ import pipes
 import subprocess
 import collections
 import abc
+import yaml
 
 import tsort
 
@@ -140,16 +141,32 @@ class ProductFetcher(object):
         :ivar refs: A list of refs to attempt to git-checkout
         :ivar no_fetch: If true, don't fetch, just checkout the first matching ref.
     """
-    def __init__(self, build_dir, repository_patterns, refs, no_fetch):
+    def __init__(self, build_dir, repos, repository_patterns, refs, no_fetch):
         self.build_dir = os.path.abspath(build_dir)
         self.refs = refs
-        self.repository_patterns = repository_patterns.split('|')
+        if repository_patterns:
+            self.repository_patterns = repository_patterns.split('|')
+        else:
+            self.repository_patterns = None
         self.no_fetch = no_fetch
+        if repos:
+            if os.path.exists(repos):
+                f = open(repos, 'r')
+                self.repos = yaml.safe_load(f)
+            else:
+                raise Exception("YAML repos file '%s' does not exist" % repos)
+        else:
+            self.repos = None
 
     def _origin_candidates(self, product):
         """ Expand repository_patterns into URLs. """
         data = { 'product': product }
-        return [ pat % data for pat in self.repository_patterns ]
+        locations = []
+        if self.repos and product in self.repos:
+            locations.append(self.repos[product])
+        if self.repository_patterns:
+            locations += [ pat % data for pat in self.repository_patterns ]
+        return locations
 
     def fetch(self, product):
         """ Clone the product repository and checkout the first matching ref.
@@ -641,7 +658,7 @@ class BuildDirectoryConstructor(object):
         else:
             version_db = VersionDbHash(args.sha_abbrev_len, eupsObj)
 
-        product_fetcher = ProductFetcher(build_dir, args.repository_pattern, refs, args.no_fetch)
+        product_fetcher = ProductFetcher(build_dir, args.repos, args.repository_pattern, refs, args.no_fetch)
         p = BuildDirectoryConstructor(build_dir, eupsObj, product_fetcher, version_db, exclusion_resolver)
 
         #
