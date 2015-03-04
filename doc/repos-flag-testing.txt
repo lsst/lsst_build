@@ -1,0 +1,38 @@
+# loading the eups env essentially to get access to the anaconda python
+# version that has bundled several modules LSST code assumes are installed
+. ~/stack/loadLSST.bash
+
+# [lsstsw@jhoblitt-tou-el6 python]$ pkgautoversion
+# fatal: need at least git v1.8.4 (you have v1.7.1)
+#
+# required only to build git
+sudo yum install -y perl-ExtUtils-MakeMaker
+sudo yum install -y libcurl-devel
+eups distrib install git
+setup git
+
+mkdir ~/build
+# lsstsw is needed for etc/exclusions.txt
+git clone git@github.com:LSST/lsstsw.git
+# skip downloading ~6GiB repo
+echo "afwdata                 .*" >> lsstsw/etc/exclusions.txt
+
+git clone git@github.com:lsst-sqre/lsst_build.git
+cd lsst_build
+git checkout feature/repomap
+export PYTHONPATH=$PYTHONPATH:~/lsst_build/python
+
+# env ONLY
+export REPOSITORY_PATTERN="git://git.lsstcorp.org/LSST/DMS/%(product)s.git|git://git.lsstcorp.org/LSST/DMS/devenv/%(product)s.git|git://git.lsstcorp.org/LSST/DMS/testdata/%(product)s.git|git://git.lsstcorp.org/LSST/external/%(product)s.git"
+./bin/lsst-build prepare --exclusion-map=${HOME}/lsstsw/etc/exclusions.txt ${HOME}/build afw
+find ~/build -maxdepth 2 -type d -name .git -exec grep url {}/config \; | cut -d' ' -f3
+
+# repos file + env
+export REPOSITORY_PATTERN="git://git.lsstcorp.org/LSST/DMS/%(product)s.git|git://git.lsstcorp.org/LSST/DMS/devenv/%(product)s.git|git://git.lsstcorp.org/LSST/DMS/testdata/%(product)s.git|git://git.lsstcorp.org/LSST/external/%(product)s.git"
+./bin/lsst-build prepare --repos=${HOME}/repos.yaml --exclusion-map=${HOME}/lsstsw/etc/exclusions.txt ${HOME}/build afw
+find ~/build -maxdepth 2 -type d -name .git -exec grep url {}/config \; | cut -d' ' -f3
+
+# repos file ONLY
+unset REPOSITORY_PATTERN
+./bin/lsst-build prepare --repos=${HOME}/repos.yaml --exclusion-map=${HOME}/lsstsw/etc/exclusions.txt ${HOME}/build afw
+find ~/build -maxdepth 2 -type d -name .git -exec grep url {}/config \; | cut -d' ' -f3
