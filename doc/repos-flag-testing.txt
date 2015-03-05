@@ -8,18 +8,19 @@
 # required only to build git
 sudo yum install -y perl-ExtUtils-MakeMaker
 sudo yum install -y libcurl-devel
+sudo yum install -y gettext
 eups distrib install git
 setup git
 
 mkdir ~/build
 # lsstsw is needed for etc/exclusions.txt
-git clone git@github.com:LSST/lsstsw.git
+git clone git@github.com:lsst/lsstsw.git
 # skip downloading ~6GiB repo
 echo "afwdata                 .*" >> lsstsw/etc/exclusions.txt
 
-git clone git@github.com:lsst-sqre/lsst_build.git
+git clone git@github.com:lsst/lsst_build.git
 cd lsst_build
-git checkout feature/repomap
+git checkout <branch-to-test>
 export PYTHONPATH=$PYTHONPATH:~/lsst_build/python
 
 # env ONLY
@@ -29,10 +30,10 @@ find ~/build -maxdepth 2 -type d -name .git -exec grep url {}/config \; | cut -d
 
 # repos file + env
 export REPOSITORY_PATTERN="git://git.lsstcorp.org/LSST/DMS/%(product)s.git|git://git.lsstcorp.org/LSST/DMS/devenv/%(product)s.git|git://git.lsstcorp.org/LSST/DMS/testdata/%(product)s.git|git://git.lsstcorp.org/LSST/external/%(product)s.git"
-./bin/lsst-build prepare --repos=${HOME}/repos.yaml --exclusion-map=${HOME}/lsstsw/etc/exclusions.txt ${HOME}/build afw
+./bin/lsst-build prepare --repos=${HOME}/lsstsw/etc/repos.yaml --exclusion-map=${HOME}/lsstsw/etc/exclusions.txt ${HOME}/build afw
 find ~/build -maxdepth 2 -type d -name .git -exec grep url {}/config \; | cut -d' ' -f3
 
 # repos file ONLY
 unset REPOSITORY_PATTERN
-./bin/lsst-build prepare --repos=${HOME}/repos.yaml --exclusion-map=${HOME}/lsstsw/etc/exclusions.txt ${HOME}/build afw
+./bin/lsst-build prepare --repos=${HOME}/lsstsw/etc/repos.yaml --exclusion-map=${HOME}/lsstsw/etc/exclusions.txt ${HOME}/build afw
 find ~/build -maxdepth 2 -type d -name .git -exec grep url {}/config \; | cut -d' ' -f3
