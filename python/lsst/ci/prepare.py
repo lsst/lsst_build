@@ -151,8 +151,8 @@ class ProductFetcher(object):
         self.no_fetch = no_fetch
         if repos:
             if os.path.exists(repos):
-                f = open(repos, 'r')
-                self.repos = yaml.safe_load(f)
+                with open(repos, 'r') as f:
+                    self.repos = yaml.safe_load(f)
             else:
                 raise Exception("YAML repos file '%s' does not exist" % repos)
         else:

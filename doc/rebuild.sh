@@ -12,7 +12,7 @@
 #
 # The versiondb repository should be cloned from:
 #
-#   git@git.lsstcorp.org/LSST/DMS/devenv/versiondb.git
+#   git@github.com:lsst/versiondb.git
 #
 # For creation, use:
 #
