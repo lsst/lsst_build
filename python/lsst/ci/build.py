@@ -149,6 +149,7 @@ class Builder(object):
             %(setups)s
             EOF
             set +x
+            echo "Setting up environment with EUPS"
             setup --vro=_build.tags -r .
             set -x
 
