@@ -9,6 +9,7 @@ import pipes
 import time
 import eups.tags
 import contextlib
+import datetime
 
 from .prepare import Manifest
 
@@ -189,6 +190,7 @@ class Builder(object):
             # execute the build file from the product directory, capturing the output and return code
             process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir)
             for line in iter(process.stdout.readline, ''):
+                line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), line)
                 logfp.write(line)
                 progress.reportProgress()
 
