@@ -9,6 +9,7 @@ import pipes
 import time
 import eups.tags
 import contextlib
+import datetime
 
 from .prepare import Manifest
 
@@ -113,6 +114,7 @@ class Builder(object):
         buildscript = os.path.join(productdir, '_build.sh')
         logfile = os.path.join(productdir, '_build.log')
         eupsdir = eups.productDir("eups")
+        eupspath = os.environ["EUPS_PATH"]
 
         # construct the tags file with exact dependencies
         setups = [ 
@@ -132,8 +134,9 @@ class Builder(object):
             # stop on any error
             set -ex
 
-            # define the setup command
-            . %(eupsdir)s/bin/setups.sh 
+            # define the setup command, but preserve EUPS_PATH
+            . %(eupsdir)s/bin/setups.sh
+            export EUPS_PATH="%(eupspath)s"
 
             cd %(productdir)s
 
@@ -149,6 +152,7 @@ class Builder(object):
             %(setups)s
             EOF
             set +x
+            echo "Setting up environment with EUPS"
             setup --vro=_build.tags -r .
             set -x
 
@@ -174,6 +178,7 @@ class Builder(object):
                     'productdir' : productdir,
                     'setups': '\n            '.join(setups),
                     'eupsdir': eupsdir,
+                    'eupspath': eupspath,
                 }
             )
 
@@ -188,6 +193,7 @@ class Builder(object):
             # execute the build file from the product directory, capturing the output and return code
             process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir)
             for line in iter(process.stdout.readline, ''):
+                line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), line)
                 logfp.write(line)
                 progress.reportProgress()
 
