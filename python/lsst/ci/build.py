@@ -114,6 +114,7 @@ class Builder(object):
         buildscript = os.path.join(productdir, '_build.sh')
         logfile = os.path.join(productdir, '_build.log')
         eupsdir = eups.productDir("eups")
+        eupspath = os.environ["EUPS_PATH"]
 
         # construct the tags file with exact dependencies
         setups = [ 
@@ -133,8 +134,9 @@ class Builder(object):
             # stop on any error
             set -ex
 
-            # define the setup command
-            . %(eupsdir)s/bin/setups.sh 
+            # define the setup command, but preserve EUPS_PATH
+            . %(eupsdir)s/bin/setups.sh
+            export EUPS_PATH="%(eupspath)s"
 
             cd %(productdir)s
 
@@ -176,6 +178,7 @@ class Builder(object):
                     'productdir' : productdir,
                     'setups': '\n            '.join(setups),
                     'eupsdir': eupsdir,
+                    'eupspath': eupspath,
                 }
             )
 
