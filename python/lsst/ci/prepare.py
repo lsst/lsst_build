@@ -246,7 +246,7 @@ class ProductFetcher(object):
 
         # clean up the working directory (eg., remove remnants of
         # previous builds)
-        git.clean("-d", "-f", "-q")
+        git.clean("-d", "-f", "-q", "-x")
 
         print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
         return ref, sha1
