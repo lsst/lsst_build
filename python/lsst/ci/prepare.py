@@ -162,11 +162,47 @@ class ProductFetcher(object):
         """ Expand repository_patterns into URLs. """
         data = { 'product': product }
         locations = []
-        if self.repos and product in self.repos:
-            locations.append(self.repos[product])
+        origin, ref = self._repos_yaml_coordinates(product)
+
+        if origin:
+            locations.append(origin)
         if self.repository_patterns:
             locations += [ pat % data for pat in self.repository_patterns ]
         return locations
+
+    def _ref_candidates(self, product):
+        """ Generate a list of refs to attempt to checkout. """
+
+        # ref precedence should be:
+        # user specified refs > repos.yaml default ref > implicit master
+        refs = self.refs
+        origin, ref = self._repos_yaml_coordinates(product)
+
+        if ref:
+            refs.append(ref)
+
+        # Add 'master' to list of refs, if not there already
+        if 'master' not in refs:
+            refs.append('master')
+
+        return refs
+
+    def _repos_yaml_coordinates(self, product):
+        """ Return origin and ref [if present] from repos.yaml. """
+        origin = ref = None
+
+        if self.repos and product in self.repos:
+
+            spec = self.repos[product]
+            if isinstance(spec, str):
+                origin = spec
+            elif isinstance(spec, dict):
+                origin = spec['url']
+                ref = spec['ref']
+            else:
+                raise Exception('invalid repos.yaml repo specification -- please check the file with repos-lint')
+
+        return origin, ref
 
     def fetch(self, product):
         """ Clone the product repository and checkout the first matching ref.
@@ -220,7 +256,7 @@ class ProductFetcher(object):
             git.fetch("-fup", "origin", "+refs/heads/*:refs/heads/*", "refs/tags/*:refs/tags/*")
 
         # find a ref that matches, checkout it
-        for ref in self.refs:
+        for ref in self._ref_candidates(product):
             sha1, _ = git.rev_parse("-q", "--verify", "refs/remotes/origin/" + ref, return_status=True)
 
             branch = sha1 != ""
@@ -635,12 +671,7 @@ class BuildDirectoryConstructor(object):
         if not os.access(build_dir, os.W_OK):
             raise Exception("Directory '%s' does not exist or isn't writable." % build_dir)
 
-        #
-        # Add 'master' to list of refs, if not there already
-        #
         refs = args.ref
-        if 'master' not in refs:
-            refs.append('master')
 
         #
         # Wire-up the BuildDirectoryConstructor constructor
