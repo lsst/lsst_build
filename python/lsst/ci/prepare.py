@@ -13,6 +13,7 @@ import subprocess
 import collections
 import abc
 import yaml
+import copy
 
 import tsort
 
@@ -175,7 +176,7 @@ class ProductFetcher(object):
 
         # ref precedence should be:
         # user specified refs > repos.yaml default ref > implicit master
-        refs = self.refs
+        refs = copy.copy(self.refs)
         origin, ref = self._repos_yaml_coordinates(product)
 
         if ref:
