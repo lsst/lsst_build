@@ -26,7 +26,8 @@ class Git:
 
         return_status = kwargs.get("return_status", False)
 
-        cmd = ('git',) + args
+        # force all cli args into strings
+        cmd = ['git'] + [str(x) for x in args]
 
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.cwd)
         (stdout, stderr) = process.communicate()
