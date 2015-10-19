@@ -163,10 +163,10 @@ class ProductFetcher(object):
         """ Expand repository_patterns into URLs. """
         data = { 'product': product }
         locations = []
-        origin, ref = self._repos_yaml_coordinates(product)
+        yaml = self._repos_yaml_lookup(product)
 
-        if origin:
-            locations.append(origin)
+        if yaml:
+            locations.append(yaml)
         if self.repository_patterns:
             locations += [ pat % data for pat in self.repository_patterns ]
         return locations
@@ -177,10 +177,10 @@ class ProductFetcher(object):
         # ref precedence should be:
         # user specified refs > repos.yaml default ref > implicit master
         refs = copy.copy(self.refs)
-        origin, ref = self._repos_yaml_coordinates(product)
+        yaml = self._repos_yaml_lookup(product)
 
-        if ref:
-            refs.append(ref)
+        if yaml.ref:
+            refs.append(yaml.ref)
 
         # Add 'master' to list of refs, if not there already
         if 'master' not in refs:
@@ -188,22 +188,25 @@ class ProductFetcher(object):
 
         return refs
 
-    def _repos_yaml_coordinates(self, product):
-        """ Return origin and ref [if present] from repos.yaml. """
-        origin = ref = None
+    def _repos_yaml_lookup(self, product):
+        """ Return repo specification [if present] from repos.yaml.
+            The multiplate possible formats in repos.yaml are normalized into a
+            single consistent object.  No sanity checking is performed.
+        """
+        rs = None
 
         if self.repos and product in self.repos:
-
             spec = self.repos[product]
             if isinstance(spec, str):
-                origin = spec
+                rs = RepoSpec(product, spec)
             elif isinstance(spec, dict):
-                origin = spec['url']
-                ref = spec['ref']
+                # the repos.yaml hash *must* not have keys that are not a
+                # RepoSpec constructor args
+                rs = RepoSpec(product, **spec)
             else:
                 raise Exception('invalid repos.yaml repo specification -- please check the file with repos-lint')
 
-        return origin, ref
+        return rs
 
     def fetch(self, product):
         """ Clone the product repository and checkout the first matching ref.
@@ -705,3 +708,15 @@ class BuildDirectoryConstructor(object):
         manifestFn = os.path.join(build_dir, 'manifest.txt')
         with open(manifestFn, 'w') as fp:
             manifest.toFile(fp)
+
+class RepoSpec:
+    """Represents a git repo specification in repos.yaml. """
+
+    def __init__(self, product, url, ref='master', lfs=False):
+        self.product = product
+        self.url = url
+        self.ref = ref
+        self.lfs = lfs
+
+    def __str__(self):
+        return self.url
