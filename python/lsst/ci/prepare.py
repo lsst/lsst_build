@@ -166,7 +166,7 @@ class ProductFetcher(object):
         yaml = self._repos_yaml_lookup(product)
 
         if yaml:
-            locations.append(yaml)
+            locations.append(yaml.url)
         if self.repository_patterns:
             locations += [ pat % data for pat in self.repository_patterns ]
         return locations
@@ -190,7 +190,7 @@ class ProductFetcher(object):
 
     def _repos_yaml_lookup(self, product):
         """ Return repo specification [if present] from repos.yaml.
-            The multiplate possible formats in repos.yaml are normalized into a
+            The multiple possible formats in repos.yaml are normalized into a
             single consistent object.  No sanity checking is performed.
         """
         rs = None
@@ -207,6 +207,15 @@ class ProductFetcher(object):
                 raise Exception('invalid repos.yaml repo specification -- please check the file with repos-lint')
 
         return rs
+
+    def _origin_uses_lfs(self, product):
+        """ Attempt to determine if this remote url needs git lfs support """
+        yaml = self._repos_yaml_lookup(product)
+        if yaml:
+            # is this an lfs backed repo?
+            if yaml.lfs:
+                return True
+        return False
 
     def fetch(self, product):
         """ Clone the product repository and checkout the first matching ref.
@@ -237,6 +246,16 @@ class ProductFetcher(object):
         productdir = os.path.join(self.build_dir, product)
         git = Git(productdir)
 
+        # lfs credential helper string
+        helper = '!f() { cat > /dev/null; echo username=; echo password=; }; f'
+
+        # determine if the repo is likely using lfs.
+        # if the repos.yaml url is invalid, and a valid pattern generated
+        # origin is found, this will cause lfs support to be enabled
+        # for that repo (if it needs it or not).  This should not break non-lfs
+        # repos.
+        lfs = self._origin_uses_lfs(product)
+
         # verify the URL of origin hasn't changed
         if os.path.isdir(productdir):
             origin = git('config', '--get', 'remote.origin.url')
@@ -246,8 +265,32 @@ class ProductFetcher(object):
         # clone
         if not os.path.isdir(productdir):
             for url in self._origin_candidates(product):
-                if not Git.clone(url, productdir, return_status=True)[1]:
-                    break
+                args = []
+                if lfs:
+                    # need to work around git-lfs v1.0.0 always prompting
+                    # for credentials, even when they are not required.
+                    # migration to the batch API is required to resolved this:
+                    # https://github.com/github/git-lfs/issues/737#issuecomment-149689914
+
+                    # these env vars shouldn't have to removed with the cache
+                    # helper we are specifying but it doesn't hurt to be
+                    # paranoid
+                    if 'GIT_ASKPASS' in os.environ:
+                        del os.environ['GIT_ASKPASS']
+                    if 'SSH_ASKPASS' in os.environ:
+                        del os.environ['SSH_ASKPASS']
+
+                    # lfs will pickup the .gitconfig and pull lfs objects for
+                    # the default ref during clone.  Config options set on the
+                    # cli during the clone get recorded in `.git/config'
+                    args += ['-c', 'filter.lfs.required']
+                    args += ['-c', 'filter.lfs.smudge=git-lfs smudge %f']
+                    args += ['-c', 'filter.lfs.clean=git-lfs clean %f']
+                    args += ['-c', ('credential.helper=%s' % helper)]
+
+                args += [url, productdir]
+                if not Git.clone(*args, return_status=True)[1]:
+                        break
             else:
                 raise Exception("Failed to clone product '%s' from any of the offered repositories" % product)
 

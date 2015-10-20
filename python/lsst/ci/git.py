@@ -67,3 +67,6 @@ class Git:
 
     def describe(self, *args, **kwargs):
         return self('describe', *args, **kwargs)
+
+    def lfs(self, *args, **kwargs):
+        return self('lfs', *args, **kwargs)
