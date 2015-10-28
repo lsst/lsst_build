@@ -163,10 +163,10 @@ class ProductFetcher(object):
         """ Expand repository_patterns into URLs. """
         data = { 'product': product }
         locations = []
-        origin, ref = self._repos_yaml_coordinates(product)
+        yaml = self._repos_yaml_lookup(product)
 
-        if origin:
-            locations.append(origin)
+        if yaml:
+            locations.append(yaml.url)
         if self.repository_patterns:
             locations += [ pat % data for pat in self.repository_patterns ]
         return locations
@@ -177,10 +177,10 @@ class ProductFetcher(object):
         # ref precedence should be:
         # user specified refs > repos.yaml default ref > implicit master
         refs = copy.copy(self.refs)
-        origin, ref = self._repos_yaml_coordinates(product)
+        yaml = self._repos_yaml_lookup(product)
 
-        if ref:
-            refs.append(ref)
+        if yaml.ref:
+            refs.append(yaml.ref)
 
         # Add 'master' to list of refs, if not there already
         if 'master' not in refs:
@@ -188,22 +188,34 @@ class ProductFetcher(object):
 
         return refs
 
-    def _repos_yaml_coordinates(self, product):
-        """ Return origin and ref [if present] from repos.yaml. """
-        origin = ref = None
+    def _repos_yaml_lookup(self, product):
+        """ Return repo specification [if present] from repos.yaml.
+            The multiple possible formats in repos.yaml are normalized into a
+            single consistent object.  No sanity checking is performed.
+        """
+        rs = None
 
         if self.repos and product in self.repos:
-
             spec = self.repos[product]
             if isinstance(spec, str):
-                origin = spec
+                rs = RepoSpec(product, spec)
             elif isinstance(spec, dict):
-                origin = spec['url']
-                ref = spec['ref']
+                # the repos.yaml hash *must* not have keys that are not a
+                # RepoSpec constructor args
+                rs = RepoSpec(product, **spec)
             else:
                 raise Exception('invalid repos.yaml repo specification -- please check the file with repos-lint')
 
-        return origin, ref
+        return rs
+
+    def _origin_uses_lfs(self, product):
+        """ Attempt to determine if this remote url needs git lfs support """
+        yaml = self._repos_yaml_lookup(product)
+        if yaml:
+            # is this an lfs backed repo?
+            if yaml.lfs:
+                return True
+        return False
 
     def fetch(self, product):
         """ Clone the product repository and checkout the first matching ref.
@@ -234,6 +246,16 @@ class ProductFetcher(object):
         productdir = os.path.join(self.build_dir, product)
         git = Git(productdir)
 
+        # lfs credential helper string
+        helper = '!f() { cat > /dev/null; echo username=; echo password=; }; f'
+
+        # determine if the repo is likely using lfs.
+        # if the repos.yaml url is invalid, and a valid pattern generated
+        # origin is found, this will cause lfs support to be enabled
+        # for that repo (if it needs it or not).  This should not break non-lfs
+        # repos.
+        lfs = self._origin_uses_lfs(product)
+
         # verify the URL of origin hasn't changed
         if os.path.isdir(productdir):
             origin = git('config', '--get', 'remote.origin.url')
@@ -243,8 +265,32 @@ class ProductFetcher(object):
         # clone
         if not os.path.isdir(productdir):
             for url in self._origin_candidates(product):
-                if not Git.clone(url, productdir, return_status=True)[1]:
-                    break
+                args = []
+                if lfs:
+                    # need to work around git-lfs v1.0.0 always prompting
+                    # for credentials, even when they are not required.
+                    # migration to the batch API is required to resolved this:
+                    # https://github.com/github/git-lfs/issues/737#issuecomment-149689914
+
+                    # these env vars shouldn't have to removed with the cache
+                    # helper we are specifying but it doesn't hurt to be
+                    # paranoid
+                    if 'GIT_ASKPASS' in os.environ:
+                        del os.environ['GIT_ASKPASS']
+                    if 'SSH_ASKPASS' in os.environ:
+                        del os.environ['SSH_ASKPASS']
+
+                    # lfs will pickup the .gitconfig and pull lfs objects for
+                    # the default ref during clone.  Config options set on the
+                    # cli during the clone get recorded in `.git/config'
+                    args += ['-c', 'filter.lfs.required']
+                    args += ['-c', 'filter.lfs.smudge=git-lfs smudge %f']
+                    args += ['-c', 'filter.lfs.clean=git-lfs clean %f']
+                    args += ['-c', ('credential.helper=%s' % helper)]
+
+                args += [url, productdir]
+                if not Git.clone(*args, return_status=True)[1]:
+                        break
             else:
                 raise Exception("Failed to clone product '%s' from any of the offered repositories" % product)
 
@@ -705,3 +751,15 @@ class BuildDirectoryConstructor(object):
         manifestFn = os.path.join(build_dir, 'manifest.txt')
         with open(manifestFn, 'w') as fp:
             manifest.toFile(fp)
+
+class RepoSpec:
+    """Represents a git repo specification in repos.yaml. """
+
+    def __init__(self, product, url, ref='master', lfs=False):
+        self.product = product
+        self.url = url
+        self.ref = ref
+        self.lfs = lfs
+
+    def __str__(self):
+        return self.url

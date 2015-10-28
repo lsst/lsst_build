@@ -11,7 +11,7 @@ class GitError:
         self.stderr = stderr
 
     def __str__(self):
-        return "Command '%s' returned non-zero exit status %d." % (self.cmd, self.returncode)
+        return "Command '%s' returned non-zero exit status %d.\nstdout:\n%s\nstderr:\n%s" % (self.cmd, self.returncode, self.output, self.stderr)
 
 class Git:
     def __init__(self, cwd=None):
@@ -26,7 +26,8 @@ class Git:
 
         return_status = kwargs.get("return_status", False)
 
-        cmd = ('git',) + args
+        # force all cli args into strings
+        cmd = ['git'] + [str(x) for x in args]
 
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.cwd)
         (stdout, stderr) = process.communicate()
@@ -66,3 +67,6 @@ class Git:
 
     def describe(self, *args, **kwargs):
         return self('describe', *args, **kwargs)
+
+    def lfs(self, *args, **kwargs):
+        return self('lfs', *args, **kwargs)
