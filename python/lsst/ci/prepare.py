@@ -283,6 +283,7 @@ class ProductFetcher(object):
                     # lfs will pickup the .gitconfig and pull lfs objects for
                     # the default ref during clone.  Config options set on the
                     # cli during the clone get recorded in `.git/config'
+                    args += ['-c', 'lfs.batch=false']
                     args += ['-c', 'filter.lfs.required']
                     args += ['-c', 'filter.lfs.smudge=git-lfs smudge %f']
                     args += ['-c', 'filter.lfs.clean=git-lfs clean %f']
