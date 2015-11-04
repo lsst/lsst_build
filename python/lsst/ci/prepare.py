@@ -141,8 +141,10 @@ class ProductFetcher(object):
         :ivar repository_patterns: A list of str.format() patterns used discover the URL of the remote git repository.
         :ivar refs: A list of refs to attempt to git-checkout
         :ivar no_fetch: If true, don't fetch, just checkout the first matching ref.
+        :ivar use_ssh: If true, rewrite HTTPS URLs as ssh to allow pushing
     """
-    def __init__(self, build_dir, repos, repository_patterns, refs, no_fetch):
+    def __init__(self, build_dir, repos, repository_patterns, refs, no_fetch,
+            use_ssh=False):
         self.build_dir = os.path.abspath(build_dir)
         self.refs = refs
         if repository_patterns:
@@ -150,6 +152,7 @@ class ProductFetcher(object):
         else:
             self.repository_patterns = None
         self.no_fetch = no_fetch
+        self.use_ssh = use_ssh
         if repos:
             if os.path.exists(repos):
                 with open(repos, 'r') as f:
@@ -166,7 +169,10 @@ class ProductFetcher(object):
         yaml = self._repos_yaml_lookup(product)
 
         if yaml:
-            locations.append(yaml.url)
+            url = yaml.url
+            if self.use_ssh:
+                re.replace(r'^https://(.*?)/', r'git@\1:/', url)
+            locations.append(url)
         if self.repository_patterns:
             locations += [ pat % data for pat in self.repository_patterns ]
         return locations
@@ -737,7 +743,8 @@ class BuildDirectoryConstructor(object):
         else:
             version_db = VersionDbHash(args.sha_abbrev_len, eupsObj)
 
-        product_fetcher = ProductFetcher(build_dir, args.repos, args.repository_pattern, refs, args.no_fetch)
+        product_fetcher = ProductFetcher(build_dir, args.repos,
+                args.repository_pattern, refs, args.no_fetch, args.use_ssh)
         p = BuildDirectoryConstructor(build_dir, eupsObj, product_fetcher, version_db, exclusion_resolver)
 
         #
