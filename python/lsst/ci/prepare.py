@@ -265,35 +265,38 @@ class ProductFetcher(object):
         # clone
         if not os.path.isdir(productdir):
             for url in self._origin_candidates(product):
-                args = []
-                if lfs:
-                    # need to work around git-lfs v1.0.0 always prompting
-                    # for credentials, even when they are not required.
-                    # migration to the batch API is required to resolved this:
-                    # https://github.com/github/git-lfs/issues/737#issuecomment-149689914
-
-                    # these env vars shouldn't have to removed with the cache
-                    # helper we are specifying but it doesn't hurt to be
-                    # paranoid
-                    if 'GIT_ASKPASS' in os.environ:
-                        del os.environ['GIT_ASKPASS']
-                    if 'SSH_ASKPASS' in os.environ:
-                        del os.environ['SSH_ASKPASS']
-
-                    # lfs will pickup the .gitconfig and pull lfs objects for
-                    # the default ref during clone.  Config options set on the
-                    # cli during the clone get recorded in `.git/config'
-                    args += ['-c', 'lfs.batch=false']
-                    args += ['-c', 'filter.lfs.required']
-                    args += ['-c', 'filter.lfs.smudge=git-lfs smudge %f']
-                    args += ['-c', 'filter.lfs.clean=git-lfs clean %f']
-                    args += ['-c', ('credential.helper=%s' % helper)]
-
-                args += [url, productdir]
+                args = [url, productdir]
                 if not Git.clone(*args, return_status=True)[1]:
                         break
             else:
                 raise Exception("Failed to clone product '%s' from any of the offered repositories" % product)
+
+        # If lfs is enabled in repos.yaml but hasn't previously been used with
+        # this repository, update the repository configuration and pull in any
+        # data.
+        lfs_enabled = git('config', '--get', 'lfs.batch', return_status=True)[0] == "false"
+        if lfs and not lfs_enabled:
+            git('config', 'lfs.batch', 'false')
+            git('config', 'filter.lfs.required', 'true')
+            git('config', 'filter.lfs.smudge', 'git-lfs smudge %f')
+            git('config', 'filter.lfs.clean', 'git-lfs clean %f')
+
+            # need to work around git-lfs v1.0.0 always prompting
+            # for credentials, even when they are not required.
+            # migration to the batch API is required to resolved this:
+            # https://github.com/github/git-lfs/issues/737#issuecomment-149689914
+            git('config', 'credential.helper',  helper)
+
+            # these env vars shouldn't have to removed with the cache
+            # helper we are specifying but it doesn't hurt to be
+            # paranoid
+            if 'GIT_ASKPASS' in os.environ:
+                del os.environ['GIT_ASKPASS']
+            if 'SSH_ASKPASS' in os.environ:
+                del os.environ['SSH_ASKPASS']
+
+            # Update lfs-managed files in the working copy.
+            git('lfs', 'pull')
 
         # update from origin
         if not self.no_fetch:
