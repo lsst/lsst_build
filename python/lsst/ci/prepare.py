@@ -532,7 +532,7 @@ class VersionDbGit(VersionDbHash):
         except KeyError:
             absverfn = os.path.join(self.dbdir, self.__verfn(productName))
             try:
-                vm = VersionDbGit.VersionMap.fromFile(file(absverfn))
+                vm = VersionDbGit.VersionMap.fromFile(open(absverfn))
             except IOError:
                 vm = VersionDbGit.VersionMap()
             self.versionMaps[productName] = vm
