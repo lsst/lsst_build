@@ -118,7 +118,7 @@ class Manifest(object):
         Returns:
             The created `Manifest`.
         """
-        deps = [ (dep.name, prod.name) for prod in productDict.itervalues() for dep in prod.dependencies ];
+        deps = [ (dep.name, prod.name) for prod in productDict.itervalues() for dep in prod.dependencies ]
         topoSortedProductNames = tsort.tsort(deps)
 
         # Append top-level products with no dependencies
@@ -405,6 +405,8 @@ class VersionDbHash(VersionDb):
         self.eups = eups
 
     def _hash_dependencies(self, dependencies):
+        def cmp(a, b):
+            return (a > b) - (a < b)
         m = hashlib.sha1()
         for dep in sorted(dependencies, lambda a, b: cmp(a.name, b.name)):
             s = '%s\t%s\n' % (dep.name, dep.version)
@@ -521,7 +523,7 @@ class VersionDbGit(VersionDbHash):
         except KeyError:
             absverfn = os.path.join(self.dbdir, self.__verfn(productName))
             try:
-                vm = VersionDbGit.VersionMap.fromFile(file(absverfn))
+                vm = VersionDbGit.VersionMap.fromFile(open(absverfn))
             except IOError:
                 vm = VersionDbGit.VersionMap()
             self.versionMaps[productName] = vm
@@ -690,9 +692,9 @@ class BuildDirectoryConstructor(object):
 
                 # skip excluded optional products, and implicit products
                 if doptional and self.exclusion_resolver.is_excluded(dprod.name, productName):
-                    continue;
+                    continue
                 if dprod.name == "implicitProducts":
-                    continue;
+                    continue
 
                 dependencies.append( self._add_product_tree(products, dprod.name) )
 
