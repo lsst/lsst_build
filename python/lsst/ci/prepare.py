@@ -118,7 +118,7 @@ class Manifest(object):
         Returns:
             The created `Manifest`.
         """
-        deps = [ (dep.name, prod.name) for prod in productDict.itervalues() for dep in prod.dependencies ];
+        deps = [ (dep.name, prod.name) for prod in productDict.itervalues() for dep in prod.dependencies ]
         topoSortedProductNames = tsort.tsort(deps)
 
         # Append top-level products with no dependencies
@@ -690,9 +690,9 @@ class BuildDirectoryConstructor(object):
 
                 # skip excluded optional products, and implicit products
                 if doptional and self.exclusion_resolver.is_excluded(dprod.name, productName):
-                    continue;
+                    continue
                 if dprod.name == "implicitProducts":
-                    continue;
+                    continue
 
                 dependencies.append( self._add_product_tree(products, dprod.name) )
 
