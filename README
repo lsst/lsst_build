@@ -25,7 +25,7 @@ Provides the following capabilities:
 Example:
 
     git clone git@github.com:lsst/versiondb.git
-    export REPOSITORY_PATTERN="git://git.lsstcorp.org/LSST/DMS/%(product)s.git|git://git.lsstcorp.org/LSST/DMS/devenv/%(product)s.git|git://git.lsstcorp.org/LSST/DMS/testdata/%(product)s.git|git://git.lsstcorp.org/LSST/external/%(product)s.git"
+    export REPOSITORY_PATTERN="git@github.com:lsst/%(product)s.git|https://github.com/lsst/%(product)s.git/"
 
     cat > exclusions.txt <<-EOF
         # Exclusion map. Format:
