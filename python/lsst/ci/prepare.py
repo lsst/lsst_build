@@ -414,6 +414,8 @@ class VersionDbHash(VersionDb):
         self.eups = eups
 
     def _hash_dependencies(self, dependencies):
+        def cmp(a, b):
+            return (a > b) - (a < b)
         m = hashlib.sha1()
         for dep in sorted(dependencies, lambda a, b: cmp(a.name, b.name)):
             s = '%s\t%s\n' % (dep.name, dep.version)
