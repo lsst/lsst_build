@@ -1,3 +1,5 @@
+from __future__ import print_function
+from __future__ import absolute_import
 #############################################################################
 # Preparer
 
@@ -15,7 +17,7 @@ import abc
 import yaml
 import copy
 
-import tsort
+from . import tsort
 
 from .git import Git
 
@@ -60,10 +62,10 @@ class Manifest(object):
 
     def toFile(self, fileObject):
         """ Serialize the manifest to a file object """
-        print >>fileObject, '# %-23s %-41s %-30s' % ("product", "SHA1", "Version")
-        print >>fileObject, 'BUILD=%s' % self.buildID
+        print('# %-23s %-41s %-30s' % ("product", "SHA1", "Version"), file=fileObject)
+        print('BUILD=%s' % self.buildID, file=fileObject)
         for prod in self.products.itervalues():
-            print >>fileObject, '%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version, ','.join(dep.name for dep in prod.dependencies))
+            print('%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version, ','.join(dep.name for dep in prod.dependencies)), file=fileObject)
 
     def content_hash(self):
         """ Return a hash of the manifest, based on the products it contains. """
@@ -332,7 +334,7 @@ class ProductFetcher(object):
         # previous builds)
         git.clean("-d", "-f", "-q", "-x")
 
-        print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
+        print(" ok (%.1f sec)." % (time.time() - t0), file=sys.stderr)
         return ref, sha1
 
 class VersionDb(object):
