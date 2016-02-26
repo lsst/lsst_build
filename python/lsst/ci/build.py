@@ -1,3 +1,4 @@
+from __future__ import print_function
 #############################################################################
 # Builder
 import eups
@@ -65,15 +66,15 @@ class ProgressReporter(object):
             else:
                 elapsedTime = time.time() - self.t0
                 if retcode:
-                    print >>self.out, "ERROR (%d sec)." % elapsedTime
-                    print >>self.out, "*** error building product %s." % self.product.name
-                    print >>self.out, "*** exit code = %d" % retcode
-                    print >>self.out, "*** log is in %s" % logfile
-                    print >>self.out, "*** last few lines:"
+                    print("ERROR (%d sec)." % elapsedTime, file=self.out)
+                    print("*** error building product %s." % self.product.name, file=self.out)
+                    print("*** exit code = %d" % retcode, file=self.out)
+                    print("*** log is in %s" % logfile, file=self.out)
+                    print("*** last few lines:", file=self.out)
 
                     os.system("tail -n 10 %s | sed -e 's/^/:::::  /'" % pipes.quote(logfile))
                 else:
-                    print >>self.out, "ok (%.1f sec)." % elapsedTime
+                    print("ok (%.1f sec)." % elapsedTime, file=self.out)
 
             self.product = None
 
