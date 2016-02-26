@@ -5,7 +5,10 @@ import eups
 
 import subprocess
 import textwrap
-import os, stat, sys, shutil
+import os
+import stat
+import sys
+import shutil
 import pipes
 import time
 import eups.tags
@@ -13,6 +16,7 @@ import contextlib
 import datetime
 
 from .prepare import Manifest
+
 
 def declareEupsTag(tag, eupsObj):
     """ Declare a new EUPS tag
@@ -23,6 +27,7 @@ def declareEupsTag(tag, eupsObj):
     if tag not in tags.getTagNames():
         tags.registerTag(tag)
         tags.saveGlobalTags(eupsObj.path[0])
+
 
 class ProgressReporter(object):
     # progress reporter: display the version string as progress bar, character by character
@@ -93,9 +98,10 @@ class ProgressReporter(object):
         yield progress
         progress._finalize()
 
+
 class Builder(object):
     """Class that builds and installs all products in a manifest.
-    
+
        The result is tagged with the `Manifest`s build ID, if any.
     """
     def __init__(self, build_dir, manifest, progress, eups):
@@ -118,10 +124,8 @@ class Builder(object):
         eupspath = os.environ["EUPS_PATH"]
 
         # construct the tags file with exact dependencies
-        setups = [ 
-            "\t%-20s %s" % (dep.name, dep.version)
-                for dep in product.flat_dependencies()
-        ]
+        setups = ["\t%-20s %s" % (dep.name, dep.version)
+                  for dep in product.flat_dependencies()]
 
         # create the buildscript
         with open(buildscript, 'w') as fp:
@@ -162,8 +166,8 @@ class Builder(object):
             eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic build
             if [ -d  tests/.tests ] && \
                 [ "`ls tests/.tests/*\.failed 2> /dev/null | wc -l`" -ne 0 ]; then
-                echo "*** Failed unit tests."; 
-                exit 1 
+                echo "*** Failed unit tests.";
+                exit 1
             fi
             eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic install
 
@@ -172,11 +176,11 @@ class Builder(object):
 
             # explicitly append SHA1 to pkginfo
             echo SHA1=%(sha1)s >> $(eups list %(product)s %(version)s -d)/ups/pkginfo
-            """ %    {
+            """ % {
                     'product': product.name,
                     'version': product.version,
-                    'sha1' : product.sha1,
-                    'productdir' : productdir,
+                    'sha1': product.sha1,
+                    'productdir': productdir,
                     'setups': '\n            '.join(setups),
                     'eupsdir': eupsdir,
                     'eupspath': eupspath,
@@ -192,7 +196,8 @@ class Builder(object):
         # Run the build script
         with open(logfile, 'w') as logfp:
             # execute the build file from the product directory, capturing the output and return code
-            process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir)
+            process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                       cwd=productdir)
             for line in iter(process.stdout.readline, ''):
                 line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), line)
                 logfp.write(line)
