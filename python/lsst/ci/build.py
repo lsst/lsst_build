@@ -135,10 +135,10 @@ class Builder(object):
             set -ex
 
             # define the setup command, but preserve EUPS_PATH
-            . %(eupsdir)s/bin/setups.sh
+            . "%(eupsdir)s/bin/setups.sh"
             export EUPS_PATH="%(eupspath)s"
 
-            cd %(productdir)s
+            cd "%(productdir)s"
 
             # clean up the working directory
             git reset --hard
