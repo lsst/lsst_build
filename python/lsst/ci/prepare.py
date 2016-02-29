@@ -585,7 +585,6 @@ class VersionDbGit(VersionDbHash):
         manifest.buildID = self.__getBuildId(manifest, manifestSha) if build_id is None else build_id
 
         # Write files
-        dirty = False
         for (productName, vm) in self.versionMaps.iteritems():
             if not vm.dirty:
                 continue
@@ -600,7 +599,6 @@ class VersionDbGit(VersionDbHash):
                     vm.appendAdditionsToFile(fpVer, fpDep)
 
             git.add(verfn, depfn)
-            dirty = True
 
         # Store a copy of the manifest
         manfn = os.path.join('manifests', "%s.txt" % manifest.buildID)
