@@ -46,7 +46,7 @@ def tsort(edges):
             if not ts[t]:       # new frontier
                 S.add(t)
 
-    if filter(None, st.values()):  # we have a cycle. report the cycle.
+    if [_f for _f in st.values() if _f]:  # we have a cycle. report the cycle.
         def traverse(vs, seen):
             for s in vs:
                 if s in seen:
