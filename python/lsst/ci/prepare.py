@@ -566,7 +566,7 @@ class VersionDbGit(VersionDbHash):
                 tags = git.tag('-l', 'b[0-9]*').split()
                 btre = re.compile('^b[0-9]+$')
                 btags = [0]
-                btags += [int(tag[1:]) for tag in tags if btre.match(tag)]
+                btags += [int(t[1:]) for t in tags if btre.match(t)]
                 btag = max(btags)
 
                 definedTags = self.eups.tags.getTagNames()
