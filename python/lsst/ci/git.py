@@ -3,6 +3,7 @@
 
 import subprocess
 
+
 class GitError:
     def __init__(self, returncode, cmd, output, stderr):
         self.returncode = returncode
@@ -11,7 +12,11 @@ class GitError:
         self.stderr = stderr
 
     def __str__(self):
-        return "Command '%s' returned non-zero exit status %d.\nstdout:\n%s\nstderr:\n%s" % (self.cmd, self.returncode, self.output, self.stderr)
+        return "Command '%s' returned non-zero exit status %d.\nstdout:\n%s\nstderr:\n%s" % (self.cmd,
+                                                                                             self.returncode,
+                                                                                             self.output,
+                                                                                             self.stderr)
+
 
 class Git:
     def __init__(self, cwd=None):

@@ -3,14 +3,15 @@
 # lsst-build [build|prepare] <build_directory> [ref]
 #
 
-import argparse, os
+import argparse
+import os
 
 from lsst.ci.prepare import BuildDirectoryConstructor
 from lsst.ci.build import Builder
 
 parser = argparse.ArgumentParser(description='Build LSST Software Stack from git source',
-    formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog="""Examples:
+                                 formatter_class=argparse.RawDescriptionHelpFormatter,
+                                 epilog="""Examples:
     lsst-build prepare <build_directory> [ref1 [ref2 [...]]]
     lsst-build build <build_directory>
 .
@@ -22,19 +23,28 @@ parser_prepare = subparsers.add_parser('prepare', help='Prepare the source tree 
 parser_prepare.set_defaults(func=BuildDirectoryConstructor.run)
 parser_prepare.add_argument('build_dir', type=str, help='Build directory')
 parser_prepare.add_argument('products', type=str, help='Top-level products to build', nargs='+')
-parser_prepare.add_argument('--ref', default=[], action='append', type=str, help='An ordered list of refs to check out')
-parser_prepare.add_argument('--repos', type=str, help="YAML file with map of product names to git repository URLs.")
-parser_prepare.add_argument('--repository-pattern', default=os.environ.get("REPOSITORY_PATTERN"), type=str, help="Python pattern to source git repository ('|'-delimited; default: $REPOSITORY_PATTERN)")
-parser_prepare.add_argument('--sha-abbrev-len', default=10, type=int, help='Length of SHA1 commit ID abbreviation')
-parser_prepare.add_argument('--build-id', default=None, type=str, help='Build ID (default: autodetected from existing EUPS or git tags)')
+parser_prepare.add_argument('--ref', default=[], action='append', type=str,
+                            help='An ordered list of refs to check out')
+parser_prepare.add_argument('--repos', type=str,
+                            help="YAML file with map of product names to git repository URLs.")
+parser_prepare.add_argument('--repository-pattern', default=os.environ.get("REPOSITORY_PATTERN"), type=str,
+                            help="Python pattern to source git repository " +
+                            "('|'-delimited; default: $REPOSITORY_PATTERN)")
+parser_prepare.add_argument('--sha-abbrev-len', default=10, type=int,
+                            help='Length of SHA1 commit ID abbreviation')
+parser_prepare.add_argument('--build-id', default=None, type=str,
+                            help='Build ID (default: autodetected from existing EUPS or git tags)')
 parser_prepare.add_argument('--no-fetch', action='store_true', help="Don't git-fetch any products")
-parser_prepare.add_argument('--exclusion-map', type=str, help="File with map of optional packages to exclude.")
-parser_prepare.add_argument('--version-git-repo', type=str, help="Working directory of a git repository with the version database.")
+parser_prepare.add_argument('--exclusion-map', type=str,
+                            help="File with map of optional packages to exclude.")
+parser_prepare.add_argument('--version-git-repo', type=str,
+                            help="Working directory of a git repository with the version database.")
 
 # Parser for the 'build' command
 parser_prepare = subparsers.add_parser('build', help='Build the source tree given the manifest')
 parser_prepare.set_defaults(func=Builder.run)
-parser_prepare.add_argument('build_dir', type=str, help="Build directory with manifest.txt built by the `prepare' subcommand")
+parser_prepare.add_argument('build_dir', type=str,
+                            help="Build directory with manifest.txt built by the `prepare' subcommand")
 
 args = parser.parse_args()
 
