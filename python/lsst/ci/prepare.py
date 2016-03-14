@@ -179,7 +179,7 @@ class ProductFetcher(object):
         refs = copy.copy(self.refs)
         yaml = self._repos_yaml_lookup(product)
 
-        if yaml.ref:
+        if yaml is not None and yaml.ref:
             refs.append(yaml.ref)
 
         # Add 'master' to list of refs, if not there already
