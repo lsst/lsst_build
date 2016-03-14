@@ -1,9 +1,13 @@
+from __future__ import print_function
+from __future__ import absolute_import
 #############################################################################
 # Preparer
 
-import os, os.path
+import os
+import os.path
 import sys
-import eups, eups.tags
+import eups
+import eups.tags
 import hashlib
 import shutil
 import time
@@ -15,9 +19,10 @@ import abc
 import yaml
 import copy
 
-import tsort
+from . import tsort
 
 from .git import Git
+
 
 class Product(object):
     """Class representing an EUPS product to be built"""
@@ -29,7 +34,7 @@ class Product(object):
 
     def flat_dependencies(self):
         """Return a flat list of dependencies for the product.
-        
+
             Returns:
                 list of `Product`s.
         """
@@ -40,30 +45,33 @@ class Product(object):
 
         return res
 
+
 class Manifest(object):
     """A representation of topologically ordered list of EUPS products to be built
-    
+
        :ivar products: topologically sorted list of `Product`s
        :ivar buildID:  unique build identifier
     """
 
     def __init__(self, productsList, buildID=None):
         """Construct the manifest
-        
+
         Args:
             productList (OrderedDict): A topologically sorted dict of `Product`s
             buildID (str): A unique identifier for this build
-        
+
         """
         self.buildID = buildID
         self.products = productsList
 
     def toFile(self, fileObject):
         """ Serialize the manifest to a file object """
-        print >>fileObject, '# %-23s %-41s %-30s' % ("product", "SHA1", "Version")
-        print >>fileObject, 'BUILD=%s' % self.buildID
+        print('# %-23s %-41s %-30s' % ("product", "SHA1", "Version"), file=fileObject)
+        print('BUILD=%s' % self.buildID, file=fileObject)
         for prod in self.products.itervalues():
-            print >>fileObject, '%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version, ','.join(dep.name for dep in prod.dependencies))
+            print('%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version,
+                                            ','.join(dep.name for dep in prod.dependencies)),
+                  file=fileObject)
 
     def content_hash(self):
         """ Return a hash of the manifest, based on the products it contains. """
@@ -99,7 +107,7 @@ class Manifest(object):
             arr = line.split()
             if len(arr) == 4:
                 (name, sha1, version, deps) = arr
-                deps = [ products[dep_name] for dep_name in deps.split(',') ]
+                deps = [products[dep_name] for dep_name in deps.split(',')]
             else:
                 (name, sha1, version) = arr
                 deps = []
@@ -110,15 +118,15 @@ class Manifest(object):
 
     @staticmethod
     def fromProductDict(productDict):
-        """ Create a `Manifest` by topologically sorting the dict of `Product`s 
-        
+        """ Create a `Manifest` by topologically sorting the dict of `Product`s
+
         Args:
             productDict (dict): A productName -> `Product` dictionary of products
 
         Returns:
             The created `Manifest`.
         """
-        deps = [ (dep.name, prod.name) for prod in productDict.itervalues() for dep in prod.dependencies ];
+        deps = [(dep.name, prod.name) for prod in productDict.itervalues() for dep in prod.dependencies]
         topoSortedProductNames = tsort.tsort(deps)
 
         # Append top-level products with no dependencies
@@ -132,11 +140,12 @@ class Manifest(object):
             products[name] = productDict[name]
         return Manifest(products, None)
 
+
 class ProductFetcher(object):
     """ Fetches products from remote git repositories and checks out matching refs.
 
         See `fetch` for further documentation.
-        
+
         :ivar build_dir: The product will be cloned to build_dir/productName
         :ivar repository_patterns: A list of str.format() patterns used discover the URL of the remote git repository.
         :ivar refs: A list of refs to attempt to git-checkout
@@ -161,14 +170,14 @@ class ProductFetcher(object):
 
     def _origin_candidates(self, product):
         """ Expand repository_patterns into URLs. """
-        data = { 'product': product }
+        data = {'product': product}
         locations = []
         yaml = self._repos_yaml_lookup(product)
 
         if yaml:
             locations.append(yaml.url)
         if self.repository_patterns:
-            locations += [ pat % data for pat in self.repository_patterns ]
+            locations += [pat % data for pat in self.repository_patterns]
         return locations
 
     def _ref_candidates(self, product):
@@ -219,13 +228,13 @@ class ProductFetcher(object):
 
     def fetch(self, product):
         """ Clone the product repository and checkout the first matching ref.
-        
+
         Args:
             product (str): the product to fetch
-            
+
         Returns:
             (ref, sha1) tuple where::
-            
+
                  ref -- the checked out ref (e.g., 'master')
                  sha1 -- the corresponding commit's SHA1
 
@@ -332,27 +341,28 @@ class ProductFetcher(object):
         # previous builds)
         git.clean("-d", "-f", "-q", "-x")
 
-        print >>sys.stderr, " ok (%.1f sec)." % (time.time() - t0)
+        print(" ok (%.1f sec)." % (time.time() - t0), file=sys.stderr)
         return ref, sha1
+
 
 class VersionDb(object):
     """ Construct a full XXX+YYY version for a product.
-    
+
         The subclasses of VersionDb determine how +YYY will be computed.
         The XXX part is computed by running EUPS' pkgautoversion.
     """
 
     __metaclass__ = abc.ABCMeta
-    
+
     @abc.abstractmethod
     def getSuffix(self, productName, productVersion, dependencies):
         """Return a unique +YYY version suffix for a product given its dependencies
-        
+
             Args:
                 productName (str): name of the product
                 productVersion (str): primary version of the product
                 dependencies (list): A list of `Product`s that are the immediate dependencies of productName
-                
+
             Returns:
                 str. the +YYY suffix (w/o the + sign).
         """
@@ -361,11 +371,11 @@ class VersionDb(object):
     @abc.abstractmethod
     def commit(self, manifest, build_id):
         """Commit the changes to the version database
-        
+
            Args:
                manifest (`Manifest`): a manifest of products from this run
                build_id (str): the build identifier
-               
+
            A subclass must override this method to commit to
            permanent storage any changes to the underlying database
            caused by getSuffix() invocations, and to assign the
@@ -375,7 +385,7 @@ class VersionDb(object):
 
     def version(self, productName, productdir, ref, dependencies):
         """ Return a standardized XXX+YYY EUPS version, that includes the dependencies.
-        
+
             Args:
                 productName (str): name of the product to version
                 productdir (str): the directory with product source code
@@ -386,7 +396,7 @@ class VersionDb(object):
                 str. the XXX+YYY version string.
         """
         q = pipes.quote
-        cmd ="cd %s && pkgautoversion %s" % (q(productdir), q(ref))
+        cmd = "cd %s && pkgautoversion %s" % (q(productdir), q(ref))
         productVersion = subprocess.check_output(cmd, shell=True).strip()
 
         # add +XXXX suffix, if any
@@ -394,7 +404,6 @@ class VersionDb(object):
         assert suffix.__class__ == str
         suffix = "+%s" % suffix if suffix else ""
         return "%s%s" % (productVersion, suffix)
-
 
 
 class VersionDbHash(VersionDb):
@@ -405,6 +414,8 @@ class VersionDbHash(VersionDb):
         self.eups = eups
 
     def _hash_dependencies(self, dependencies):
+        def cmp(a, b):
+            return (a > b) - (a < b)
         m = hashlib.sha1()
         for dep in sorted(dependencies, lambda a, b: cmp(a.name, b.name)):
             s = '%s\t%s\n' % (dep.name, dep.version)
@@ -425,8 +436,8 @@ class VersionDbHash(VersionDb):
         tags.loadFromEupsPath(self.eups.path)
 
         btre = re.compile('^b[0-9]+$')
-        btags = [ 0 ]
-        btags += [ int(tag[1:]) for tag in tags.getTagNames() if btre.match(tag) ]
+        btags = [0]
+        btags += [int(tag[1:]) for tag in tags.getTagNames() if btre.match(tag)]
         tag = "b%s" % (max(btags) + 1)
 
         return tag
@@ -434,17 +445,18 @@ class VersionDbHash(VersionDb):
     def commit(self, manifest, build_id):
         manifest.buildID = self.__getBuildId() if build_id is None else build_id
 
+
 class VersionDbGit(VersionDbHash):
     """Subclass of `VersionDb` that generates +YYY suffixes by assigning a unique +N integer to
-       each set of dependencies, and tracking the assignments in a git repository.    
+       each set of dependencies, and tracking the assignments in a git repository.
     """
 
     class VersionMap(object):
         def __init__(self):
-            self.verhash2suffix = dict()	# (version, dep_sha) -> suffix
-            self.versuffix2hash = dict()	# (version, suffix) -> depsha
+            self.verhash2suffix = dict()  # (version, dep_sha) -> suffix
+            self.versuffix2hash = dict()  # (version, suffix) -> depsha
 
-            self.added_entries = dict()		# (version, suffix) -> [ (depName, depVersion) ]
+            self.added_entries = dict()	 # (version, suffix) -> [ (depName, depVersion) ]
 
             self.dirty = False
 
@@ -458,7 +470,8 @@ class VersionDbGit(VersionDbHash):
             self.__just_add(version, hash, suffix)
 
             # Record additions to know what needs to be appended
-            self.added_entries[(version, suffix)] = [ (product.name, product.version) for product in dependencies ]
+            self.added_entries[(version, suffix)] = [(product.name, product.version)
+                                                     for product in dependencies]
 
             self.dirty = True
 
@@ -521,7 +534,7 @@ class VersionDbGit(VersionDbHash):
         except KeyError:
             absverfn = os.path.join(self.dbdir, self.__verfn(productName))
             try:
-                vm = VersionDbGit.VersionMap.fromFile(file(absverfn))
+                vm = VersionDbGit.VersionMap.fromFile(open(absverfn))
             except IOError:
                 vm = VersionDbGit.VersionMap()
             self.versionMaps[productName] = vm
@@ -554,8 +567,8 @@ class VersionDbGit(VersionDbHash):
                 git = Git(self.dbdir)
                 tags = git.tag('-l', 'b[0-9]*').split()
                 btre = re.compile('^b[0-9]+$')
-                btags = [ 0 ]
-                btags += [ int(tag[1:]) for tag in tags if btre.match(tag) ]
+                btags = [0]
+                btags += [int(t[1:]) for t in tags if btre.match(t)]
                 btag = max(btags)
 
                 definedTags = self.eups.tags.getTagNames()
@@ -574,7 +587,6 @@ class VersionDbGit(VersionDbHash):
         manifest.buildID = self.__getBuildId(manifest, manifestSha) if build_id is None else build_id
 
         # Write files
-        dirty = False
         for (productName, vm) in self.versionMaps.iteritems():
             if not vm.dirty:
                 continue
@@ -589,7 +601,6 @@ class VersionDbGit(VersionDbHash):
                     vm.appendAdditionsToFile(fpVer, fpDep)
 
             git.add(verfn, depfn)
-            dirty = True
 
         # Store a copy of the manifest
         manfn = os.path.join('manifests', "%s.txt" % manifest.buildID)
@@ -620,6 +631,7 @@ class VersionDbGit(VersionDbHash):
             msg = "Build ID %s" % manifest.buildID
             git.tag('-a', '-m', msg, manifest.buildID)
 
+
 class ExclusionResolver(object):
     """A class to determine whether a dependency should be excluded from
        build for a product, based on matching against a list of regular
@@ -638,7 +650,7 @@ class ExclusionResolver(object):
             rc = self._exclusion_regex_cache = dict()
 
         if product not in rc:
-            rc[product] = [ dep_re for (dep_re, prod_re) in self.exclusions if prod_re.match(product) ]
+            rc[product] = [dep_re for (dep_re, prod_re) in self.exclusions if prod_re.match(product)]
 
         for dep_re in rc[product]:
             if dep_re.match(dep):
@@ -663,7 +675,7 @@ class ExclusionResolver(object):
 class BuildDirectoryConstructor(object):
     """A class that, given one or more top level packages, recursively
     clones them to a build directory thus preparing them to be built."""
-    
+
     def __init__(self, build_dir, eups, product_fetcher, version_db, exclusion_resolver):
         self.build_dir = os.path.abspath(build_dir)
 
@@ -690,11 +702,11 @@ class BuildDirectoryConstructor(object):
 
                 # skip excluded optional products, and implicit products
                 if doptional and self.exclusion_resolver.is_excluded(dprod.name, productName):
-                    continue;
+                    continue
                 if dprod.name == "implicitProducts":
-                    continue;
+                    continue
 
-                dependencies.append( self._add_product_tree(products, dprod.name) )
+                dependencies.append(self._add_product_tree(products, dprod.name))
 
         # Construct EUPS version
         version = self.version_db.version(productName, productdir, ref, dependencies)
@@ -752,6 +764,7 @@ class BuildDirectoryConstructor(object):
         manifestFn = os.path.join(build_dir, 'manifest.txt')
         with open(manifestFn, 'w') as fp:
             manifest.toFile(fp)
+
 
 class RepoSpec:
     """Represents a git repo specification in repos.yaml. """
