@@ -3,6 +3,10 @@ from __future__ import absolute_import
 #############################################################################
 # Preparer
 
+from builtins import str
+from builtins import object
+from io import open
+
 import os
 import os.path
 import sys
@@ -22,6 +26,7 @@ import copy
 from . import tsort
 
 from .git import Git
+from future.utils import with_metaclass
 
 
 class Product(object):
@@ -68,7 +73,7 @@ class Manifest(object):
         """ Serialize the manifest to a file object """
         print('# %-23s %-41s %-30s' % ("product", "SHA1", "Version"), file=fileObject)
         print('BUILD=%s' % self.buildID, file=fileObject)
-        for prod in self.products.itervalues():
+        for prod in self.products.values():
             print('%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version,
                                             ','.join(dep.name for dep in prod.dependencies)),
                   file=fileObject)
@@ -76,9 +81,9 @@ class Manifest(object):
     def content_hash(self):
         """ Return a hash of the manifest, based on the products it contains. """
         m = hashlib.sha1()
-        for prod in self.products.itervalues():
+        for prod in self.products.values():
             s = '%s\t%s\t%s\n' % (prod.name, prod.sha1, prod.version)
-            m.update(s)
+            m.update(s.encode("ascii"))
 
         return m.hexdigest()
 
@@ -126,12 +131,12 @@ class Manifest(object):
         Returns:
             The created `Manifest`.
         """
-        deps = [(dep.name, prod.name) for prod in productDict.itervalues() for dep in prod.dependencies]
+        deps = [(dep.name, prod.name) for prod in productDict.values() for dep in prod.dependencies]
         topoSortedProductNames = tsort.tsort(deps)
 
         # Append top-level products with no dependencies
         _p = set(topoSortedProductNames)
-        for name in set(productDict.iterkeys()):
+        for name in set(productDict.keys()):
             if name not in _p:
                 topoSortedProductNames.append(name)
 
@@ -161,7 +166,7 @@ class ProductFetcher(object):
         self.no_fetch = no_fetch
         if repos:
             if os.path.exists(repos):
-                with open(repos, 'r') as f:
+                with open(repos, 'r', encoding="utf-8") as f:
                     self.repos = yaml.safe_load(f)
             else:
                 raise Exception("YAML repos file '%s' does not exist" % repos)
@@ -345,14 +350,12 @@ class ProductFetcher(object):
         return ref, sha1
 
 
-class VersionDb(object):
+class VersionDb(with_metaclass(abc.ABCMeta, object)):
     """ Construct a full XXX+YYY version for a product.
 
         The subclasses of VersionDb determine how +YYY will be computed.
         The XXX part is computed by running EUPS' pkgautoversion.
     """
-
-    __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
     def getSuffix(self, productName, productVersion, dependencies):
@@ -397,7 +400,7 @@ class VersionDb(object):
         """
         q = pipes.quote
         cmd = "cd %s && pkgautoversion %s" % (q(productdir), q(ref))
-        productVersion = subprocess.check_output(cmd, shell=True).strip()
+        productVersion = subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
 
         # add +XXXX suffix, if any
         suffix = self.getSuffix(productName, productVersion, dependencies)
@@ -414,12 +417,12 @@ class VersionDbHash(VersionDb):
         self.eups = eups
 
     def _hash_dependencies(self, dependencies):
-        def cmp(a, b):
-            return (a > b) - (a < b)
+        def namekey(d):
+            return d.name
         m = hashlib.sha1()
-        for dep in sorted(dependencies, lambda a, b: cmp(a.name, b.name)):
+        for dep in sorted(dependencies, key=namekey):
             s = '%s\t%s\n' % (dep.name, dep.version)
-            m.update(s)
+            m.update(s.encode("ascii"))
 
         return m.hexdigest()
 
@@ -492,7 +495,7 @@ class VersionDbGit(VersionDbHash):
 
         def appendAdditionsToFile(self, fileObjectVer, fileObjectDep):
             # write (version, hash)<->suffix and dependency table updates
-            for (version, suffix), dependencies in self.added_entries.iteritems():
+            for (version, suffix), dependencies in self.added_entries.items():
                 fileObjectVer.write("%s\t%s\t%d\n" % (version, self.hash(version, suffix), suffix))
                 for depName, depVersion in dependencies:
                     fileObjectDep.write("%s\t%d\t%s\t%s\n" % (version, suffix, depName, depVersion))
@@ -534,7 +537,7 @@ class VersionDbGit(VersionDbHash):
         except KeyError:
             absverfn = os.path.join(self.dbdir, self.__verfn(productName))
             try:
-                vm = VersionDbGit.VersionMap.fromFile(open(absverfn))
+                vm = VersionDbGit.VersionMap.fromFile(open(absverfn, encoding="utf-8"))
             except IOError:
                 vm = VersionDbGit.VersionMap()
             self.versionMaps[productName] = vm
@@ -555,7 +558,7 @@ class VersionDbGit(VersionDbHash):
         """Return a build ID unique to this manifest. If a matching manifest already
            exists in the database, its build ID will be used.
         """
-        with open(os.path.join(self.dbdir, 'manifests', 'content_sha.db.txt'), 'a+') as fp:
+        with open(os.path.join(self.dbdir, 'manifests', 'content_sha.db.txt'), 'a+', encoding="utf-8") as fp:
                 # Try to find a manifest with existing matching content
                 for line in fp:
                         (sha1, tag) = line.strip().split()
@@ -587,7 +590,7 @@ class VersionDbGit(VersionDbHash):
         manifest.buildID = self.__getBuildId(manifest, manifestSha) if build_id is None else build_id
 
         # Write files
-        for (productName, vm) in self.versionMaps.iteritems():
+        for (productName, vm) in self.versionMaps.items():
             if not vm.dirty:
                 continue
 
@@ -596,8 +599,8 @@ class VersionDbGit(VersionDbHash):
             absverfn = os.path.join(self.dbdir, verfn)
             absdepfn = os.path.join(self.dbdir, depfn)
 
-            with open(absverfn, 'a') as fpVer:
-                with open(absdepfn, 'a') as fpDep:
+            with open(absverfn, 'a', encoding="utf-8") as fpVer:
+                with open(absdepfn, 'a', encoding="utf-8") as fpDep:
                     vm.appendAdditionsToFile(fpVer, fpDep)
 
             git.add(verfn, depfn)
@@ -605,7 +608,7 @@ class VersionDbGit(VersionDbHash):
         # Store a copy of the manifest
         manfn = os.path.join('manifests', "%s.txt" % manifest.buildID)
         absmanfn = os.path.join(self.dbdir, manfn)
-        with open(absmanfn, 'w') as fp:
+        with open(absmanfn, 'w', encoding="utf-8") as fp:
             manifest.toFile(fp)
 
         if git.tag("-l", manifest.buildID) == manifest.buildID:
@@ -619,7 +622,7 @@ class VersionDbGit(VersionDbHash):
             # add the new manifest<->buildID mapping
             shafn = self.__shafn()
             absshafn = os.path.join(self.dbdir, shafn)
-            with open(absshafn, 'a+') as fp:
+            with open(absshafn, 'a+', encoding="utf-8") as fp:
                 fp.write("%s\t%s\n" % (manifestSha, manifest.buildID))
             git.add(shafn)
 
@@ -739,7 +742,7 @@ class BuildDirectoryConstructor(object):
         eupsObj = eups.Eups()
 
         if args.exclusion_map:
-            with open(args.exclusion_map) as fp:
+            with open(args.exclusion_map, encoding="utf-8") as fp:
                 exclusion_resolver = ExclusionResolver.fromFile(fp)
         else:
             exclusion_resolver = ExclusionResolver([])
@@ -762,11 +765,11 @@ class BuildDirectoryConstructor(object):
         # Store the result in build_dir/manifest.txt
         #
         manifestFn = os.path.join(build_dir, 'manifest.txt')
-        with open(manifestFn, 'w') as fp:
+        with open(manifestFn, 'w', encoding="utf-8") as fp:
             manifest.toFile(fp)
 
 
-class RepoSpec:
+class RepoSpec(object):
     """Represents a git repo specification in repos.yaml. """
 
     def __init__(self, product, url, ref='master', lfs=False):

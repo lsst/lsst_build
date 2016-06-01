@@ -1,6 +1,7 @@
 from __future__ import print_function
 #############################################################################
 # Builder
+from io import open
 import eups
 
 import subprocess
@@ -128,7 +129,7 @@ class Builder(object):
                   for dep in product.flat_dependencies()]
 
         # create the buildscript
-        with open(buildscript, 'w') as fp:
+        with open(buildscript, 'w', encoding="utf-8") as fp:
             text = textwrap.dedent(
             """\
             #!/bin/bash
@@ -194,12 +195,12 @@ class Builder(object):
         os.chmod(buildscript, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         # Run the build script
-        with open(logfile, 'w') as logfp:
+        with open(logfile, 'w', encoding="utf-8") as logfp:
             # execute the build file from the product directory, capturing the output and return code
             process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        cwd=productdir)
-            for line in iter(process.stdout.readline, ''):
-                line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), line)
+            for line in iter(process.stdout.readline, b''):
+                line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), line.decode("utf-8"))
                 logfp.write(line)
                 progress.reportProgress()
 
@@ -236,7 +237,7 @@ class Builder(object):
             declareEupsTag(self.manifest.buildID, self.eups)
 
         # Build all products
-        for product in self.manifest.products.itervalues():
+        for product in self.manifest.products.values():
             if not self._build_product_if_needed(product):
                 return False
 
@@ -253,7 +254,7 @@ class Builder(object):
         progress = ProgressReporter(sys.stderr)
 
         manifestFn = os.path.join(build_dir, 'manifest.txt')
-        with open(manifestFn) as fp:
+        with open(manifestFn, encoding="utf-8") as fp:
             manifest = Manifest.fromFile(fp)
 
         b = Builder(build_dir, manifest, progress, eupsObj)

@@ -41,7 +41,7 @@ def tsort(edges):
     while S:
         s = S.pop()
         L.append(s)
-        for t in st.get(s, {}).keys():
+        for t in list(st.get(s, {}).keys()):
             prune(s, t)
             if not ts[t]:       # new frontier
                 S.add(t)

@@ -4,7 +4,7 @@
 import subprocess
 
 
-class GitError:
+class GitError(Exception):
     def __init__(self, returncode, cmd, output, stderr):
         self.returncode = returncode
         self.cmd = cmd
@@ -18,7 +18,7 @@ class GitError:
                                                                                              self.stderr)
 
 
-class Git:
+class Git(object):
     def __init__(self, cwd=None):
         self.cwd = cwd
 
@@ -36,6 +36,8 @@ class Git:
 
         process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=self.cwd)
         (stdout, stderr) = process.communicate()
+        stdout = stdout.decode('utf-8')
+        stderr = stderr.decode('utf-8')
         retcode = process.poll()
 
         if retcode and not return_status:
