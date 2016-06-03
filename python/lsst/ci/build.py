@@ -26,6 +26,7 @@ def declareEupsTag(tag, eupsObj):
     """
     tags = eupsObj.tags
     if tag not in tags.getTagNames():
+        tag = str(tag)
         tags.registerTag(tag)
         tags.saveGlobalTags(eupsObj.path[0])
 
@@ -113,7 +114,7 @@ class Builder(object):
 
     def _tag_product(self, name, version, tag):
         if tag:
-            self.eups.declare(name, version, tag=tag)
+            self.eups.declare(name, version, tag=str(tag))
 
     def _build_product(self, product, progress):
         # run the eupspkg sequence for the product
@@ -131,7 +132,7 @@ class Builder(object):
         # create the buildscript
         with open(buildscript, 'w', encoding="utf-8") as fp:
             text = textwrap.dedent(
-            """\
+            u"""\
             #!/bin/bash
 
             # redirect stderr to stdin

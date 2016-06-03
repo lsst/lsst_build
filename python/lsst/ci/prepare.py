@@ -3,7 +3,6 @@ from __future__ import absolute_import
 #############################################################################
 # Preparer
 
-from builtins import str
 from builtins import object
 from io import open
 
@@ -71,11 +70,11 @@ class Manifest(object):
 
     def toFile(self, fileObject):
         """ Serialize the manifest to a file object """
-        print('# %-23s %-41s %-30s' % ("product", "SHA1", "Version"), file=fileObject)
-        print('BUILD=%s' % self.buildID, file=fileObject)
+        print(u'# %-23s %-41s %-30s' % ("product", "SHA1", "Version"), file=fileObject)
+        print(u'BUILD=%s' % self.buildID, file=fileObject)
         for prod in self.products.values():
-            print('%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version,
-                                            ','.join(dep.name for dep in prod.dependencies)),
+            print(u'%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version,
+                                             ','.join(dep.name for dep in prod.dependencies)),
                   file=fileObject)
 
     def content_hash(self):
@@ -623,7 +622,7 @@ class VersionDbGit(VersionDbHash):
             shafn = self.__shafn()
             absshafn = os.path.join(self.dbdir, shafn)
             with open(absshafn, 'a+', encoding="utf-8") as fp:
-                fp.write("%s\t%s\n" % (manifestSha, manifest.buildID))
+                fp.write(u"%s\t%s\n" % (manifestSha, manifest.buildID))
             git.add(shafn)
 
             # git-commit
