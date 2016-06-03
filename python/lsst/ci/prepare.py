@@ -91,7 +91,7 @@ class Manifest(object):
         varre = re.compile('^(\w+)=(.*)$')
 
         products = collections.OrderedDict()
-        buildId = None
+        build_id = None
         for line in fileObject:
             line = line.strip()
             if not line:
@@ -102,10 +102,10 @@ class Manifest(object):
             # Look for variable assignments
             m = varre.match(line)
             if m:
-                varName = m.group(1)
-                varValue = m.group(2)
-                if varName == "BUILD":
-                    buildId = varValue
+                var_name = m.group(1)
+                var_value = m.group(2)
+                if var_name == "BUILD":
+                    build_id = var_value
                 continue
 
             arr = line.split()
@@ -118,7 +118,7 @@ class Manifest(object):
 
             products[name] = Product(name, sha1, version, deps)
 
-        return Manifest(products, buildId)
+        return Manifest(products, build_id)
 
     @staticmethod
     def fromProductDict(productDict):
@@ -131,16 +131,16 @@ class Manifest(object):
             The created `Manifest`.
         """
         deps = [(dep.name, prod.name) for prod in productDict.values() for dep in prod.dependencies]
-        topoSortedProductNames = tsort.tsort(deps)
+        topo_sorted_product_names = tsort.tsort(deps)
 
         # Append top-level products with no dependencies
-        _p = set(topoSortedProductNames)
+        _p = set(topo_sorted_product_names)
         for name in set(productDict.keys()):
             if name not in _p:
-                topoSortedProductNames.append(name)
+                topo_sorted_product_names.append(name)
 
         products = collections.OrderedDict()
-        for name in topoSortedProductNames:
+        for name in topo_sorted_product_names:
             products[name] = productDict[name]
         return Manifest(products, None)
 
@@ -151,7 +151,8 @@ class ProductFetcher(object):
         See `fetch` for further documentation.
 
         :ivar build_dir: The product will be cloned to build_dir/productName
-        :ivar repository_patterns: A list of str.format() patterns used discover the URL of the remote git repository.
+        :ivar repository_patterns: A list of str.format() patterns used discover the URL of the remote git
+              repository.
         :ivar refs: A list of refs to attempt to git-checkout
         :ivar no_fetch: If true, don't fetch, just checkout the first matching ref.
     """
@@ -217,7 +218,8 @@ class ProductFetcher(object):
                 # RepoSpec constructor args
                 rs = RepoSpec(product, **spec)
             else:
-                raise Exception('invalid repos.yaml repo specification -- please check the file with repos-lint')
+                raise Exception('invalid repos.yaml repo specification'
+                                ' -- please check the file with repos-lint')
 
         return rs
 
@@ -399,13 +401,13 @@ class VersionDb(with_metaclass(abc.ABCMeta, object)):
         """
         q = pipes.quote
         cmd = "cd %s && pkgautoversion %s" % (q(productdir), q(ref))
-        productVersion = subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
+        product_version = subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
 
         # add +XXXX suffix, if any
-        suffix = self.getSuffix(productName, productVersion, dependencies)
+        suffix = self.getSuffix(productName, product_version, dependencies)
         assert suffix.__class__ == str
         suffix = "+%s" % suffix if suffix else ""
-        return "%s%s" % (productVersion, suffix)
+        return "%s%s" % (product_version, suffix)
 
 
 class VersionDbHash(VersionDb):
@@ -511,10 +513,10 @@ class VersionDbGit(VersionDbHash):
 
             return vm
 
-    def __init__(self, dbdir, eupsObj):
+    def __init__(self, dbdir, eups_obj):
         super(VersionDbGit, self).__init__(None, None)
         self.dbdir = dbdir
-        self.eups = eupsObj
+        self.eups = eups_obj
 
         self.versionMaps = dict()
 
@@ -573,11 +575,11 @@ class VersionDbGit(VersionDbHash):
                 btags += [int(t[1:]) for t in tags if btre.match(t)]
                 btag = max(btags)
 
-                definedTags = self.eups.tags.getTagNames()
+                defined_tags = self.eups.tags.getTagNames()
                 while True:
                     btag += 1
                     tag = "b%s" % btag
-                    if tag not in definedTags:
+                    if tag not in defined_tags:
                         break
 
                 return tag
@@ -585,8 +587,8 @@ class VersionDbGit(VersionDbHash):
     def commit(self, manifest, build_id):
         git = Git(self.dbdir)
 
-        manifestSha = manifest.content_hash()
-        manifest.buildID = self.__getBuildId(manifest, manifestSha) if build_id is None else build_id
+        manifest_sha = manifest.content_hash()
+        manifest.buildID = self.__getBuildId(manifest, manifest_sha) if build_id is None else build_id
 
         # Write files
         for (productName, vm) in self.versionMaps.items():
@@ -622,7 +624,7 @@ class VersionDbGit(VersionDbHash):
             shafn = self.__shafn()
             absshafn = os.path.join(self.dbdir, shafn)
             with open(absshafn, 'a+', encoding="utf-8") as fp:
-                fp.write(u"%s\t%s\n" % (manifestSha, manifest.buildID))
+                fp.write(u"%s\t%s\n" % (manifest_sha, manifest.buildID))
             git.add(shafn)
 
             # git-commit
@@ -738,7 +740,7 @@ class BuildDirectoryConstructor(object):
         #
         # Wire-up the BuildDirectoryConstructor constructor
         #
-        eupsObj = eups.Eups()
+        eups_obj = eups.Eups()
 
         if args.exclusion_map:
             with open(args.exclusion_map, encoding="utf-8") as fp:
@@ -747,12 +749,12 @@ class BuildDirectoryConstructor(object):
             exclusion_resolver = ExclusionResolver([])
 
         if args.version_git_repo:
-            version_db = VersionDbGit(args.version_git_repo, eupsObj)
+            version_db = VersionDbGit(args.version_git_repo, eups_obj)
         else:
-            version_db = VersionDbHash(args.sha_abbrev_len, eupsObj)
+            version_db = VersionDbHash(args.sha_abbrev_len, eups_obj)
 
         product_fetcher = ProductFetcher(build_dir, args.repos, args.repository_pattern, refs, args.no_fetch)
-        p = BuildDirectoryConstructor(build_dir, eupsObj, product_fetcher, version_db, exclusion_resolver)
+        p = BuildDirectoryConstructor(build_dir, eups_obj, product_fetcher, version_db, exclusion_resolver)
 
         #
         # Run the construction
@@ -763,8 +765,8 @@ class BuildDirectoryConstructor(object):
         #
         # Store the result in build_dir/manifest.txt
         #
-        manifestFn = os.path.join(build_dir, 'manifest.txt')
-        with open(manifestFn, 'w', encoding="utf-8") as fp:
+        manifest_fn = os.path.join(build_dir, 'manifest.txt')
+        with open(manifest_fn, 'w', encoding="utf-8") as fp:
             manifest.toFile(fp)
 
 

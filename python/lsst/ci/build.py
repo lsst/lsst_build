@@ -71,9 +71,9 @@ class ProgressReporter(object):
             if logfile is None:
                 sys.stderr.write('(already installed).\n')
             else:
-                elapsedTime = time.time() - self.t0
+                elapsed_time = time.time() - self.t0
                 if retcode:
-                    print("ERROR (%d sec)." % elapsedTime, file=self.out)
+                    print("ERROR (%d sec)." % elapsed_time, file=self.out)
                     print("*** error building product %s." % self.product.name, file=self.out)
                     print("*** exit code = %d" % retcode, file=self.out)
                     print("*** log is in %s" % logfile, file=self.out)
@@ -81,7 +81,7 @@ class ProgressReporter(object):
 
                     os.system("tail -n 10 %s | sed -e 's/^/:::::  /'" % pipes.quote(logfile))
                 else:
-                    print("ok (%.1f sec)." % elapsedTime, file=self.out)
+                    print("ok (%.1f sec)." % elapsed_time, file=self.out)
 
             self.product = None
 
@@ -131,8 +131,7 @@ class Builder(object):
 
         # create the buildscript
         with open(buildscript, 'w', encoding="utf-8") as fp:
-            text = textwrap.dedent(
-            u"""\
+            text = textwrap.dedent(u"""\
             #!/bin/bash
 
             # redirect stderr to stdin
@@ -179,15 +178,14 @@ class Builder(object):
             # explicitly append SHA1 to pkginfo
             echo SHA1=%(sha1)s >> $(eups list %(product)s %(version)s -d)/ups/pkginfo
             """ % {
-                    'product': product.name,
-                    'version': product.version,
-                    'sha1': product.sha1,
-                    'productdir': productdir,
-                    'setups': '\n            '.join(setups),
-                    'eupsdir': eupsdir,
-                    'eupspath': eupspath,
-                }
-            )
+                'product': product.name,
+                'version': product.version,
+                'sha1': product.sha1,
+                'productdir': productdir,
+                'setups': '\n            '.join(setups),
+                'eupsdir': eupsdir,
+                'eupspath': eupspath,
+            })
 
             fp.write(text)
 
@@ -208,12 +206,12 @@ class Builder(object):
         retcode = process.poll()
         if not retcode:
             # copy the log file to product directory
-            eupsProd = self.eups.getProduct(product.name, product.version)
-            shutil.copy2(logfile, eupsProd.dir)
+            eups_prod = self.eups.getProduct(product.name, product.version)
+            shutil.copy2(logfile, eups_prod.dir)
         else:
-            eupsProd = None
+            eups_prod = None
 
-        return (eupsProd, retcode, logfile)
+        return (eups_prod, retcode, logfile)
 
     def _build_product_if_needed(self, product):
         # Build a product if it hasn't been installed already
@@ -250,14 +248,14 @@ class Builder(object):
             raise Exception("Directory '%s' does not exist or isn't writable." % build_dir)
 
         # Build products
-        eupsObj = eups.Eups()
+        eups_obj = eups.Eups()
 
         progress = ProgressReporter(sys.stderr)
 
-        manifestFn = os.path.join(build_dir, 'manifest.txt')
-        with open(manifestFn, encoding="utf-8") as fp:
+        manifest_fn = os.path.join(build_dir, 'manifest.txt')
+        with open(manifest_fn, encoding="utf-8") as fp:
             manifest = Manifest.fromFile(fp)
 
-        b = Builder(build_dir, manifest, progress, eupsObj)
+        b = Builder(build_dir, manifest, progress, eups_obj)
         retcode = b.build()
-        exit(retcode == 0)
+        sys.exit(retcode == 0)
