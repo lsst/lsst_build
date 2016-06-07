@@ -54,28 +54,28 @@ class Manifest(object):
     """A representation of topologically ordered list of EUPS products to be built
 
        :ivar products: topologically sorted list of `Product`s
-       :ivar buildID:  unique build identifier
+       :ivar build_id:  unique build identifier
     """
 
-    def __init__(self, productsList, buildID=None):
+    def __init__(self, products_list, build_id=None):
         """Construct the manifest
 
         Args:
-            productList (OrderedDict): A topologically sorted dict of `Product`s
-            buildID (str): A unique identifier for this build
+            products_list (OrderedDict): A topologically sorted dict of `Product`s
+            build_id (str): A unique identifier for this build
 
         """
-        self.buildID = buildID
-        self.products = productsList
+        self.build_id = build_id
+        self.products = products_list
 
-    def toFile(self, fileObject):
+    def to_file(self, file_object):
         """ Serialize the manifest to a file object """
-        print(u'# %-23s %-41s %-30s' % ("product", "SHA1", "Version"), file=fileObject)
-        print(u'BUILD=%s' % self.buildID, file=fileObject)
+        print(u'# %-23s %-41s %-30s' % ("product", "SHA1", "Version"), file=file_object)
+        print(u'BUILD=%s' % self.build_id, file=file_object)
         for prod in self.products.values():
             print(u'%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version,
                                              ','.join(dep.name for dep in prod.dependencies)),
-                  file=fileObject)
+                  file=file_object)
 
     def content_hash(self):
         """ Return a hash of the manifest, based on the products it contains. """
@@ -87,12 +87,12 @@ class Manifest(object):
         return m.hexdigest()
 
     @staticmethod
-    def fromFile(fileObject):
+    def from_file(file_object):
         varre = re.compile('^(\w+)=(.*)$')
 
         products = collections.OrderedDict()
         build_id = None
-        for line in fileObject:
+        for line in file_object:
             line = line.strip()
             if not line:
                 continue
@@ -121,27 +121,27 @@ class Manifest(object):
         return Manifest(products, build_id)
 
     @staticmethod
-    def fromProductDict(productDict):
+    def from_product_dict(product_dict):
         """ Create a `Manifest` by topologically sorting the dict of `Product`s
 
         Args:
-            productDict (dict): A productName -> `Product` dictionary of products
+            product_dict (dict): A product_name -> `Product` dictionary of products
 
         Returns:
             The created `Manifest`.
         """
-        deps = [(dep.name, prod.name) for prod in productDict.values() for dep in prod.dependencies]
+        deps = [(dep.name, prod.name) for prod in product_dict.values() for dep in prod.dependencies]
         topo_sorted_product_names = tsort.tsort(deps)
 
         # Append top-level products with no dependencies
         _p = set(topo_sorted_product_names)
-        for name in set(productDict.keys()):
+        for name in set(product_dict.keys()):
             if name not in _p:
                 topo_sorted_product_names.append(name)
 
         products = collections.OrderedDict()
         for name in topo_sorted_product_names:
-            products[name] = productDict[name]
+            products[name] = product_dict[name]
         return Manifest(products, None)
 
 
@@ -150,7 +150,7 @@ class ProductFetcher(object):
 
         See `fetch` for further documentation.
 
-        :ivar build_dir: The product will be cloned to build_dir/productName
+        :ivar build_dir: The product will be cloned to build_dir/product_name
         :ivar repository_patterns: A list of str.format() patterns used discover the URL of the remote git
               repository.
         :ivar refs: A list of refs to attempt to git-checkout
@@ -359,13 +359,13 @@ class VersionDb(with_metaclass(abc.ABCMeta, object)):
     """
 
     @abc.abstractmethod
-    def getSuffix(self, productName, productVersion, dependencies):
+    def get_suffix(self, product_name, product_version, dependencies):
         """Return a unique +YYY version suffix for a product given its dependencies
 
             Args:
-                productName (str): name of the product
-                productVersion (str): primary version of the product
-                dependencies (list): A list of `Product`s that are the immediate dependencies of productName
+                product_name (str): name of the product
+                product_version (str): primary version of the product
+                dependencies (list): A list of `Product`s that are the immediate dependencies of product_name
 
             Returns:
                 str. the +YYY suffix (w/o the + sign).
@@ -382,19 +382,19 @@ class VersionDb(with_metaclass(abc.ABCMeta, object)):
 
            A subclass must override this method to commit to
            permanent storage any changes to the underlying database
-           caused by getSuffix() invocations, and to assign the
-           build_id to manifest.buildID.
+           caused by get_suffix() invocations, and to assign the
+           build_id to manifest.build_id.
         """
         pass
 
-    def version(self, productName, productdir, ref, dependencies):
+    def version(self, product_name, productdir, ref, dependencies):
         """ Return a standardized XXX+YYY EUPS version, that includes the dependencies.
 
             Args:
-                productName (str): name of the product to version
+                product_name (str): name of the product to version
                 productdir (str): the directory with product source code
                 ref (str): the git ref that has been checked out into productdir (e.g., 'master')
-                dependencies (list): A list of `Product`s that are the immediate dependencies of productName
+                dependencies (list): A list of `Product`s that are the immediate dependencies of product_name
 
             Returns:
                 str. the XXX+YYY version string.
@@ -404,7 +404,7 @@ class VersionDb(with_metaclass(abc.ABCMeta, object)):
         product_version = subprocess.check_output(cmd, shell=True).decode("utf-8").strip()
 
         # add +XXXX suffix, if any
-        suffix = self.getSuffix(productName, product_version, dependencies)
+        suffix = self.get_suffix(product_name, product_version, dependencies)
         assert suffix.__class__ == str
         suffix = "+%s" % suffix if suffix else ""
         return "%s%s" % (product_version, suffix)
@@ -427,13 +427,13 @@ class VersionDbHash(VersionDb):
 
         return m.hexdigest()
 
-    def getSuffix(self, productName, productVersion, dependencies):
+    def get_suffix(self, product_name, product_version, dependencies):
         """ Return a hash of the sorted list of printed (dep_name, dep_version) tuples """
         hash = self._hash_dependencies(dependencies)
         suffix = hash[:self.sha_abbrev_len]
         return suffix
 
-    def __getBuildId(self):
+    def __get_build_id(self):
         """Allocate the next unused EUPS tag that matches the bNNNN pattern"""
 
         tags = eups.tags.Tags()
@@ -447,7 +447,7 @@ class VersionDbHash(VersionDb):
         return tag
 
     def commit(self, manifest, build_id):
-        manifest.buildID = self.__getBuildId() if build_id is None else build_id
+        manifest.build_id = self.__get_build_id() if build_id is None else build_id
 
 
 class VersionDbGit(VersionDbHash):
@@ -460,7 +460,7 @@ class VersionDbGit(VersionDbHash):
             self.verhash2suffix = dict()  # (version, dep_sha) -> suffix
             self.versuffix2hash = dict()  # (version, suffix) -> depsha
 
-            self.added_entries = dict()	 # (version, suffix) -> [ (depName, depVersion) ]
+            self.added_entries = dict()	 # (version, suffix) -> [ (dep_name, dep_version) ]
 
             self.dirty = False
 
@@ -494,20 +494,20 @@ class VersionDbGit(VersionDbHash):
             self.__add(version, hash, suffix, dependencies)
             return suffix
 
-        def appendAdditionsToFile(self, fileObjectVer, fileObjectDep):
+        def append_additions_to_file(self, file_object_ver, file_object_dep):
             # write (version, hash)<->suffix and dependency table updates
             for (version, suffix), dependencies in self.added_entries.items():
-                fileObjectVer.write("%s\t%s\t%d\n" % (version, self.hash(version, suffix), suffix))
-                for depName, depVersion in dependencies:
-                    fileObjectDep.write("%s\t%d\t%s\t%s\n" % (version, suffix, depName, depVersion))
+                file_object_ver.write("%s\t%s\t%d\n" % (version, self.hash(version, suffix), suffix))
+                for dep_name, dep_version in dependencies:
+                    file_object_dep.write("%s\t%d\t%s\t%s\n" % (version, suffix, dep_name, dep_version))
 
             self.added_entries = []
             self.dirty = False
 
         @staticmethod
-        def fromFile(fileObject):
+        def from_file(file_object):
             vm = VersionDbGit.VersionMap()
-            for line in iter(fileObject.readline, ''):
+            for line in iter(file_object.readline, ''):
                 (version, hash, suffix) = line.strip().split()[:3]
                 vm.__just_add(version, hash, int(suffix))
 
@@ -518,36 +518,36 @@ class VersionDbGit(VersionDbHash):
         self.dbdir = dbdir
         self.eups = eups_obj
 
-        self.versionMaps = dict()
+        self.version_maps = dict()
 
-    def __verfn(self, productName):
-        return os.path.join("ver_db", productName + '.txt')
+    def __verfn(self, product_name):
+        return os.path.join("ver_db", product_name + '.txt')
 
-    def __depfn(self, productName):
-        return os.path.join("dep_db", productName + '.txt')
+    def __depfn(self, product_name):
+        return os.path.join("dep_db", product_name + '.txt')
 
     def __shafn(self):
         return os.path.join("manifests", 'content_sha.db.txt')
 
-    def getSuffix(self, productName, productVersion, dependencies):
+    def get_suffix(self, product_name, product_version, dependencies):
         hash = self._hash_dependencies(dependencies)
 
         # Lazy-load/create
         try:
-            vm = self.versionMaps[productName]
+            vm = self.version_maps[product_name]
         except KeyError:
-            absverfn = os.path.join(self.dbdir, self.__verfn(productName))
+            absverfn = os.path.join(self.dbdir, self.__verfn(product_name))
             try:
-                vm = VersionDbGit.VersionMap.fromFile(open(absverfn, encoding="utf-8"))
+                vm = VersionDbGit.VersionMap.from_file(open(absverfn, encoding='utf-8'))
             except IOError:
                 vm = VersionDbGit.VersionMap()
-            self.versionMaps[productName] = vm
+            self.version_maps[product_name] = vm
 
         # get or create a new suffix
         try:
-            suffix = vm.suffix(productVersion, hash)
+            suffix = vm.suffix(product_version, hash)
         except KeyError:
-            suffix = vm.new_suffix(productVersion, hash, dependencies)
+            suffix = vm.new_suffix(product_version, hash, dependencies)
 
         assert isinstance(suffix, int)
         if suffix == 0:
@@ -555,7 +555,7 @@ class VersionDbGit(VersionDbHash):
 
         return str(suffix)
 
-    def __getBuildId(self, manifest, manifestSha):
+    def __get_build_id(self, manifest, manifest_sha):
         """Return a build ID unique to this manifest. If a matching manifest already
            exists in the database, its build ID will be used.
         """
@@ -563,7 +563,7 @@ class VersionDbGit(VersionDbHash):
                 # Try to find a manifest with existing matching content
                 for line in fp:
                         (sha1, tag) = line.strip().split()
-                        if sha1 == manifestSha:
+                        if sha1 == manifest_sha:
                                 return tag
 
                 # Find the next unused tag that matches the bNNNN pattern
@@ -588,52 +588,52 @@ class VersionDbGit(VersionDbHash):
         git = Git(self.dbdir)
 
         manifest_sha = manifest.content_hash()
-        manifest.buildID = self.__getBuildId(manifest, manifest_sha) if build_id is None else build_id
+        manifest.build_id = self.__get_build_id(manifest, manifest_sha) if build_id is None else build_id
 
         # Write files
-        for (productName, vm) in self.versionMaps.items():
+        for (product_name, vm) in self.version_maps.items():
             if not vm.dirty:
                 continue
 
-            verfn = self.__verfn(productName)
-            depfn = self.__depfn(productName)
+            verfn = self.__verfn(product_name)
+            depfn = self.__depfn(product_name)
             absverfn = os.path.join(self.dbdir, verfn)
             absdepfn = os.path.join(self.dbdir, depfn)
 
-            with open(absverfn, 'a', encoding='utf-8') as fpVer:
-                with open(absdepfn, 'a', encoding='utf-8') as fpDep:
-                    vm.appendAdditionsToFile(fpVer, fpDep)
+            with open(absverfn, 'a', encoding='utf-8') as fp_ver:
+                with open(absdepfn, 'a', encoding='utf-8') as fp_dep:
+                    vm.append_additions_to_file(fp_ver, fp_dep)
 
             git.add(verfn, depfn)
 
         # Store a copy of the manifest
-        manfn = os.path.join('manifests', "%s.txt" % manifest.buildID)
+        manfn = os.path.join('manifests', "%s.txt" % manifest.build_id)
         absmanfn = os.path.join(self.dbdir, manfn)
         with open(absmanfn, 'w', encoding='utf-8') as fp:
-            manifest.toFile(fp)
+            manifest.to_file(fp)
 
-        if git.tag("-l", manifest.buildID) == manifest.buildID:
-            # If the buildID/manifest are being reused, VersionDB repository must be clean
+        if git.tag("-l", manifest.build_id) == manifest.build_id:
+            # If the build_id/manifest are being reused, VersionDB repository must be clean
             if git.describe('--always', '--dirty=-prljavonakraju').endswith("-prljavonakraju"):
-                raise Exception("Trying to reuse the buildID, but the versionDB repository is dirty!")
+                raise Exception("Trying to reuse the build_id, but the versionDB repository is dirty!")
         else:
             # add the manifest file
             git.add(manfn)
 
-            # add the new manifest<->buildID mapping
+            # add the new manifest<->build_id mapping
             shafn = self.__shafn()
             absshafn = os.path.join(self.dbdir, shafn)
             with open(absshafn, 'a+', encoding='utf-8') as fp:
-                fp.write(u"%s\t%s\n" % (manifest_sha, manifest.buildID))
+                fp.write(u"%s\t%s\n" % (manifest_sha, manifest.build_id))
             git.add(shafn)
 
             # git-commit
-            msg = "Updates for build %s." % manifest.buildID
+            msg = "Updates for build %s." % manifest.build_id
             git.commit('-m', msg)
 
             # git-tag
-            msg = "Build ID %s" % manifest.buildID
-            git.tag('-a', '-m', msg, manifest.buildID)
+            msg = "Build ID %s" % manifest.build_id
+            git.tag('-a', '-m', msg, manifest.build_id)
 
 
 class ExclusionResolver(object):
@@ -663,10 +663,10 @@ class ExclusionResolver(object):
         return False
 
     @staticmethod
-    def fromFile(fileObject):
+    def from_file(file_object):
         exclusion_patterns = []
 
-        for line in fileObject:
+        for line in file_object:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
@@ -688,24 +688,24 @@ class BuildDirectoryConstructor(object):
         self.version_db = version_db
         self.exclusion_resolver = exclusion_resolver
 
-    def _add_product_tree(self, products, productName):
-        if productName in products:
-            return products[productName]
+    def _add_product_tree(self, products, product_name):
+        if product_name in products:
+            return products[product_name]
 
         # Mirror the product into the build directory (clone or git-pull it)
-        ref, sha1 = self.product_fetcher.fetch(productName)
+        ref, sha1 = self.product_fetcher.fetch(product_name)
 
         # Parse the table file to discover dependencies
         dependencies = []
-        productdir = os.path.join(self.build_dir, productName)
-        table_fn = os.path.join(productdir, 'ups', '%s.table' % productName)
+        productdir = os.path.join(self.build_dir, product_name)
+        table_fn = os.path.join(productdir, 'ups', '%s.table' % product_name)
         if os.path.isfile(table_fn):
             # Prepare the non-excluded dependencies
             for dep in eups.table.Table(table_fn).dependencies(self.eups):
                 (dprod, doptional) = dep[0:2]
 
                 # skip excluded optional products, and implicit products
-                if doptional and self.exclusion_resolver.is_excluded(dprod.name, productName):
+                if doptional and self.exclusion_resolver.is_excluded(dprod.name, product_name):
                     continue
                 if dprod.name == "implicitProducts":
                     continue
@@ -713,18 +713,18 @@ class BuildDirectoryConstructor(object):
                 dependencies.append(self._add_product_tree(products, dprod.name))
 
         # Construct EUPS version
-        version = self.version_db.version(productName, productdir, ref, dependencies)
+        version = self.version_db.version(product_name, productdir, ref, dependencies)
 
         # Add the result to products, return it for convenience
-        products[productName] = Product(productName, sha1, version, dependencies)
-        return products[productName]
+        products[product_name] = Product(product_name, sha1, version, dependencies)
+        return products[product_name]
 
-    def construct(self, productNames):
+    def construct(self, product_names):
         products = dict()
-        for name in productNames:
+        for name in product_names:
             self._add_product_tree(products, name)
 
-        return Manifest.fromProductDict(products)
+        return Manifest.from_product_dict(products)
 
     @staticmethod
     def run(args):
@@ -744,7 +744,7 @@ class BuildDirectoryConstructor(object):
 
         if args.exclusion_map:
             with open(args.exclusion_map, encoding='utf-8') as fp:
-                exclusion_resolver = ExclusionResolver.fromFile(fp)
+                exclusion_resolver = ExclusionResolver.from_file(fp)
         else:
             exclusion_resolver = ExclusionResolver([])
 
@@ -767,7 +767,7 @@ class BuildDirectoryConstructor(object):
         #
         manifest_fn = os.path.join(build_dir, 'manifest.txt')
         with open(manifest_fn, 'w', encoding='utf-8') as fp:
-            manifest.toFile(fp)
+            manifest.to_file(fp)
 
 
 class RepoSpec(object):

@@ -19,32 +19,32 @@ import datetime
 from .prepare import Manifest
 
 
-def declareEupsTag(tag, eupsObj):
+def declare_eups_tag(tag, eups_obj):
     """ Declare a new EUPS tag
         FIXME: Not sure if this is the right way to programmatically
                define and persist a new tag. Ask RHL.
     """
-    tags = eupsObj.tags
+    tags = eups_obj.tags
     if tag not in tags.getTagNames():
         tag = str(tag)
         tags.registerTag(tag)
-        tags.saveGlobalTags(eupsObj.path[0])
+        tags.saveGlobalTags(eups_obj.path[0])
 
 
 class ProgressReporter(object):
     # progress reporter: display the version string as progress bar, character by character
 
     class ProductProgressReporter(object):
-        def __init__(self, outFileObj, product):
-            self.out = outFileObj
+        def __init__(self, out_file_obj, product):
+            self.out = out_file_obj
             self.product = product
 
-        def _buildStarted(self):
+        def _build_started(self):
             self.out.write('%20s: ' % self.product.name)
             self.progress_bar = self.product.version + " "
             self.t0 = self.t = time.time()
 
-        def reportProgress(self):
+        def report_progress(self):
             # throttled progress reporting
             #
             # Write out the version string as a progress bar, character by character, and
@@ -62,7 +62,7 @@ class ProgressReporter(object):
                 self.out.flush()
                 self.t += 2
 
-        def reportResult(self, retcode, logfile):
+        def report_result(self, retcode, logfile):
             # Make sure we write out the full version string, even if the build ended quickly
             if self.progress_bar:
                 self.out.write(self.progress_bar)
@@ -90,13 +90,13 @@ class ProgressReporter(object):
             if self.product is not None:
                 self.out.write("\n")
 
-    def __init__(self, outFileObj):
-        self.out = outFileObj
+    def __init__(self, out_file_obj):
+        self.out = out_file_obj
 
     @contextlib.contextmanager
-    def newBuild(self, product):
+    def new_build(self, product):
         progress = ProgressReporter.ProductProgressReporter(self.out, product)
-        progress._buildStarted()
+        progress._build_started()
         yield progress
         progress._finalize()
 
@@ -201,7 +201,7 @@ class Builder(object):
             for line in iter(process.stdout.readline, b''):
                 line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), line.decode("utf-8"))
                 logfp.write(line)
-                progress.reportProgress()
+                progress.report_progress()
 
         retcode = process.poll()
         if not retcode:
@@ -216,24 +216,24 @@ class Builder(object):
     def _build_product_if_needed(self, product):
         # Build a product if it hasn't been installed already
         #
-        with self.progress.newBuild(product) as progress:
+        with self.progress.new_build(product) as progress:
             try:
                 # skip the build if the product has been installed
-                eupsProd, retcode, logfile = self.eups.getProduct(product.name, product.version), 0, None
+                eups_prod, retcode, logfile = self.eups.getProduct(product.name, product.version), 0, None
             except eups.ProductNotFound:
-                eupsProd, retcode, logfile = self._build_product(product, progress)
+                eups_prod, retcode, logfile = self._build_product(product, progress)
 
-            if eupsProd is not None and self.manifest.buildID not in eupsProd.tags:
-                self._tag_product(product.name, product.version, self.manifest.buildID)
+            if eups_prod is not None and self.manifest.build_id not in eups_prod.tags:
+                self._tag_product(product.name, product.version, self.manifest.build_id)
 
-            progress.reportResult(retcode, logfile)
+            progress.report_result(retcode, logfile)
 
         return retcode == 0
 
     def build(self):
-        # Make sure EUPS knows about the buildID tag
-        if self.manifest.buildID:
-            declareEupsTag(self.manifest.buildID, self.eups)
+        # Make sure EUPS knows about the build_id tag
+        if self.manifest.build_id:
+            declare_eups_tag(self.manifest.build_id, self.eups)
 
         # Build all products
         for product in self.manifest.products.values():
@@ -254,7 +254,7 @@ class Builder(object):
 
         manifest_fn = os.path.join(build_dir, 'manifest.txt')
         with open(manifest_fn, encoding='utf-8') as fp:
-            manifest = Manifest.fromFile(fp)
+            manifest = Manifest.from_file(fp)
 
         b = Builder(build_dir, manifest, progress, eups_obj)
         retcode = b.build()
