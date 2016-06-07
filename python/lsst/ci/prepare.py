@@ -166,7 +166,7 @@ class ProductFetcher(object):
         self.no_fetch = no_fetch
         if repos:
             if os.path.exists(repos):
-                with open(repos, 'r', encoding="utf-8") as f:
+                with open(repos, 'r', encoding='utf-8') as f:
                     self.repos = yaml.safe_load(f)
             else:
                 raise Exception("YAML repos file '%s' does not exist" % repos)
@@ -559,7 +559,7 @@ class VersionDbGit(VersionDbHash):
         """Return a build ID unique to this manifest. If a matching manifest already
            exists in the database, its build ID will be used.
         """
-        with open(os.path.join(self.dbdir, 'manifests', 'content_sha.db.txt'), 'a+', encoding="utf-8") as fp:
+        with open(os.path.join(self.dbdir, 'manifests', 'content_sha.db.txt'), 'a+', encoding='utf-8') as fp:
                 # Try to find a manifest with existing matching content
                 for line in fp:
                         (sha1, tag) = line.strip().split()
@@ -600,8 +600,8 @@ class VersionDbGit(VersionDbHash):
             absverfn = os.path.join(self.dbdir, verfn)
             absdepfn = os.path.join(self.dbdir, depfn)
 
-            with open(absverfn, 'a', encoding="utf-8") as fpVer:
-                with open(absdepfn, 'a', encoding="utf-8") as fpDep:
+            with open(absverfn, 'a', encoding='utf-8') as fpVer:
+                with open(absdepfn, 'a', encoding='utf-8') as fpDep:
                     vm.appendAdditionsToFile(fpVer, fpDep)
 
             git.add(verfn, depfn)
@@ -609,7 +609,7 @@ class VersionDbGit(VersionDbHash):
         # Store a copy of the manifest
         manfn = os.path.join('manifests', "%s.txt" % manifest.buildID)
         absmanfn = os.path.join(self.dbdir, manfn)
-        with open(absmanfn, 'w', encoding="utf-8") as fp:
+        with open(absmanfn, 'w', encoding='utf-8') as fp:
             manifest.toFile(fp)
 
         if git.tag("-l", manifest.buildID) == manifest.buildID:
@@ -623,7 +623,7 @@ class VersionDbGit(VersionDbHash):
             # add the new manifest<->buildID mapping
             shafn = self.__shafn()
             absshafn = os.path.join(self.dbdir, shafn)
-            with open(absshafn, 'a+', encoding="utf-8") as fp:
+            with open(absshafn, 'a+', encoding='utf-8') as fp:
                 fp.write(u"%s\t%s\n" % (manifest_sha, manifest.buildID))
             git.add(shafn)
 
@@ -743,7 +743,7 @@ class BuildDirectoryConstructor(object):
         eups_obj = eups.Eups()
 
         if args.exclusion_map:
-            with open(args.exclusion_map, encoding="utf-8") as fp:
+            with open(args.exclusion_map, encoding='utf-8') as fp:
                 exclusion_resolver = ExclusionResolver.fromFile(fp)
         else:
             exclusion_resolver = ExclusionResolver([])
@@ -766,7 +766,7 @@ class BuildDirectoryConstructor(object):
         # Store the result in build_dir/manifest.txt
         #
         manifest_fn = os.path.join(build_dir, 'manifest.txt')
-        with open(manifest_fn, 'w', encoding="utf-8") as fp:
+        with open(manifest_fn, 'w', encoding='utf-8') as fp:
             manifest.toFile(fp)
 
 

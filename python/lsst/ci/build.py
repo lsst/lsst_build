@@ -130,7 +130,7 @@ class Builder(object):
                   for dep in product.flat_dependencies()]
 
         # create the buildscript
-        with open(buildscript, 'w', encoding="utf-8") as fp:
+        with open(buildscript, 'w', encoding='utf-8') as fp:
             text = textwrap.dedent(u"""\
             #!/bin/bash
 
@@ -194,7 +194,7 @@ class Builder(object):
         os.chmod(buildscript, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         # Run the build script
-        with open(logfile, 'w', encoding="utf-8") as logfp:
+        with open(logfile, 'w', encoding='utf-8') as logfp:
             # execute the build file from the product directory, capturing the output and return code
             process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        cwd=productdir)
@@ -253,7 +253,7 @@ class Builder(object):
         progress = ProgressReporter(sys.stderr)
 
         manifest_fn = os.path.join(build_dir, 'manifest.txt')
-        with open(manifest_fn, encoding="utf-8") as fp:
+        with open(manifest_fn, encoding='utf-8') as fp:
             manifest = Manifest.fromFile(fp)
 
         b = Builder(build_dir, manifest, progress, eups_obj)
