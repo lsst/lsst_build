@@ -16,7 +16,7 @@ def tsort(edges):
     see http://en.wikipedia.org/wiki/Topological_sorting
     """
     # resulting list
-    L = []
+    L = []  # noqa
 
     # maintain forward and backward edge maps in parallel.
     st, ts = {}, {}
@@ -36,12 +36,12 @@ def tsort(edges):
         add(s, t)
 
     # frontier
-    S = set(st.keys()).difference(ts.keys())
+    S = set(st.keys()).difference(ts.keys())  # noqa
 
     while S:
         s = S.pop()
         L.append(s)
-        for t in st.get(s, {}).keys():
+        for t in list(st.get(s, {}).keys()):
             prune(s, t)
             if not ts[t]:       # new frontier
                 S.add(t)

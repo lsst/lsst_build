@@ -1,6 +1,7 @@
 from __future__ import print_function
 #############################################################################
 # Builder
+from io import open
 import eups
 
 import subprocess
@@ -18,31 +19,32 @@ import datetime
 from .prepare import Manifest
 
 
-def declareEupsTag(tag, eupsObj):
+def declare_eups_tag(tag, eups_obj):
     """ Declare a new EUPS tag
         FIXME: Not sure if this is the right way to programmatically
                define and persist a new tag. Ask RHL.
     """
-    tags = eupsObj.tags
+    tags = eups_obj.tags
     if tag not in tags.getTagNames():
+        tag = str(tag)
         tags.registerTag(tag)
-        tags.saveGlobalTags(eupsObj.path[0])
+        tags.saveGlobalTags(eups_obj.path[0])
 
 
 class ProgressReporter(object):
     # progress reporter: display the version string as progress bar, character by character
 
     class ProductProgressReporter(object):
-        def __init__(self, outFileObj, product):
-            self.out = outFileObj
+        def __init__(self, out_file_obj, product):
+            self.out = out_file_obj
             self.product = product
 
-        def _buildStarted(self):
+        def _build_started(self):
             self.out.write('%20s: ' % self.product.name)
             self.progress_bar = self.product.version + " "
             self.t0 = self.t = time.time()
 
-        def reportProgress(self):
+        def report_progress(self):
             # throttled progress reporting
             #
             # Write out the version string as a progress bar, character by character, and
@@ -60,7 +62,7 @@ class ProgressReporter(object):
                 self.out.flush()
                 self.t += 2
 
-        def reportResult(self, retcode, logfile):
+        def report_result(self, retcode, logfile):
             # Make sure we write out the full version string, even if the build ended quickly
             if self.progress_bar:
                 self.out.write(self.progress_bar)
@@ -69,9 +71,9 @@ class ProgressReporter(object):
             if logfile is None:
                 sys.stderr.write('(already installed).\n')
             else:
-                elapsedTime = time.time() - self.t0
+                elapsed_time = time.time() - self.t0
                 if retcode:
-                    print("ERROR (%d sec)." % elapsedTime, file=self.out)
+                    print("ERROR (%d sec)." % elapsed_time, file=self.out)
                     print("*** error building product %s." % self.product.name, file=self.out)
                     print("*** exit code = %d" % retcode, file=self.out)
                     print("*** log is in %s" % logfile, file=self.out)
@@ -79,7 +81,7 @@ class ProgressReporter(object):
 
                     os.system("tail -n 10 %s | sed -e 's/^/:::::  /'" % pipes.quote(logfile))
                 else:
-                    print("ok (%.1f sec)." % elapsedTime, file=self.out)
+                    print("ok (%.1f sec)." % elapsed_time, file=self.out)
 
             self.product = None
 
@@ -88,13 +90,13 @@ class ProgressReporter(object):
             if self.product is not None:
                 self.out.write("\n")
 
-    def __init__(self, outFileObj):
-        self.out = outFileObj
+    def __init__(self, out_file_obj):
+        self.out = out_file_obj
 
     @contextlib.contextmanager
-    def newBuild(self, product):
+    def new_build(self, product):
         progress = ProgressReporter.ProductProgressReporter(self.out, product)
-        progress._buildStarted()
+        progress._build_started()
         yield progress
         progress._finalize()
 
@@ -112,7 +114,7 @@ class Builder(object):
 
     def _tag_product(self, name, version, tag):
         if tag:
-            self.eups.declare(name, version, tag=tag)
+            self.eups.declare(name, version, tag=str(tag))
 
     def _build_product(self, product, progress):
         # run the eupspkg sequence for the product
@@ -128,9 +130,8 @@ class Builder(object):
                   for dep in product.flat_dependencies()]
 
         # create the buildscript
-        with open(buildscript, 'w') as fp:
-            text = textwrap.dedent(
-            """\
+        with open(buildscript, 'w', encoding='utf-8') as fp:
+            text = textwrap.dedent(u"""\
             #!/bin/bash
 
             # redirect stderr to stdin
@@ -177,15 +178,14 @@ class Builder(object):
             # explicitly append SHA1 to pkginfo
             echo SHA1=%(sha1)s >> $(eups list %(product)s %(version)s -d)/ups/pkginfo
             """ % {
-                    'product': product.name,
-                    'version': product.version,
-                    'sha1': product.sha1,
-                    'productdir': productdir,
-                    'setups': '\n            '.join(setups),
-                    'eupsdir': eupsdir,
-                    'eupspath': eupspath,
-                }
-            )
+                'product': product.name,
+                'version': product.version,
+                'sha1': product.sha1,
+                'productdir': productdir,
+                'setups': '\n            '.join(setups),
+                'eupsdir': eupsdir,
+                'eupspath': eupspath,
+            })
 
             fp.write(text)
 
@@ -194,49 +194,49 @@ class Builder(object):
         os.chmod(buildscript, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         # Run the build script
-        with open(logfile, 'w') as logfp:
+        with open(logfile, 'w', encoding='utf-8') as logfp:
             # execute the build file from the product directory, capturing the output and return code
             process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        cwd=productdir)
-            for line in iter(process.stdout.readline, ''):
-                line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), line)
+            for line in iter(process.stdout.readline, b''):
+                line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), line.decode("utf-8"))
                 logfp.write(line)
-                progress.reportProgress()
+                progress.report_progress()
 
         retcode = process.poll()
         if not retcode:
             # copy the log file to product directory
-            eupsProd = self.eups.getProduct(product.name, product.version)
-            shutil.copy2(logfile, eupsProd.dir)
+            eups_prod = self.eups.getProduct(product.name, product.version)
+            shutil.copy2(logfile, eups_prod.dir)
         else:
-            eupsProd = None
+            eups_prod = None
 
-        return (eupsProd, retcode, logfile)
+        return (eups_prod, retcode, logfile)
 
     def _build_product_if_needed(self, product):
         # Build a product if it hasn't been installed already
         #
-        with self.progress.newBuild(product) as progress:
+        with self.progress.new_build(product) as progress:
             try:
                 # skip the build if the product has been installed
-                eupsProd, retcode, logfile = self.eups.getProduct(product.name, product.version), 0, None
+                eups_prod, retcode, logfile = self.eups.getProduct(product.name, product.version), 0, None
             except eups.ProductNotFound:
-                eupsProd, retcode, logfile = self._build_product(product, progress)
+                eups_prod, retcode, logfile = self._build_product(product, progress)
 
-            if eupsProd is not None and self.manifest.buildID not in eupsProd.tags:
-                self._tag_product(product.name, product.version, self.manifest.buildID)
+            if eups_prod is not None and self.manifest.build_id not in eups_prod.tags:
+                self._tag_product(product.name, product.version, self.manifest.build_id)
 
-            progress.reportResult(retcode, logfile)
+            progress.report_result(retcode, logfile)
 
         return retcode == 0
 
     def build(self):
-        # Make sure EUPS knows about the buildID tag
-        if self.manifest.buildID:
-            declareEupsTag(self.manifest.buildID, self.eups)
+        # Make sure EUPS knows about the build_id tag
+        if self.manifest.build_id:
+            declare_eups_tag(self.manifest.build_id, self.eups)
 
         # Build all products
-        for product in self.manifest.products.itervalues():
+        for product in self.manifest.products.values():
             if not self._build_product_if_needed(product):
                 return False
 
@@ -248,14 +248,14 @@ class Builder(object):
             raise Exception("Directory '%s' does not exist or isn't writable." % build_dir)
 
         # Build products
-        eupsObj = eups.Eups()
+        eups_obj = eups.Eups()
 
         progress = ProgressReporter(sys.stderr)
 
-        manifestFn = os.path.join(build_dir, 'manifest.txt')
-        with open(manifestFn) as fp:
-            manifest = Manifest.fromFile(fp)
+        manifest_fn = os.path.join(build_dir, 'manifest.txt')
+        with open(manifest_fn, encoding='utf-8') as fp:
+            manifest = Manifest.from_file(fp)
 
-        b = Builder(build_dir, manifest, progress, eupsObj)
+        b = Builder(build_dir, manifest, progress, eups_obj)
         retcode = b.build()
-        exit(retcode == 0)
+        sys.exit(retcode == 0)
