@@ -16,8 +16,6 @@ script: |
   # prevent ./bin/deploy from trying to clone lsst_build
   touch "$LSSTSW/lsst_build/.deployed"
   cd "$LSSTSW"
-  # Need version of lsstsw that supports python 3
-  git checkout tickets/DM-6314
   ./bin/deploy $DEPLOY_ARGS
   . "$LSSTSW/bin/setup.sh"
   rebuild cfitsio
