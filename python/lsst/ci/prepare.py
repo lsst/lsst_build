@@ -282,10 +282,8 @@ class ProductFetcher(object):
             for url in self._origin_candidates(product):
                 args = []
                 if lfs:
-                    # need to work around git-lfs v1.0.0 always prompting
+                    # need to work around git-lfs always prompting
                     # for credentials, even when they are not required.
-                    # migration to the batch API is required to resolved this:
-                    # https://github.com/github/git-lfs/issues/737#issuecomment-149689914
 
                     # these env vars shouldn't have to removed with the cache
                     # helper we are specifying but it doesn't hurt to be
@@ -298,7 +296,6 @@ class ProductFetcher(object):
                     # lfs will pickup the .gitconfig and pull lfs objects for
                     # the default ref during clone.  Config options set on the
                     # cli during the clone get recorded in `.git/config'
-                    args += ['-c', 'lfs.batch=false']
                     args += ['-c', 'filter.lfs.required']
                     args += ['-c', 'filter.lfs.smudge=git-lfs smudge %f']
                     args += ['-c', 'filter.lfs.clean=git-lfs clean %f']
