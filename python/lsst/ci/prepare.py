@@ -293,7 +293,7 @@ class ProductFetcher(object):
                     if 'SSH_ASKPASS' in os.environ:
                         del os.environ['SSH_ASKPASS']
 
-                    # lfs will pickup the .gitconfig and pull lfs objects for
+                    # lfs will pickup the .lfsconfig and pull lfs objects for
                     # the default ref during clone.  Config options set on the
                     # cli during the clone get recorded in `.git/config'
                     args += ['-c', 'filter.lfs.required']
