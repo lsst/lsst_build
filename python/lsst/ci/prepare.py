@@ -156,7 +156,7 @@ class ProductFetcher(object):
         :ivar refs: A list of refs to attempt to git-checkout
         :ivar no_fetch: If true, don't fetch, just checkout the first matching ref.
     """
-    def __init__(self, build_dir, repos, repository_patterns, refs, no_fetch):
+    def __init__(self, build_dir, repos, repository_patterns, refs, no_fetch, ref_repo_pattern=None):
         self.build_dir = os.path.abspath(build_dir)
         self.refs = refs
         if repository_patterns:
@@ -164,6 +164,7 @@ class ProductFetcher(object):
         else:
             self.repository_patterns = None
         self.no_fetch = no_fetch
+        self.ref_repo_pattern = ref_repo_pattern
         if repos:
             if os.path.exists(repos):
                 with open(repos, 'r', encoding='utf-8') as f:
@@ -300,6 +301,9 @@ class ProductFetcher(object):
                     args += ['-c', 'filter.lfs.smudge=git-lfs smudge %f']
                     args += ['-c', 'filter.lfs.clean=git-lfs clean %f']
                     args += ['-c', ('credential.helper=%s' % helper)]
+
+                if self.ref_repo_pattern is not None:
+                    args += ["--reference-if-able", "%s" % self.ref_repo_pattern.format(product)]
 
                 args += [url, productdir]
                 if not Git.clone(*args, return_status=True)[1]:
@@ -750,7 +754,7 @@ class BuildDirectoryConstructor(object):
         else:
             version_db = VersionDbHash(args.sha_abbrev_len, eups_obj)
 
-        product_fetcher = ProductFetcher(build_dir, args.repos, args.repository_pattern, refs, args.no_fetch)
+        product_fetcher = ProductFetcher(build_dir, args.repos, args.repository_pattern, refs, args.no_fetch, args.ref_repo_pattern)
         p = BuildDirectoryConstructor(build_dir, eups_obj, product_fetcher, version_db, exclusion_resolver)
 
         #

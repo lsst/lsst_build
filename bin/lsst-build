@@ -27,6 +27,10 @@ parser_prepare.add_argument('--ref', default=[], action='append', type=str,
                             help='An ordered list of refs to check out')
 parser_prepare.add_argument('--repos', type=str,
                             help="YAML file with map of product names to git repository URLs.")
+parser_prepare.add_argument('--ref-repo-pattern', type=str, default=None,
+                            help=("str.format pattern that supplies a path to a repo to be passed "
+                                  "with --reference-if-able when cloning.  Will be passed a single "
+                                  "positional argument with the name of the product."))
 parser_prepare.add_argument('--repository-pattern', default=os.environ.get("REPOSITORY_PATTERN"), type=str,
                             help="Python pattern to source git repository " +
                             "('|'-delimited; default: $REPOSITORY_PATTERN)")
