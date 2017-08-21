@@ -19,5 +19,6 @@ script: |
   ./bin/deploy $DEPLOY_ARGS
   . "$LSSTSW/bin/setup.sh"
   rebuild cfitsio
+  python -c "import yaml as y;print(y.dump(y.load(open('./build/status.yaml'))))"
 notifications:
   email: false
