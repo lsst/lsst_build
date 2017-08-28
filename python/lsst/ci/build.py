@@ -15,8 +15,22 @@ import time
 import eups.tags
 import contextlib
 import datetime
+import yaml
 
 from .prepare import Manifest
+from .prepare import Product
+
+
+def product_representer(dumper, data):
+    obj = {
+        'name': str(data.name),
+        'sha1': str(data.sha1),
+        'version': str(data.version),
+    }
+    return dumper.represent_mapping('tag:yaml.org,2002:map', obj)
+
+
+yaml.add_representer(Product, product_representer)
 
 
 def declare_eups_tag(tag, eups_obj):
@@ -111,6 +125,8 @@ class Builder(object):
         self.manifest = manifest
         self.progress = progress
         self.eups = eups
+        self.built = []
+        self.failed_at = None
 
     def _tag_product(self, name, version, tag):
         if tag:
@@ -238,7 +254,27 @@ class Builder(object):
         # Build all products
         for product in self.manifest.products.values():
             if not self._build_product_if_needed(product):
+                self.failed_at = product
                 return False
+            self.built.append(product)
+
+    def rm_status(self):
+        if os.path.isfile(self.status_file()):
+            os.remove(self.status_file())
+
+    def status_file(self):
+        return os.path.join(self.build_dir, 'status.yaml')
+
+    def write_status(self):
+        status = {
+            'built': self.built,
+        }
+
+        if self.failed_at is not None:
+            status['failed_at'] = self.failed_at
+
+        with open(self.status_file(), 'w', encoding='utf-8') as sf:
+            yaml.dump(status, sf, encoding='utf-8', default_flow_style=False)
 
     @staticmethod
     def run(args):
@@ -257,5 +293,7 @@ class Builder(object):
             manifest = Manifest.from_file(fp)
 
         b = Builder(build_dir, manifest, progress, eups_obj)
+        b.rm_status()
         retcode = b.build()
+        b.write_status()
         sys.exit(retcode == 0)

@@ -19,12 +19,6 @@ script: |
   ./bin/deploy $DEPLOY_ARGS
   . "$LSSTSW/bin/setup.sh"
   rebuild cfitsio
+  python -c "import yaml as y;print(y.dump(y.load(open('./build/status.yaml'))))"
 notifications:
   email: false
-  hipchat:
-    rooms:
-      secure: dCWgdCZ7NLKkuYCS833gGFG9is8v6oluswzRfgoevW0Ho39ey90TDo1oAPnd7iosTUJSZ34wM9MQHvBWSm3liAaA7DMrtvXScmLG/1papOjeE2R/lQse0YvXbZ67K02xK/3hce57HnU31YQhKn5ZcJFuLE7le88HCEj5120FhN4=
-    template:
-    - '%{repository}#%{build_number} (%{branch} - %{commit} : %{author}): %{message}
-      (<a href="%{build_url}">Details</a>/<a href="%{compare_url}">Change view</a>)'
-    format: html
