@@ -156,7 +156,15 @@ class ProductFetcher(object):
         :ivar refs: A list of refs to attempt to git-checkout
         :ivar no_fetch: If true, don't fetch, just checkout the first matching ref.
     """
-    def __init__(self, build_dir, repos, repository_patterns, refs, no_fetch):
+    def __init__(
+                self,
+                build_dir,
+                repos,
+                repository_patterns,
+                refs,
+                no_fetch,
+                out=sys.stdout
+            ):
         self.build_dir = os.path.abspath(build_dir)
         self.refs = refs
         if repository_patterns:
@@ -172,6 +180,7 @@ class ProductFetcher(object):
                 raise Exception("YAML repos file '%s' does not exist" % repos)
         else:
             self.repos = None
+        self.out = out
 
     def _origin_candidates(self, product):
         """ Expand repository_patterns into URLs. """
@@ -256,7 +265,8 @@ class ProductFetcher(object):
         """
 
         t0 = time.time()
-        sys.stderr.write("%20s: " % product)
+        self.out.write("%20s: " % product)
+        self.out.flush()
 
         productdir = os.path.join(self.build_dir, product)
         git = Git(productdir)
@@ -344,7 +354,8 @@ class ProductFetcher(object):
         # previous builds)
         git.clean("-d", "-f", "-q", "-x")
 
-        print(" ok (%.1f sec)." % (time.time() - t0), file=sys.stderr)
+        print(" ok (%.1f sec)." % (time.time() - t0), file=self.out)
+        self.out.flush()
         return ref, sha1
 
 

@@ -55,6 +55,7 @@ class ProgressReporter(object):
 
         def _build_started(self):
             self.out.write('%20s: ' % self.product.name)
+            self.out.flush()
             self.progress_bar = self.product.version + " "
             self.t0 = self.t = time.time()
 
@@ -80,10 +81,12 @@ class ProgressReporter(object):
             # Make sure we write out the full version string, even if the build ended quickly
             if self.progress_bar:
                 self.out.write(self.progress_bar)
+                self.out.flush()
 
             # If logfile is None, the product was already installed
             if logfile is None:
-                sys.stderr.write('(already installed).\n')
+                self.out.write('(already installed).\n')
+                self.out.flush()
             else:
                 elapsed_time = time.time() - self.t0
                 if retcode:
@@ -96,6 +99,7 @@ class ProgressReporter(object):
                     os.system("tail -n 10 %s | sed -e 's/^/:::::  /'" % pipes.quote(logfile))
                 else:
                     print("ok (%.1f sec)." % elapsed_time, file=self.out)
+                self.out.flush()
 
             self.product = None
 
@@ -103,6 +107,7 @@ class ProgressReporter(object):
             # Usually called only when an exception is thrown
             if self.product is not None:
                 self.out.write("\n")
+                self.out.flush()
 
     def __init__(self, out_file_obj):
         self.out = out_file_obj
@@ -286,7 +291,7 @@ class Builder(object):
         # Build products
         eups_obj = eups.Eups()
 
-        progress = ProgressReporter(sys.stderr)
+        progress = ProgressReporter(sys.stdout)
 
         manifest_fn = os.path.join(build_dir, 'manifest.txt')
         with open(manifest_fn, encoding='utf-8') as fp:
