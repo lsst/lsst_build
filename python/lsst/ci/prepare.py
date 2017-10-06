@@ -167,6 +167,7 @@ class ProductFetcher(object):
             ):
         self.build_dir = os.path.abspath(build_dir)
         self.refs = refs
+        self.matched_refs = {ref: 0 for ref in refs}
         if repository_patterns:
             self.repository_patterns = repository_patterns.split('|')
         else:
@@ -356,7 +357,20 @@ class ProductFetcher(object):
 
         print(" ok (%.1f sec)." % (time.time() - t0), file=self.out)
         self.out.flush()
+
+        # Log this ref if it was in the external list
+        if ref in self.matched_refs:
+            self.matched_refs[ref] += 1
+
         return ref, sha1
+
+    def validate_refs(self):
+        """Validate that all external refs were found at least once.
+        Raises RuntimeError if some have not been found."""
+        missed = [ref for ref in self.matched_refs if self.matched_refs[ref] == 0]
+        if missed:
+            raise RuntimeError("Did not checkout any products with the following refs:"
+                               " {}".format(",".join(missed)))
 
 
 class VersionDb(with_metaclass(abc.ABCMeta, object)):
@@ -732,6 +746,7 @@ class BuildDirectoryConstructor(object):
         for name in product_names:
             self._add_product_tree(products, name)
 
+        self.product_fetcher.validate_refs()
         return Manifest.from_product_dict(products)
 
     @staticmethod
