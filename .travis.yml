@@ -12,6 +12,7 @@ matrix:
 script: |
   set -e
   export LSST_BUILD_GITREV="$TRAVIS_COMMIT"
+  echo "TRAVIS_COMMIT: ${TRAVIS_COMMIT}"
   LSSTSW="${PWD}/lsstsw"
   git clone https://github.com/lsst/lsstsw.git "$LSSTSW"
   ln -s .. "${LSSTSW}/lsst_build"
