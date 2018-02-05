@@ -11,14 +11,14 @@ matrix:
 
 script: |
   set -e
-  LSSTSW="$PWD/lsstsw"
+  LSSTSW="${PWD}/lsstsw"
   git clone https://github.com/lsst/lsstsw.git
   ln -s .. lsstsw/lsst_build
   # prevent ./bin/deploy from trying to clone lsst_build
-  touch "$LSSTSW/lsst_build/.deployed"
+  touch "${LSSTSW}/lsst_build/.deployed"
   cd "$LSSTSW"
   ./bin/deploy $DEPLOY_ARGS
-  . "$LSSTSW/bin/setup.sh"
+  . "${LSSTSW}/bin/setup.sh"
   rebuild cfitsio
   python -c "import yaml as y;print(y.dump(y.load(open('./build/status.yaml'))))"
 notifications:
