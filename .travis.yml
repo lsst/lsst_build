@@ -13,7 +13,7 @@ script: |
   set -e
   LSSTSW="${PWD}/lsstsw"
   git clone https://github.com/lsst/lsstsw.git
-  ln -s .. lsstsw/lsst_build
+  ln -s .. "${LSSTSW}/lsst_build"
   # prevent ./bin/deploy from trying to clone lsst_build
   touch "${LSSTSW}/lsst_build/.deployed"
   cd "$LSSTSW"
