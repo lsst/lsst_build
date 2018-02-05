@@ -7,7 +7,7 @@ matrix:
       env: DEPLOY_ARGS="-3 -b"
     - os: linux
       python: 2.7
-      env: DEPLOY_ARGS="-b"
+      env: DEPLOY_ARGS="-2 -b"
 
 script: |
   LSSTSW="$PWD/lsstsw"
