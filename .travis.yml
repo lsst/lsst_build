@@ -14,7 +14,7 @@ script: |
   LSSTSW="${PWD}/lsstsw"
   git clone https://github.com/lsst/lsstsw.git
   ln -s .. "${LSSTSW}/lsst_build"
-  # prevent ./bin/deploy from trying to clone lsst_build
+  # prevent ./bin/deploy from trying to [re]clone lsst_build
   touch "${LSSTSW}/lsst_build/.deployed"
   cd "$LSSTSW"
   ./bin/deploy $DEPLOY_ARGS
