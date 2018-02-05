@@ -10,6 +10,7 @@ matrix:
       env: DEPLOY_ARGS="-2 -b"
 
 script: |
+  set -e
   LSSTSW="$PWD/lsstsw"
   git clone https://github.com/lsst/lsstsw.git
   ln -s .. lsstsw/lsst_build
