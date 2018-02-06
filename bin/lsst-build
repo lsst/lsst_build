@@ -43,6 +43,8 @@ prepare.add_argument('--exclusion-map', type=str,
                      help='File with map of optional packages to exclude.')
 prepare.add_argument('--version-git-repo', type=str,
                      help='Working directory of a git repository with the version database.')
+prepare.add_argument('--tries', default=5, type=int,
+                     help='Number of times to retry select git operations')
 
 # Parser for the 'build' command
 build = subparsers.add_parser('build', help='Build the source tree given the manifest')

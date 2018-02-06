@@ -28,6 +28,31 @@ from .git import Git, GitError
 from future.utils import with_metaclass
 
 
+class RemoteError(Exception):
+    """Signal that a git repo failed to cloning from all possible remotes
+
+    Parameters
+    ----------
+    product : `str`
+        Name of product being cloned.
+    git_errors: `list`
+        List of `GitError` objects, one per attempted remote.
+    """
+
+    def __init__(self, product, git_errors):
+        self.product = product
+        self.git_errors = git_errors
+
+    def __str__(self):
+        message = "Failed to clone product '%s' from any of the offered " \
+            "repositories" % self.product
+
+        for e in self.git_errors:
+            message += "\n" + str(e)
+
+        return message
+
+
 class Product(object):
     """Class representing an EUPS product to be built"""
     def __init__(self, name, sha1, version, dependencies):
@@ -155,6 +180,8 @@ class ProductFetcher(object):
               repository.
         :ivar refs: A list of refs to attempt to git-checkout
         :ivar no_fetch: If true, don't fetch, just checkout the first matching ref.
+        :ivar out: FD which to send console output.
+        :ivar tries: The number of times to attempt to 'fetch' a product.
     """
     def __init__(self,
                  build_dir,
@@ -162,7 +189,8 @@ class ProductFetcher(object):
                  repository_patterns,
                  refs,
                  no_fetch,
-                 out=sys.stdout):
+                 out=sys.stdout,
+                 tries=1):
 
         self.build_dir = os.path.abspath(build_dir)
         self.refs = refs
@@ -181,6 +209,7 @@ class ProductFetcher(object):
         else:
             self.repos = None
         self.out = out
+        self.tries = tries
 
     def _origin_candidates(self, product):
         """ Expand repository_patterns into URLs. """
@@ -264,6 +293,30 @@ class ProductFetcher(object):
 
         """
 
+        # do not handle exceptions unless there will be multiple tries
+        for i in range(self.tries - 1):
+            try:
+                return self._fetch(product)
+            except (GitError, RemoteError, OSError) as e:
+                print('<error>', file=self.out)
+                print(e, file=self.out)
+                # ensure retry is starting from a clean slate
+                productdir = os.path.join(self.build_dir, product)
+                if os.path.exists(productdir):
+                    shutil.rmtree(productdir)
+
+            print("%20s: <retrying...>" % (product), file=self.out)
+            self.out.flush()
+
+            # try to not hammer git remotes with retry attempts
+            time.sleep(3)
+
+        # do not cleanup repo dir on the last "try" so it is available for
+        # debugging + allow an exception to propagate from the final attempt
+        return self._fetch(product)
+
+    def _fetch(self, product):
+        """This method should be considered private to fetch()"""
         t0 = time.time()
         self.out.write("%20s: " % product)
         self.out.flush()
@@ -318,13 +371,11 @@ class ProductFetcher(object):
                     Git.clone(*args, return_status=False)
                 except GitError as e:
                     failed.append(e)
-                    next
+                    continue
                 else:
                     break
             else:
-                for e in failed:
-                    print(e, file=self.out)
-                raise Exception("Failed to clone product '%s' from any of the offered repositories" % product)
+                raise RemoteError(product, failed)
 
         # update from origin
         if not self.no_fetch:
@@ -792,7 +843,14 @@ class BuildDirectoryConstructor(object):
         else:
             version_db = VersionDbHash(args.sha_abbrev_len, eups_obj)
 
-        product_fetcher = ProductFetcher(build_dir, args.repos, args.repository_pattern, refs, args.no_fetch)
+        product_fetcher = ProductFetcher(
+            build_dir,
+            args.repos,
+            args.repository_pattern,
+            refs,
+            args.no_fetch,
+            tries=args.tries
+        )
         p = BuildDirectoryConstructor(build_dir, eups_obj, product_fetcher, version_db, exclusion_resolver)
 
         #
