@@ -156,15 +156,14 @@ class ProductFetcher(object):
         :ivar refs: A list of refs to attempt to git-checkout
         :ivar no_fetch: If true, don't fetch, just checkout the first matching ref.
     """
-    def __init__(
-                self,
-                build_dir,
-                repos,
-                repository_patterns,
-                refs,
-                no_fetch,
-                out=sys.stdout
-            ):
+    def __init__(self,
+                 build_dir,
+                 repos,
+                 repository_patterns,
+                 refs,
+                 no_fetch,
+                 out=sys.stdout):
+
         self.build_dir = os.path.abspath(build_dir)
         self.refs = refs
         self.matched_refs = {ref: 0 for ref in refs}
