@@ -379,14 +379,6 @@ class ProductFetcher(object):
 
         # update from origin
         if not self.no_fetch:
-            # git is unable to recover from a corrupted/zero size index file
-            # without manual deletion of the index file
-            # https://jira.lsstcorp.org/browse/DM-13494
-            index = os.path.join(git.cwd, '.git', 'index')
-            if os.path.getsize(index) == 0:
-                os.remove(index)
-                git.reset('--hard')
-
             # the line below should be equivalent to:
             #     git.fetch("origin", "--force", "--prune")
             #     git.fetch("origin", "--force", "--tags")
