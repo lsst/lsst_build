@@ -34,13 +34,18 @@ setup(
     keywords='lsst lsst_build lsstsw eups eupspkg',
     packages=['lsst', 'lsst.ci'],
     package_dir={'lsst': 'python/lsst'},
-    install_requires=['pyyaml'],
+    install_requires=[
+        'pyyaml',
+        'future>=0.15.2',
+    ],
     setup_requires=[
-        'pytest-runner>=2.11.1,<3'
+        'pytest-runner>=2.11.1,<3',
     ],
     tests_require=[
         'pytest>=3,<4',
-        'pytest-flake8>=0.8.1,<1'
+        'pytest-flake8>=0.8.1,<1',
+        'pytest-pythonpath',
+        'pytest-mock',
     ],
     scripts=[
         'bin/lsst-build',
