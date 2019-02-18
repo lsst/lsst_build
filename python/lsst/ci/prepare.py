@@ -375,11 +375,19 @@ class ProductFetcher:
 
         # update from origin
         if not self.no_fetch:
-            # the line below should be equivalent to:
-            #     git.fetch("origin", "--force", "--prune")
-            #     git.fetch("origin", "--force", "--tags")
-            # but avoids the overhead of two (possibly remote) git calls.
-            git.fetch("-fup", "origin", "+refs/heads/*:refs/heads/*", "refs/tags/*:refs/tags/*")
+            # in order to avoid broken HEAD in case the checkout branch is removed
+            # we detach the HEAD of the local repository.
+            git.checkout("--detach")
+            # the line below ensures with a single git command that the refspecs
+            #     refs/heads/*
+            #     refs/remotes/origin*
+            #     refs/tags/*
+            # are synchronized between local repository and remote repository
+            # this ensures that branches deleted remotely, will also be deleted locally
+            git.fetch("-fp", "origin",
+                      "+refs/heads/*:refs/heads/*",
+                      "+refs/heads/*:refs/remotes/origin/*",
+                      "refs/tags/*:refs/tags/*")
 
         # find a ref that matches, checkout it
         for ref in self._ref_candidates(product):
