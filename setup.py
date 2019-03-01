@@ -45,6 +45,7 @@ setup(
         'pytest-flake8>=0.8.1,<1',
         'pytest-pythonpath',
         'pytest-mock',
+        'flake8==3.7.7'
     ],
     scripts=[
         'bin/lsst-build',
