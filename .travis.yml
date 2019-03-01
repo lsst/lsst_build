@@ -34,6 +34,11 @@ matrix:
       services:
         - docker
       script: ./tests/mdl.sh
+
+    - env: TEST=yamllint
+      services:
+        - docker
+      script: ./tests/yamllint.sh
 branches:
   only:
     - master
