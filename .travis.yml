@@ -29,6 +29,11 @@ matrix:
         python setup.py test
         # https://github.com/tholo/pytest-flake8/issues/27
         flake8 bin/lsst-build
+
+    - env: TEST=markdownlint
+      services:
+        - docker
+      script: ./tests/mdl.sh
 branches:
   only:
     - master
