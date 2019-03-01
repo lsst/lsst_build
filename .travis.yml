@@ -4,8 +4,6 @@ matrix:
   include:
     - python: '3.6'
       env: DEPLOY_ARGS="-3 -b"
-    - python: '2.7'
-      env: DEPLOY_ARGS="-2 -b"
     - &pytest
       env: TEST='pytest'
       python: '3.6'
@@ -14,8 +12,6 @@ matrix:
         python setup.py test
         # https://github.com/tholo/pytest-flake8/issues/27
         flake8 bin/lsst-build
-    - <<: *pytest
-      python: '2.7'
 
 script: |
   set -e
