@@ -113,7 +113,7 @@ class Manifest(object):
 
     @staticmethod
     def from_file(file_object):
-        varre = re.compile('^(\w+)=(.*)$')
+        varre = re.compile(r'^(\w+)=(.*)$')
 
         products = collections.OrderedDict()
         build_id = None
