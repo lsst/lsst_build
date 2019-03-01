@@ -1,6 +1,8 @@
 lsst-build, a builder and continuous integration tool for LSST
 ==============================================================
 
+[![Build Status](https://travis-ci.org/lsst/lsst_build.svg?branch=master)](https://travis-ci.org/lsst/lsst_build)
+
 Provides the following capabilities:
 
 * Given one or more top-level packages, intelligently clone their git
