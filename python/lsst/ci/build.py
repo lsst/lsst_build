@@ -1,6 +1,6 @@
-from __future__ import print_function
 #############################################################################
 # Builder
+
 from io import open
 import eups
 

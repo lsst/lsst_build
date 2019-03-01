@@ -1,5 +1,3 @@
-from __future__ import print_function
-from __future__ import absolute_import
 #############################################################################
 # Preparer
 
@@ -25,7 +23,6 @@ import copy
 from . import tsort
 
 from .git import Git, GitError
-from future.utils import with_metaclass
 
 
 class RemoteError(Exception):
@@ -432,7 +429,7 @@ class ProductFetcher(object):
                                " {}".format(",".join(missed)))
 
 
-class VersionDb(with_metaclass(abc.ABCMeta, object)):
+class VersionDb(metaclass=abc.ABCMeta):
     """ Construct a full XXX+YYY version for a product.
 
         The subclasses of VersionDb determine how +YYY will be computed.

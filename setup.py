@@ -36,7 +36,6 @@ setup(
     package_dir={'lsst': 'python/lsst'},
     install_requires=[
         'pyyaml',
-        'future>=0.15.2',
     ],
     setup_requires=[
         'pytest-runner>=2.11.1,<3',
