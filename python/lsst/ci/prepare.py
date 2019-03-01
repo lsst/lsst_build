@@ -1,7 +1,6 @@
 #############################################################################
 # Preparer
 
-from builtins import object
 from io import open
 
 import os
@@ -50,7 +49,7 @@ class RemoteError(Exception):
         return message
 
 
-class Product(object):
+class Product:
     """Class representing an EUPS product to be built"""
     def __init__(self, name, sha1, version, dependencies):
         self.name = name
@@ -72,7 +71,7 @@ class Product(object):
         return res
 
 
-class Manifest(object):
+class Manifest:
     """A representation of topologically ordered list of EUPS products to be built
 
        :ivar products: topologically sorted list of `Product`s
@@ -167,7 +166,7 @@ class Manifest(object):
         return Manifest(products, None)
 
 
-class ProductFetcher(object):
+class ProductFetcher:
     """ Fetches products from remote git repositories and checks out matching refs.
 
         See `fetch` for further documentation.
@@ -533,7 +532,7 @@ class VersionDbGit(VersionDbHash):
        each set of dependencies, and tracking the assignments in a git repository.
     """
 
-    class VersionMap(object):
+    class VersionMap:
         def __init__(self):
             self.verhash2suffix = dict()  # (version, dep_sha) -> suffix
             self.versuffix2hash = dict()  # (version, suffix) -> depsha
@@ -714,7 +713,7 @@ class VersionDbGit(VersionDbHash):
             git.tag('-a', '-m', msg, manifest.build_id)
 
 
-class ExclusionResolver(object):
+class ExclusionResolver:
     """A class to determine whether a dependency should be excluded from
        build for a product, based on matching against a list of regular
        expression rules.
@@ -754,7 +753,7 @@ class ExclusionResolver(object):
         return ExclusionResolver(exclusion_patterns)
 
 
-class BuildDirectoryConstructor(object):
+class BuildDirectoryConstructor:
     """A class that, given one or more top level packages, recursively
     clones them to a build directory thus preparing them to be built."""
 
@@ -856,7 +855,7 @@ class BuildDirectoryConstructor(object):
             manifest.to_file(fp)
 
 
-class RepoSpec(object):
+class RepoSpec:
     """Represents a git repo specification in repos.yaml. """
 
     def __init__(self, product, url, ref='master', lfs=False):

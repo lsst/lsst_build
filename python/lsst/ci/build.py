@@ -45,10 +45,10 @@ def declare_eups_tag(tag, eups_obj):
         tags.saveGlobalTags(eups_obj.path[0])
 
 
-class ProgressReporter(object):
+class ProgressReporter:
     # progress reporter: display the version string as progress bar, character by character
 
-    class ProductProgressReporter(object):
+    class ProductProgressReporter:
         def __init__(self, out_file_obj, product):
             self.out = out_file_obj
             self.product = product
@@ -120,7 +120,7 @@ class ProgressReporter(object):
         progress._finalize()
 
 
-class Builder(object):
+class Builder:
     """Class that builds and installs all products in a manifest.
 
        The result is tagged with the `Manifest`s build ID, if any.

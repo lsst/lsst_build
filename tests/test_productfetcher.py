@@ -1,7 +1,5 @@
 """Test ProductFetcher class"""
 
-from builtins import * # NOQA
-
 import os
 import pytest
 import sys
