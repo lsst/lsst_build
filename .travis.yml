@@ -1,31 +1,36 @@
+---
 sudo: false
-language: python
+language: c
 matrix:
   include:
-    - python: '3.6'
-      env: DEPLOY_ARGS="-3 -b"
-    - &pytest
-      env: TEST='pytest'
-      python: '3.6'
+    - env: DEPLOY_ARGS="-3 -b"
+      language: python
+      python: &pyver '3.6'
+      script: |
+        set -e
+        export LSST_BUILD_GITREV="$TRAVIS_COMMIT"
+        echo "TRAVIS_COMMIT: ${TRAVIS_COMMIT}"
+        LSSTSW="${PWD}/lsstsw"
+        git clone https://github.com/lsst/lsstsw.git "$LSSTSW"
+        ln -s .. "${LSSTSW}/lsst_build"
+        # prevent ./bin/deploy from trying to [re]clone lsst_build
+        touch "${LSSTSW}/lsst_build/.deployed"
+        cd "$LSSTSW"
+        ./bin/deploy $DEPLOY_ARGS
+        . "${LSSTSW}/bin/setup.sh"
+        rebuild cfitsio
+        python -c "import yaml as y;print(y.dump(y.load(open('./build/status.yaml'))))"
+
+    - env: TEST='pytest'
+      language: python
+      python: *pyver
       install: pip install --upgrade -r requirements.txt
       script: |
         python setup.py test
         # https://github.com/tholo/pytest-flake8/issues/27
         flake8 bin/lsst-build
-
-script: |
-  set -e
-  export LSST_BUILD_GITREV="$TRAVIS_COMMIT"
-  echo "TRAVIS_COMMIT: ${TRAVIS_COMMIT}"
-  LSSTSW="${PWD}/lsstsw"
-  git clone https://github.com/lsst/lsstsw.git "$LSSTSW"
-  ln -s .. "${LSSTSW}/lsst_build"
-  # prevent ./bin/deploy from trying to [re]clone lsst_build
-  touch "${LSSTSW}/lsst_build/.deployed"
-  cd "$LSSTSW"
-  ./bin/deploy $DEPLOY_ARGS
-  . "${LSSTSW}/bin/setup.sh"
-  rebuild cfitsio
-  python -c "import yaml as y;print(y.dump(y.load(open('./build/status.yaml'))))"
+branches:
+  only:
+    - master
 notifications:
   email: false
