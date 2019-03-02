@@ -24,7 +24,7 @@ matrix:
     - env: TEST='pytest'
       language: python
       python: *pyver
-      install: pip install --upgrade -r requirements.txt
+      install: pip install --upgrade .[travis]
       script: |
         python setup.py test
         # https://github.com/tholo/pytest-flake8/issues/27

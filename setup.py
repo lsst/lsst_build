@@ -12,6 +12,8 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
+f8 = 'flake8>=3.7.7,<4'
+
 setup(
     name='lsst_build',
     version='1.0.0',
@@ -45,8 +47,13 @@ setup(
         'pytest-flake8>=1.0.4,<2',
         'pytest-pythonpath>=0.7,<1',
         'pytest-mock>=1.10,<2',
-        'flake8>=3.7.7,<4',
+        f8,
     ],
+    extras_require={
+        'travis': [
+            f8
+        ],
+    },
     scripts=[
         'bin/lsst-build',
     ],
