@@ -35,17 +35,17 @@ setup(
     packages=['lsst', 'lsst.ci'],
     package_dir={'lsst': 'python/lsst'},
     install_requires=[
-        'pyyaml',
+        'pyyaml>=3.13,<4',
     ],
     setup_requires=[
-        'pytest-runner>=2.11.1,<3',
+        'pytest-runner>=4.4,<5',
     ],
     tests_require=[
-        'pytest>=3,<4',
-        'pytest-flake8>=0.8.1,<1',
-        'pytest-pythonpath',
-        'pytest-mock',
-        'flake8==3.7.7'
+        'pytest>=4.3,<5',
+        'pytest-flake8>=1.0.4,<2',
+        'pytest-pythonpath>=0.7,<1',
+        'pytest-mock>=1.10,<2',
+        'flake8>=3.7.7,<4',
     ],
     scripts=[
         'bin/lsst-build',
