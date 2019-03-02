@@ -637,29 +637,29 @@ class VersionDbGit(VersionDbHash):
            exists in the database, its build ID will be used.
         """
         with open(os.path.join(self.dbdir, 'manifests', 'content_sha.db.txt'), 'a+', encoding='utf-8') as fp:
-                # Try to find a manifest with existing matching content
-                for line in fp:
-                        (sha1, tag) = line.strip().split()
-                        if sha1 == manifest_sha:
-                                return tag
+            # Try to find a manifest with existing matching content
+            for line in fp:
+                (sha1, tag) = line.strip().split()
+                if sha1 == manifest_sha:
+                    return tag
 
-                # Find the next unused tag that matches the bNNNN pattern
-                # and isn't defined in EUPS yet
-                git = Git(self.dbdir)
-                tags = git.tag('-l', 'b[0-9]*').split()
-                btre = re.compile('^b[0-9]+$')
-                btags = [0]
-                btags += [int(t[1:]) for t in tags if btre.match(t)]
-                btag = max(btags)
+            # Find the next unused tag that matches the bNNNN pattern
+            # and isn't defined in EUPS yet
+            git = Git(self.dbdir)
+            tags = git.tag('-l', 'b[0-9]*').split()
+            btre = re.compile('^b[0-9]+$')
+            btags = [0]
+            btags += [int(t[1:]) for t in tags if btre.match(t)]
+            btag = max(btags)
 
-                defined_tags = self.eups.tags.getTagNames()
-                while True:
-                    btag += 1
-                    tag = "b%s" % btag
-                    if tag not in defined_tags:
-                        break
+            defined_tags = self.eups.tags.getTagNames()
+            while True:
+                btag += 1
+                tag = "b%s" % btag
+                if tag not in defined_tags:
+                    break
 
-                return tag
+            return tag
 
     def commit(self, manifest, build_id):
         git = Git(self.dbdir)
