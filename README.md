@@ -6,7 +6,7 @@ lsst-build, a builder and continuous integration tool for LSST
 Provides the following capabilities:
 
 * Given one or more top-level packages, intelligently clone their git
-  repositores and check out the requested branches into a build directory:
+  repositories and check out the requested branches into a build directory:
 
   ```bash
   lsst-build prepare
@@ -58,7 +58,7 @@ lsst-build build build
 ------------------
 
 `lsst-build prepare` clones the given top level product(s) into `<builddir>`,
-discovers its depenencies by reading its `ups/$PRODUCT.table` file, and
+discovers its dependencies by reading its `ups/$PRODUCT.table` file, and
 recursively clones them until all dependencies are exhausted.  Following the
 clone, it writes out `<builddir>/manifest.txt` file, which lists all cloned
 products, their versions and dependency relationships.
