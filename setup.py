@@ -9,8 +9,10 @@ from codecs import open
 from os import path
 
 here = path.abspath(path.dirname(__file__))
-with open(path.join(here, 'README'), encoding='utf-8') as f:
+with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
+
+f8 = 'flake8>=3.7.7,<4'
 
 setup(
     name='lsst_build',
@@ -24,29 +26,29 @@ setup(
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Build Tools',
         'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
     ],
     keywords='lsst lsst_build lsstsw eups eupspkg',
     packages=['lsst', 'lsst.ci'],
     package_dir={'lsst': 'python/lsst'},
     install_requires=[
-        'pyyaml',
-        'future>=0.15.2',
+        'pyyaml>=3.13,<4',
     ],
     setup_requires=[
-        'pytest-runner>=2.11.1,<3',
+        'pytest-runner>=4.4,<5',
     ],
     tests_require=[
-        'pytest>=3,<4',
-        'pytest-flake8>=0.8.1,<1',
-        'pytest-pythonpath',
-        'pytest-mock',
+        'pytest>=4.3,<5',
+        'pytest-flake8>=1.0.4,<2',
+        'pytest-pythonpath>=0.7,<1',
+        'pytest-mock>=1.10,<2',
+        f8,
     ],
+    extras_require={
+        'travis': [
+            f8
+        ],
+    },
     scripts=[
         'bin/lsst-build',
     ],

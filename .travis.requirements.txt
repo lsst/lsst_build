@@ -1,3 +1,0 @@
-pip>=9
-pytest>=3,<4
-flake8>=3,<4

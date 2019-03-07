@@ -18,7 +18,7 @@ class GitError(Exception):
                                                                                              self.stderr)
 
 
-class Git(object):
+class Git:
     def __init__(self, cwd=None):
         self.cwd = cwd
 

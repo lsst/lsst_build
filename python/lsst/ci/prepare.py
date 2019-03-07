@@ -1,9 +1,6 @@
-from __future__ import print_function
-from __future__ import absolute_import
 #############################################################################
 # Preparer
 
-from builtins import object
 from io import open
 
 import os
@@ -25,7 +22,6 @@ import copy
 from . import tsort
 
 from .git import Git, GitError
-from future.utils import with_metaclass
 
 
 class RemoteError(Exception):
@@ -53,7 +49,7 @@ class RemoteError(Exception):
         return message
 
 
-class Product(object):
+class Product:
     """Class representing an EUPS product to be built"""
     def __init__(self, name, sha1, version, dependencies):
         self.name = name
@@ -75,7 +71,7 @@ class Product(object):
         return res
 
 
-class Manifest(object):
+class Manifest:
     """A representation of topologically ordered list of EUPS products to be built
 
        :ivar products: topologically sorted list of `Product`s
@@ -113,7 +109,7 @@ class Manifest(object):
 
     @staticmethod
     def from_file(file_object):
-        varre = re.compile('^(\w+)=(.*)$')
+        varre = re.compile(r'^(\w+)=(.*)$')
 
         products = collections.OrderedDict()
         build_id = None
@@ -170,7 +166,7 @@ class Manifest(object):
         return Manifest(products, None)
 
 
-class ProductFetcher(object):
+class ProductFetcher:
     """ Fetches products from remote git repositories and checks out matching refs.
 
         See `fetch` for further documentation.
@@ -432,7 +428,7 @@ class ProductFetcher(object):
                                " {}".format(",".join(missed)))
 
 
-class VersionDb(with_metaclass(abc.ABCMeta, object)):
+class VersionDb(metaclass=abc.ABCMeta):
     """ Construct a full XXX+YYY version for a product.
 
         The subclasses of VersionDb determine how +YYY will be computed.
@@ -536,7 +532,7 @@ class VersionDbGit(VersionDbHash):
        each set of dependencies, and tracking the assignments in a git repository.
     """
 
-    class VersionMap(object):
+    class VersionMap:
         def __init__(self):
             self.verhash2suffix = dict()  # (version, dep_sha) -> suffix
             self.versuffix2hash = dict()  # (version, suffix) -> depsha
@@ -641,29 +637,29 @@ class VersionDbGit(VersionDbHash):
            exists in the database, its build ID will be used.
         """
         with open(os.path.join(self.dbdir, 'manifests', 'content_sha.db.txt'), 'a+', encoding='utf-8') as fp:
-                # Try to find a manifest with existing matching content
-                for line in fp:
-                        (sha1, tag) = line.strip().split()
-                        if sha1 == manifest_sha:
-                                return tag
+            # Try to find a manifest with existing matching content
+            for line in fp:
+                (sha1, tag) = line.strip().split()
+                if sha1 == manifest_sha:
+                    return tag
 
-                # Find the next unused tag that matches the bNNNN pattern
-                # and isn't defined in EUPS yet
-                git = Git(self.dbdir)
-                tags = git.tag('-l', 'b[0-9]*').split()
-                btre = re.compile('^b[0-9]+$')
-                btags = [0]
-                btags += [int(t[1:]) for t in tags if btre.match(t)]
-                btag = max(btags)
+            # Find the next unused tag that matches the bNNNN pattern
+            # and isn't defined in EUPS yet
+            git = Git(self.dbdir)
+            tags = git.tag('-l', 'b[0-9]*').split()
+            btre = re.compile('^b[0-9]+$')
+            btags = [0]
+            btags += [int(t[1:]) for t in tags if btre.match(t)]
+            btag = max(btags)
 
-                defined_tags = self.eups.tags.getTagNames()
-                while True:
-                    btag += 1
-                    tag = "b%s" % btag
-                    if tag not in defined_tags:
-                        break
+            defined_tags = self.eups.tags.getTagNames()
+            while True:
+                btag += 1
+                tag = "b%s" % btag
+                if tag not in defined_tags:
+                    break
 
-                return tag
+            return tag
 
     def commit(self, manifest, build_id):
         git = Git(self.dbdir)
@@ -717,7 +713,7 @@ class VersionDbGit(VersionDbHash):
             git.tag('-a', '-m', msg, manifest.build_id)
 
 
-class ExclusionResolver(object):
+class ExclusionResolver:
     """A class to determine whether a dependency should be excluded from
        build for a product, based on matching against a list of regular
        expression rules.
@@ -757,7 +753,7 @@ class ExclusionResolver(object):
         return ExclusionResolver(exclusion_patterns)
 
 
-class BuildDirectoryConstructor(object):
+class BuildDirectoryConstructor:
     """A class that, given one or more top level packages, recursively
     clones them to a build directory thus preparing them to be built."""
 
@@ -859,7 +855,7 @@ class BuildDirectoryConstructor(object):
             manifest.to_file(fp)
 
 
-class RepoSpec(object):
+class RepoSpec:
     """Represents a git repo specification in repos.yaml. """
 
     def __init__(self, product, url, ref='master', lfs=False):
