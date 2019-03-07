@@ -32,7 +32,7 @@ setup(
     packages=['lsst', 'lsst.ci'],
     package_dir={'lsst': 'python/lsst'},
     install_requires=[
-        'pyyaml>=3.13,<4',
+        'pyyaml>=3.13',
     ],
     setup_requires=[
         'pytest-runner>=4.4,<5',
