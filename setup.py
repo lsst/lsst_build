@@ -45,9 +45,6 @@ setup(
     setup_requires=['setuptools_scm', 'setuptools_scm_git_archive'],
     tests_require=test_deps,
     extras_require={
-        'travis': [
-            f8
-        ],
         'test': test_deps,
     },
     scripts=[

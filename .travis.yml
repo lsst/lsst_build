@@ -24,9 +24,10 @@ matrix:
     - env: TEST='pytest'
       language: python
       python: *pyver
-      install: pip install --upgrade .[travis]
+      install: |
+        pip install --upgrade .[test]
       script: |
-        python setup.py test
+        pytest
         # https://github.com/tholo/pytest-flake8/issues/27
         flake8 bin/lsst-build
 
