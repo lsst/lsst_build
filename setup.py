@@ -14,9 +14,17 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 f8 = 'flake8>=3.7.7,<4'
 
+test_deps = [
+    'pytest>=4.3,<5',
+    'pytest-flake8>=1.0.4,<2',
+    'pytest-pythonpath>=0.7,<1',
+    'pytest-mock>=1.10,<1.13',
+    f8,
+]
+
 setup(
     name='lsst_build',
-    version='1.0.0',
+    use_scm_version=True,
     description='LSST build automation',
     long_description=long_description,
     url='https://github.com/lsst/lsst_build',
@@ -34,20 +42,13 @@ setup(
     install_requires=[
         'pyyaml>=3.13',
     ],
-    setup_requires=[
-        'pytest-runner>=4.4,<5',
-    ],
-    tests_require=[
-        'pytest>=4.3,<5',
-        'pytest-flake8>=1.0.4,<2',
-        'pytest-pythonpath>=0.7,<1',
-        'pytest-mock>=1.10,<2',
-        f8,
-    ],
+    setup_requires=['setuptools_scm', 'setuptools_scm_git_archive'],
+    tests_require=test_deps,
     extras_require={
         'travis': [
             f8
         ],
+        'test': test_deps,
     },
     scripts=[
         'bin/lsst-build',
