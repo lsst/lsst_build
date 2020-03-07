@@ -8,9 +8,10 @@ import os
 
 from lsst.ci.prepare import BuildDirectoryConstructor
 from lsst.ci.build import Builder
+from lsst.ci import __version__
 
 parser = argparse.ArgumentParser(
-        description='Build LSST Software Stack from git source',
+        description=f'Build LSST Software Stack from git source. Version {__version__}',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
     lsst-build prepare <build_directory> [ref1 [ref2 [...]]]
