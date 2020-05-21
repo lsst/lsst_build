@@ -151,8 +151,8 @@ class Manifest:
         Returns:
             The created `Manifest`.
         """
-        deps = [(dep.name, prod.name) for prod in product_dict.values() for dep in prod.dependencies]
-        topo_sorted_product_names = tsort.tsort(deps)
+        deps = [(prod.name, dep.name) for prod in product_dict.values() for dep in prod.dependencies]
+        topo_sorted_product_names = tsort.flatten(tsort.toposort(deps))
 
         # Append top-level products with no dependencies
         _p = set(topo_sorted_product_names)

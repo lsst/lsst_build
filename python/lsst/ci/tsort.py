@@ -1,59 +1,103 @@
-#!/usr/bin/env python
-# -- mjuric: Taken from https://pypi.python.org/pypi/tsort and slightly modified
-# -- mjuric: LGPL licenced
-# -*- coding: utf-8 -*-
-
+from typing import Iterator, Iterable, List, Mapping, Set, Tuple
 
 class GraphError(Exception):
     pass
 
 
-def tsort(edges):
-    """topologically sort vertices in edges.
-    edges: list of pairs of vertices. Edges must form a DAG.
-           If the graph has a cycle, then GraphError is raised.
-    returns: topologically sorted list of vertices.
-    see http://en.wikipedia.org/wiki/Topological_sorting
+def to_dep_graph(edges: Iterable[Tuple[str, str]]) -> Mapping[str, Set[str]]:
+    """Takes an iterable collection of (object, dependency) pairs and returns
+    as a graph set"""
+    graph = {}
+    for node, dep in edges:
+        graph.setdefault(node, set()).add(dep)
+        # Ensure all deps are added to graph	
+        graph.setdefault(dep, set())
+    return graph
+
+
+def toposort(edges: Iterable[Tuple[str, str]]) -> Iterator[List]:
+    """Takes an iterable collection of (object, dependency) pairs
+    and returns an iterator of ordered dependency lists.
+    The items in each list can be processed in any order.
     """
-    # resulting list
-    L = []  # noqa
+    return toposort_mapping(to_dep_graph(edges))
 
-    # maintain forward and backward edge maps in parallel.
-    st, ts = {}, {}
 
-    def prune(s, t):
-        del st[s][t]
-        del ts[t][s]
+def toposort_dfs(edges: Iterable[Tuple[str, str]]) -> List[str]:
+    """Takes an iterable collection of (object, dependency) pairs
+    and returns an list of ordered dependencies.
+    """
+    return toposort_dfs_mapping(to_dep_graph(edges))
 
-    def add(s, t):
-        try:
-            st.setdefault(s, {})[t] = 1
-        except Exception as e:
-            raise RuntimeError(e, (s, t))
-        ts.setdefault(t, {})[s] = 1
 
-    for s, t in edges:
-        add(s, t)
+def toposort_mapping(graph_set: Mapping[str, Set[str]]) -> Iterator[List]:
+    """Returns an iterator of ordered dependency lists from a 
+    graph dictionary.
+    The items in each list can be processed in any order.
+    """
+    all_dependencies = set()
+    self_including_nodes = []
+    for node, dependencies in graph_set.items():
+        if node in dependencies:
+            self_including_nodes.append(node)
+        all_dependencies.union(dependencies)
+    if self_including_nodes:
+        raise GraphError(f"Self-including nodes: {self_including_nodes}")
+    missing_nodes = list(sorted(all_dependencies - set(graph_set.keys())))
+    if missing_nodes:
+        raise GraphError(f"Missing nodes in mapping: {missing_nodes}")
+    remaining_nodes = graph_set.copy()
+    while True:
+        # Visit all nodes, remove nodes without dependencies
+        childless_nodes = set(node for node, dependencies in remaining_nodes.items() if not dependencies)
+        if not childless_nodes:
+            break
+        yield list(sorted(childless_nodes))
+        more_nodes = {}
+        # Remove nodes we returned from dependency lists
+        for node, dependencies in remaining_nodes.items():
+            if node not in childless_nodes:
+                more_nodes[node] = (dependencies - childless_nodes)
+        remaining_nodes = more_nodes
+    if remaining_nodes:
+        raise GraphError(f"Cycle among nodes: {remaining_nodes}")
 
-    # frontier
-    S = set(st.keys()).difference(ts.keys())  # noqa
 
-    while S:
-        s = S.pop()
-        L.append(s)
-        for t in list(st.get(s, {}).keys()):
-            prune(s, t)
-            if not ts[t]:       # new frontier
-                S.add(t)
+def toposort_dfs_mapping(graph: Mapping[str, Set[str]]) -> List[str]:
+    """Topological sort - Depth-first search.
+    The results are already flattened
+    """
+    class Node:
+        def __init__(self, name, dependencies):
+            self.name = name    
+            self.dependencies = sorted(set(dependencies))
+            self.processing = False
+            self.processed = False
+    sorted_node_names = []
+    node_map = {name: Node(name, dependencies) for name, dependencies in graph.items()}
+    def visit(n: Node):
+        if n.processed:
+             return
+        if n.processing:
+            raise GraphError(f"Cycle: {n.name}")
+        n.processing = True
+        for dep in sorted(n.dependencies):
+            try:
+                visit(node_map[dep])
+            except GraphError as e:
+                # unroll cycle
+                raise GraphError(e.args[0] + f" <- {n.name}")
+        n.proccessing = False
+        n.processed = True
+        sorted_node_names.append(n.name)
+    for node in sorted(node_map.values(), key=lambda n: n.name):
+        visit(node)
+    return sorted_node_names
 
-    if [_f for _f in st.values() if _f]:  # we have a cycle. report the cycle.
-        def traverse(vs, seen):
-            for s in vs:
-                if s in seen:
-                    raise GraphError('contains cycle: ', seen)
-                seen.append(s)  # xx use ordered set..
-                traverse(st[s].keys(), seen)
-        traverse(st.keys(), list())
-        assert False, 'should not reach..'
 
-    return L
+def flatten(dependency_lists: Iterable[List]) -> List[str]:
+    """Flattens an iterable collection of dependency lists for serial processing"""
+    flattened = []
+    for sorted_list in dependency_lists:
+        flattened.extend(sorted_list)
+    return flattened
