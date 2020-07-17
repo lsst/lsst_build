@@ -18,7 +18,7 @@ import datetime
 import yaml
 
 from .prepare import Manifest
-from .prepare import Product
+from .models import Product
 
 
 def product_representer(dumper, data):
@@ -148,7 +148,7 @@ class Builder:
 
         # construct the tags file with exact dependencies
         setups = ["\t%-20s %s" % (dep.name, dep.version)
-                  for dep in product.flat_dependencies()]
+                  for dep in self.manifest.products.flat_dependencies(product)]
 
         # create the buildscript
         with open(buildscript, 'w', encoding='utf-8') as fp:
