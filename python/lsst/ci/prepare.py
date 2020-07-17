@@ -199,6 +199,7 @@ class ProductFetcher:
         self.dependency_module = dependency_module
         self.version_db = version_db
         self.product_index = ProductIndex()
+        self.lfs_product_names = []
 
         self.repo_specs: Dict[str, RepoSpec] = {}
         for product, spec in self.repos.items():
@@ -307,6 +308,7 @@ class ProductFetcher:
 
         if repo_spec.lfs:
             lfs = True
+            self.lfs_product_names.append(product)
         else:
             lfs = False
 
@@ -336,8 +338,8 @@ class ProductFetcher:
                     # lfs will pickup the .gitconfig and pull lfs objects for
                     # the default ref during clone.  Config options set on the
                     # cli during the clone get recorded in `.git/config'
-                    args += ['-c', 'filter.lfs.required']
-                    args += ['-c', 'filter.lfs.smudge=git-lfs smudge %f']
+                    args += ['-c', 'filter.lfs.required=false']
+                    args += ['-c', 'filter.lfs.smudge=']
                     args += ['-c', 'filter.lfs.clean=git-lfs clean %f']
                     args += ['-c', ('credential.helper=%s' % helper)]
 
@@ -484,6 +486,8 @@ class ProductFetcher:
         self.validate_refs(refs)
         if self.version_db:
             loop.run_until_complete(self.resolve_versions())
+        if not self.no_fetch:
+            loop.run_until_complete(self.lfs_checkout())
         loop.close()
 
     async def fetch_products(self, product_names: List[str], refs: List[str]) -> Set[str]:
@@ -562,6 +566,42 @@ class ProductFetcher:
         if len(exceptions):
             first_exception = exceptions[0]
             logger.error("At least one error occurred during while resolving versions")
+            raise first_exception
+
+    async def lfs_checkout(self):
+        """
+        Parallel LFS checkout
+        We do this after everything is fetched so we can use flat dependencies
+        """
+        print("Performing git-lfs pulls...")
+        exceptions = []
+
+        async def pull_worker(queue):
+            while True:
+                lfs_product_name = await queue.get()
+                try:
+                    print(f"Pulling {lfs_product_name} LFS data...")
+                    t0 = time.time()
+                    repo_dir = os.path.join(self.build_dir, lfs_product_name)
+                    git = Git(repo_dir)
+                    await git.lfs("pull")
+                    finish_msg = f"{lfs_product_name} ok ({time.time() - t0:.1f} sec)."
+                    print(f"{finish_msg:>80}", file=self.out)
+                    queue.task_done()
+                except Exception as e:
+                    logger.error(f"Failed git-lfs pull for {lfs_product_name}")
+                    exceptions.append(e)
+                    queue.task_done()
+                    continue
+
+        queue = asyncio.Queue()
+        for lfs_product_name in self.lfs_product_names:
+            queue.put_nowait(lfs_product_name)
+        await self.run_async_tasks(pull_worker, queue)
+
+        if len(exceptions):
+            first_exception = exceptions[0]
+            logger.error("At least one error occurred during while performing LFS pulls")
             raise first_exception
 
 
@@ -734,7 +774,6 @@ class VersionDbGit(VersionDbHash):
         super(VersionDbGit, self).__init__(None, None)
         self.dbdir = dbdir
         self.eups = eups_obj
-
         self.version_maps = dict()
 
     def __verfn(self, product_name):
