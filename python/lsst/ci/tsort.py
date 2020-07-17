@@ -1,16 +1,17 @@
-from typing import Iterator, Iterable, List, Mapping, Set, Tuple
+from typing import Iterator, Iterable, List, Mapping, Set, Tuple, Dict
+
 
 class GraphError(Exception):
     pass
 
 
-def to_dep_graph(edges: Iterable[Tuple[str, str]]) -> Mapping[str, Set[str]]:
+def to_dep_graph(edges: Iterable[Tuple[str, str]]) -> Dict[str, Set[str]]:
     """Takes an iterable collection of (object, dependency) pairs and returns
     as a graph set"""
     graph = {}
     for node, dep in edges:
         graph.setdefault(node, set()).add(dep)
-        # Ensure all deps are added to graph	
+        # Ensure all deps are added to graph
         graph.setdefault(dep, set())
     return graph
 
@@ -30,7 +31,7 @@ def toposort_dfs(edges: Iterable[Tuple[str, str]]) -> List[str]:
     return toposort_dfs_mapping(to_dep_graph(edges))
 
 
-def toposort_mapping(graph_set: Mapping[str, Set[str]]) -> Iterator[List]:
+def toposort_mapping(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
     """Returns an iterator of ordered dependency lists from a 
     graph dictionary.
     The items in each list can be processed in any order.
@@ -57,7 +58,7 @@ def toposort_mapping(graph_set: Mapping[str, Set[str]]) -> Iterator[List]:
         # Remove nodes we returned from dependency lists
         for node, dependencies in remaining_nodes.items():
             if node not in childless_nodes:
-                more_nodes[node] = (dependencies - childless_nodes)
+                more_nodes[node] = dependencies - childless_nodes
         remaining_nodes = more_nodes
     if remaining_nodes:
         raise GraphError(f"Cycle among nodes: {remaining_nodes}")
@@ -67,17 +68,20 @@ def toposort_dfs_mapping(graph: Mapping[str, Set[str]]) -> List[str]:
     """Topological sort - Depth-first search.
     The results are already flattened
     """
+
     class Node:
         def __init__(self, name, dependencies):
-            self.name = name    
+            self.name = name
             self.dependencies = sorted(set(dependencies))
             self.processing = False
             self.processed = False
+
     sorted_node_names = []
     node_map = {name: Node(name, dependencies) for name, dependencies in graph.items()}
+
     def visit(n: Node):
         if n.processed:
-             return
+            return
         if n.processing:
             raise GraphError(f"Cycle: {n.name}")
         n.processing = True
@@ -90,6 +94,7 @@ def toposort_dfs_mapping(graph: Mapping[str, Set[str]]) -> List[str]:
         n.proccessing = False
         n.processed = True
         sorted_node_names.append(n.name)
+
     for node in sorted(node_map.values(), key=lambda n: n.name):
         visit(node)
     return sorted_node_names
