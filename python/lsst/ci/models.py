@@ -17,7 +17,7 @@ class ProductIndex(OrderedDict):
         ----------
         product_index
         """
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self.toposorted = False
         self.sorted_groups = []
 
