@@ -32,7 +32,7 @@ def toposort_dfs(edges: Iterable[Tuple[str, str]]) -> List[str]:
 
 
 def toposort_mapping(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
-    """Returns an iterator of ordered dependency lists from a 
+    """Returns an iterator of ordered dependency lists from a
     graph dictionary.
     The items in each list can be processed in any order.
     """

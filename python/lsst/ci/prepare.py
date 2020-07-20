@@ -573,7 +573,7 @@ class ProductFetcher:
         Parallel LFS checkout
         We do this after everything is fetched so we can use flat dependencies
         """
-        print("Performing git-lfs pulls...")
+        print("Performing git-lfs pulls...", file=self.out)
         exceptions = []
 
         async def pull_worker(queue):
