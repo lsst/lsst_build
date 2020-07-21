@@ -61,6 +61,7 @@ def toposort_mapping(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
                 more_nodes[node] = dependencies - childless_nodes
         remaining_nodes = more_nodes
     if remaining_nodes:
+        remaining_nodes = sorted(remaining_nodes)
         raise GraphError(f"Cycle among nodes: {remaining_nodes}")
 
 
