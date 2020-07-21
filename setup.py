@@ -16,7 +16,10 @@ f8 = 'flake8>=3.7.7,<4'
 
 setup(
     name='lsst_build',
-    version='1.0.0',
+    use_scm_version={
+        'version_scheme': 'post-release',
+        'tag_regex': r'^lsst-build-(?P<prefix>v)?(?P<version>[^\+]+)(?P<suffix>.*)?$',
+    },
     description='LSST build automation',
     long_description=long_description,
     url='https://github.com/lsst/lsst_build',
@@ -35,7 +38,7 @@ setup(
         'pyyaml>=3.13',
     ],
     setup_requires=[
-        'pytest-runner>=4.4,<5',
+        'pytest-runner>=4.4,<5', 'setuptools_scm', 'setuptools_scm_git_archive'
     ],
     tests_require=[
         'pytest>=4.3,<5',
