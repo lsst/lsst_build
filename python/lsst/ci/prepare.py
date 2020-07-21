@@ -291,7 +291,7 @@ class ProductFetcher:
         """This method should be considered private to fetch(d)"""
         repo_spec = self.repo_specs[product]
         t0 = time.time()
-        print("Fetching %s...\n" % product, file=self.out)
+        print("Fetching %s..." % product, file=self.out)
         self.out.flush()
 
         productdir = os.path.join(self.build_dir, product)
