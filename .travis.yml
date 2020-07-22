@@ -1,11 +1,12 @@
 ---
+dist: bionic
 sudo: false
 language: c
 matrix:
   include:
-    - env: DEPLOY_ARGS="-3 -b"
+    - env: DEPLOY_ARGS="-b"
       language: python
-      python: &pyver '3.6'
+      python: &pyver '3.7'
       script: |
         set -e
         export LSST_BUILD_GITREV="$TRAVIS_COMMIT"

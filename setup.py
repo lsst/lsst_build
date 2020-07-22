@@ -14,11 +14,14 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 f8 = 'flake8>=3.7.7,<4'
 
+
 setup(
     name='lsst_build',
     use_scm_version={
         'version_scheme': 'post-release',
         'tag_regex': r'^lsst-build-(?P<prefix>v)?(?P<version>[^\+]+)(?P<suffix>.*)?$',
+        'git_describe_command': 'git describe --dirty --tags --long --match lsst-build-v*.*',
+        'fallback_version': '0.0.0',
     },
     description='LSST build automation',
     long_description=long_description,
