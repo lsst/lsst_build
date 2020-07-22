@@ -158,3 +158,17 @@ def test_fetch_bad_git_checkout_retry(tmpdir, repos_yaml_good, mocker, test_prod
     # clone is not called on the first iteration as the repo already exists
     assert lsst.ci.prepare.Git.clone.call_count == (tries - 1)
     assert lsst.ci.prepare.Git.checkout.call_count == tries
+
+
+def test_fetch_products(tmpdir, repos_yaml_good, test_product):
+    """Clone git repo from a valid repos.yaml"""
+    refs = [MAIN_BRANCH_NAME]
+    product_fetcher = ProductFetcher(
+        tmpdir,
+        repos_yaml_good,
+        None,
+        no_fetch=False
+    )
+
+    asyncio.run(product_fetcher.fetch_products([test_product], refs))
+    assert os.path.exists(os.path.join(tmpdir, test_product, '.git'))
