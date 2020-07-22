@@ -1,22 +1,24 @@
-from typing import Iterator, Iterable, List, Mapping, Set, Tuple, Dict
+from typing import Iterator, Iterable, List, Mapping, Set, Tuple, Dict, Optional
 
 
 class GraphError(Exception):
     pass
 
 
-def to_dep_graph(edges: Iterable[Tuple[str, str]]) -> Dict[str, Set[str]]:
+def to_dep_graph(edges: Iterable[Tuple[str, Optional[str]]]) -> Dict[str, Set[str]]:
     """Takes an iterable collection of (object, dependency) pairs and returns
     as a graph set"""
     graph = {}
     for node, dep in edges:
-        graph.setdefault(node, set()).add(dep)
-        # Ensure all deps are added to graph
-        graph.setdefault(dep, set())
+        node_set = graph.setdefault(node, set())
+        if dep:  # has an edge
+            node_set.add(dep)
+            # Ensure all deps are added to graph
+            graph.setdefault(dep, set())
     return graph
 
 
-def toposort(edges: Iterable[Tuple[str, str]]) -> Iterator[List]:
+def toposort(edges: Iterable[Tuple[str, Optional[str]]]) -> Iterator[List]:
     """Takes an iterable collection of (object, dependency) pairs
     and returns an iterator of ordered dependency lists.
     The items in each list can be processed in any order.
@@ -24,7 +26,7 @@ def toposort(edges: Iterable[Tuple[str, str]]) -> Iterator[List]:
     return toposort_mapping(to_dep_graph(edges))
 
 
-def toposort_dfs(edges: Iterable[Tuple[str, str]]) -> List[str]:
+def toposort_dfs(edges: Iterable[Tuple[str, Optional[str]]]) -> List[str]:
     """Takes an iterable collection of (object, dependency) pairs
     and returns an list of ordered dependencies.
     """

@@ -1,5 +1,13 @@
 from lsst.ci import tsort
 
+edgeless_data = [
+    ("a", ""),  # No edge
+    ("b", None),  # No edge
+    ("z", "y"),
+    ("z", "x"),
+    ("y", "x"),
+]
+
 good_data = [
     ("z", "y"),  # z depends on y
     ("b", "a"),  # b depends on a
@@ -40,6 +48,9 @@ multigraph_data = [
 
 
 def test_toposort():
+    sorted_lists = list(tsort.toposort(edgeless_data))
+    assert sorted_lists == [["a", "b", "x"], ["y"], ["z"]]
+
     sorted_lists = list(tsort.toposort(good_data))
     assert sorted_lists == [["a", "x"], ["b", "y"], ["c", "z"]]
 

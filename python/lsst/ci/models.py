@@ -31,10 +31,8 @@ class ProductIndex(OrderedDict):
         OrderedDict[str, `Product`]
             Topologically sorted OrderedDict
         """
-        deps = []
-        for product_name, product in self.items():
-            deps.extend([(product_name, dependency) for dependency in product.dependencies])
-        topo_sorted_product_lists = tsort.toposort(deps)
+        dep_graph = {name: set(product.dependencies) for name, product in self.items()}
+        topo_sorted_product_lists = tsort.toposort_mapping(dep_graph)
         ordered_product_list = []
         for group_idx, sort_group in enumerate(topo_sorted_product_lists):
             self.sorted_groups.append(sort_group)
