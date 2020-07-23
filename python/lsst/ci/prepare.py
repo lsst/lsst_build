@@ -373,11 +373,12 @@ class ProductFetcher:
         # clean up the working directory (eg., remove remnants of
         # previous builds)
         await git.clean("-d", "-f", "-q", "-x")
-        finish_msg = f"{product} ok ({time.time() - t0:.1f} sec)."
+
+        target_ref = Ref.from_commit_and_ref(sha1, ref)
+        finish_msg = f"{product} ok [{target_ref.treeish}] ({time.time() - t0:.1f} sec)."
         print(f"{finish_msg:>80}", file=self.out)
         self.out.flush()
 
-        target_ref = Ref.from_commit_and_ref(sha1, ref)
         # Log this ref if it was in the external list
         if self.dependency_module:
             dep_file_path = os.path.join(
