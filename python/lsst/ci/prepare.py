@@ -129,32 +129,6 @@ class Manifest:
         product_index.toposort()
         return Manifest(product_index, build_id)
 
-    @staticmethod
-    def from_product_dict(product_dict):
-        """ Create a `Manifest` by topologically sorting the dict of `Product`s
-
-        Args:
-            product_dict (dict): A product_name -> `Product` dictionary of products
-
-        Returns:
-            The created `Manifest`.
-        """
-        deps = [(prod.name, dep.name) for prod in product_dict.values() for dep in prod.dependencies]
-        topo_sorted_product_names = tsort.flatten(tsort.toposort(deps))
-
-        # Append top-level products with no dependencies
-        _p = set(topo_sorted_product_names)
-        for name in set(product_dict.keys()):
-            if name not in _p:
-                topo_sorted_product_names.append(name)
-
-        product_index = ProductIndex()
-        for name in topo_sorted_product_names:
-            product_index[name] = product_dict[name]
-        product_index.toposort()
-        return Manifest(product_index, None)
-
-
 class ProductFetcher:
     """ Fetches products from remote git repositories and checks out matching refs.
 
@@ -486,7 +460,7 @@ class ProductFetcher:
         self.validate_refs(refs)
         if self.version_db:
             loop.run_until_complete(self.resolve_versions())
-        if not self.no_fetch:
+        if not self.no_fetch and len(self.lfs_product_names):
             loop.run_until_complete(self.lfs_checkout())
         loop.close()
 
