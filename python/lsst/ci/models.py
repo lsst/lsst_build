@@ -1,11 +1,10 @@
 from dataclasses import dataclass
-from typing import List, Set, Optional, OrderedDict as ODict
-from collections import OrderedDict
+from typing import List, Set, Optional, Dict
 
 from lsst.ci import tsort
 
 
-class ProductIndex(OrderedDict):
+class ProductIndex(dict):
     """
     Container class for a product index with index-related operations.
     """
@@ -13,22 +12,19 @@ class ProductIndex(OrderedDict):
     def __init__(self, *args, **kwargs):
         """Create a new product index object.
 
-        Parameters
-        ----------
-        product_index
         """
         super().__init__(*args, **kwargs)
         self.toposorted = False
         self.sorted_groups = []
 
-    def toposort(self) -> ODict[str, "Product"]:
+    def toposort(self) -> Dict[str, "Product"]:
         """Topologically sort the product index and return it.
 
         This mutates this object.
 
         Returns
         -------
-        OrderedDict[str, `Product`]
+        Dict[str, `Product`]
             Topologically sorted OrderedDict
         """
         dep_graph = {name: set(product.dependencies) for name, product in self.items()}
@@ -44,37 +40,30 @@ class ProductIndex(OrderedDict):
         self.toposorted = True
         return self
 
-    def flat_dependencies(self, product: "Product") -> List["Product"]:
-        """Return a flat list of dependencies for this product.
+    def flat_dependencies(self, product: "Product", resolved: Optional[Set["Product"]] = None) -> List["Product"]:
+        """Return and calculate the set of flat dependencies for this product.
 
         Parameters
         ----------
-        product_index : ordered index (from manifest)
+        product
+            The product we are calculating the flat dependencies for.
+        resolved
+            A set which holds dependencies which we have have previously
+            processed, and which we will add to as we process.
 
-
-            Returns:
-                list of `Product`s.
+        Returns
+        -------
+            A list of the resolved set of dependencies.
 
         """
-        resolved: Set[Product] = set()
-        self.flat_dependencies_recurse(resolved, product)
-        return list(resolved)
-
-    def flat_dependencies_recurse(self, resolved: Set["Product"], product: "Product"):
-        """Return a flat list of dependencies for this product.
-
-        Parameters
-        ----------
-        product_index : ordered index (from manifest)
-
-            Returns:
-                list of `Product`s.
-        """
+        if resolved is None:
+            resolved = set()
         for dependency_name in product.dependencies:
             dependency_product = self[dependency_name]
             if dependency_product not in resolved:
                 resolved.add(dependency_product)
-                self.flat_dependencies_recurse(resolved, dependency_product)
+                self.flat_dependencies(dependency_product, resolved)
+        return list(resolved)
 
 
 class Product:
