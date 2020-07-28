@@ -68,7 +68,7 @@ class ProductIndex(dict):
 
 
 class Product:
-    """Class representing an EUPS product to be built"""
+    """Class representing an EUPS product to be built."""
 
     def __init__(
         self,
@@ -77,40 +77,56 @@ class Product:
         version,
         dependencies: List[str],
         optional_dependencies: Optional[List[str]] = None,
-        treeish: str = None,
+        ref: Optional[Ref] = None,
     ):
         self.name = name
         self.sha1 = sha1
         self.version = version
         self.dependencies = dependencies
         self.optional_dependencies = optional_dependencies
-        self.treeish = treeish
+        self.ref = ref
 
 
 @dataclass
 class Ref:
-    """"""
+    """A Ref object includes information about a checked-out git ref.
 
-    treeish: str  # Short name (branch name or tag name)
+    This includes information about the type of reference (branch or tag)
+    and the unabbreviated object name.
+    """
+
     sha: str  # sha of the git object
-    ref: str  # full ref (e.g. ref/heads/<branch>, ref/tags/<tag>)
-    ref_type: str  # branch, tag, or head
+    name: str  # branch or tag name
+    ref_type: str  # branch, tag, or head (if unknown)
 
     HEAD_PREFIX = "refs/heads/"
     TAG_PREFIX = "refs/tags/"
 
     @staticmethod
-    def from_commit_and_ref(commit: str, ref: str) -> "Ref":
-        (remote_commit, remote_ref) = (commit, ref)
+    def from_commit_and_ref(sha: str, ref: str) -> Ref:
+        """Take in a commit sha and possibly an unabbreviated ref name.
+        If the ref name is unabbreviated, we will use that to determine the
+        ref type as well, and shorten it to the abbreviated form.
+
+        Parameters
+        ----------
+        sha
+            git commit sha
+        ref
+            name of a branch or tag - can be unabbreviated.
+
+        Returns
+        -------
+
+        """
         ref_type = "head"
-        treeish = remote_ref
-        if Ref.HEAD_PREFIX in remote_ref:
+        if Ref.HEAD_PREFIX in ref:
             ref_type = "branch"
-            treeish = remote_ref[len(Ref.HEAD_PREFIX) :]
-        elif Ref.TAG_PREFIX in remote_ref:
+            ref = ref[len(Ref.HEAD_PREFIX) :]
+        elif Ref.TAG_PREFIX in ref:
             ref_type = "tag"
-            treeish = remote_ref[len(Ref.HEAD_PREFIX) :]
-        return Ref(treeish=treeish, sha=remote_commit, ref=remote_ref, ref_type=ref_type)
+            ref = ref[len(Ref.HEAD_PREFIX) :]
+        return Ref(name=ref, sha=sha, ref_type=ref_type)
 
 
 class RepoSpec:

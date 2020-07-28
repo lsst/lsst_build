@@ -374,8 +374,13 @@ class ProductFetcher:
         # previous builds)
         await git.clean("-d", "-f", "-q", "-x")
 
-        target_ref = Ref.from_commit_and_ref(sha1, ref)
-        finish_msg = f"{product} ok [{target_ref.treeish}] ({time.time() - t0:.1f} sec)."
+        # Find out if we are in a branch or a tag (branches get precedence)
+        show_ref_output = await git("show-ref", "--heads")
+        heads = [i.split()[1] for i in show_ref_output.splitlines()]
+        is_branch = ref in [head[len(Ref.HEAD_PREFIX) :] for head in heads]
+        target_ref = Ref(name=ref, sha=sha1, ref_type="branch" if is_branch else "tag")
+
+        finish_msg = f"{product} ok [{target_ref.name}] ({time.time() - t0:.1f} sec)."
         print(f"{finish_msg:>80}", file=self.out)
         self.out.flush()
 
@@ -393,7 +398,7 @@ class ProductFetcher:
             optional_dependency_names = []
 
         product_obj = Product(product, target_ref.sha, None, dependency_names,
-                              optional_dependencies=optional_dependency_names, treeish=target_ref.treeish)
+                              optional_dependencies=optional_dependency_names, ref=target_ref)
         self.product_index[product] = product_obj
         return target_ref, dependency_names
 
@@ -402,8 +407,9 @@ class ProductFetcher:
         Raises RuntimeError if some have not been found."""
         matched_refs = {ref: 0 for ref in refs}
         for product in self.product_index.values():
-            if product.treeish in matched_refs:
-                matched_refs[product.treeish] += 1
+            assert product.ref is not None
+            if product.ref.name in matched_refs:
+                matched_refs[product.ref.name] += 1
 
         missed = [ref for ref in matched_refs if matched_refs[ref] == 0]
         if missed:
@@ -455,7 +461,7 @@ class ProductFetcher:
             sort_groups = self.product_index.sorted_groups
             for idx, group in enumerate(sort_groups):
                 for dependency in group:
-                    deps = " ".join(self.product_index[dependency].dependency_nodes)
+                    deps = " ".join(self.product_index[dependency].dependencies)
                     logger.debug(f"{(' ' * idx + dependency):<46} -> {deps}")
 
         self.validate_refs(refs)
@@ -520,10 +526,11 @@ class ProductFetcher:
         async def version_worker(queue):
             while True:
                 product = await queue.get()
+                assert product.ref is not None
                 try:
                     repo_dir = os.path.join(self.build_dir, product.name)
                     product.version = await self.version_db.version(
-                        product.name, repo_dir, product.treeish, product.dependency_nodes, self.product_index
+                        product.name, repo_dir, product.ref.name, product.dependencies, self.product_index
                     )
                     queue.task_done()
                 except Exception as e:
