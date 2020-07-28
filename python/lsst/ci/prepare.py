@@ -25,13 +25,12 @@ import copy
 from .eups import EupsModule
 
 from .git import Git, GitError
-from .models import Product, RepoSpec, ProductIndex, Ref
+from .models import Product, RepoSpec, ProductIndex, Ref, DEFAULT_BRANCH_NAME
 
 import logging
 logger = logging.getLogger("lsst.ci")
 
 ASYNC_QUEUE_WORKERS = 16
-MAIN_BRANCH_NAME = 'master'
 
 
 class RemoteError(Exception):
@@ -129,6 +128,7 @@ class Manifest:
         product_index.toposort()
         return Manifest(product_index, build_id)
 
+
 class ProductFetcher:
     """ Fetches products from remote git repositories and checks out matching refs.
 
@@ -211,8 +211,8 @@ class ProductFetcher:
             refs.append(repo_spec.ref)
 
         # Add main branch to list of refs, if not there already
-        if MAIN_BRANCH_NAME not in refs:
-            refs.append(MAIN_BRANCH_NAME)
+        if DEFAULT_BRANCH_NAME not in refs:
+            refs.append(DEFAULT_BRANCH_NAME)
 
         return refs
 

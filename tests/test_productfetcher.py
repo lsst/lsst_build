@@ -10,11 +10,10 @@ from unittest.mock import Mock
 sys.modules['eups'] = Mock()
 sys.modules['eups.tags'] = Mock()
 
+from lsst.ci.models import DEFAULT_BRANCH_NAME
 from lsst.ci.prepare import ProductFetcher, RemoteError, VersionDbHash  # NOQA
 from lsst.ci.git import GitError # NOQA
 import lsst.ci.git # NOQA
-
-MAIN_BRANCH_NAME = 'master'
 
 
 @pytest.fixture
@@ -40,7 +39,7 @@ def test_product():
 
 def test_fetch(tmpdir, repos_yaml_good, test_product):
     """Clone git repo from a valid repos.yaml"""
-    refs = [MAIN_BRANCH_NAME]
+    refs = [DEFAULT_BRANCH_NAME]
     product_fetcher = ProductFetcher(
         tmpdir,
         repos_yaml_good,
@@ -56,7 +55,7 @@ def test_fetch(tmpdir, repos_yaml_good, test_product):
 
 def test_fetch_bad_remote(tmpdir, repos_yaml_bad, test_product):
     """Fail to clone when there isn't a valid remote in repos.yaml"""
-    refs = [MAIN_BRANCH_NAME]
+    refs = [DEFAULT_BRANCH_NAME]
     product_fetcher = ProductFetcher(
         tmpdir,
         repos_yaml_bad,
@@ -72,7 +71,7 @@ def test_fetch_bad_remote(tmpdir, repos_yaml_bad, test_product):
 
 def test_fetch_bad_git_checkout(tmpdir, repos_yaml_good, mocker, test_product):
     """Fail when git command errors on top of an existing clone"""
-    refs = [MAIN_BRANCH_NAME]
+    refs = [DEFAULT_BRANCH_NAME]
     product_fetcher = ProductFetcher(
         tmpdir,
         repos_yaml_good,
@@ -99,7 +98,7 @@ def test_fetch_bad_git_checkout(tmpdir, repos_yaml_good, mocker, test_product):
 def test_fetch_bad_remote_retry(tmpdir, repos_yaml_bad, mocker, test_product):
     """Verify that cloning is retried when upon failure"""
     tries = 3
-    refs = [MAIN_BRANCH_NAME]
+    refs = [DEFAULT_BRANCH_NAME]
     product_fetcher = ProductFetcher(
         tmpdir,
         repos_yaml_bad,
@@ -125,7 +124,7 @@ def test_fetch_bad_remote_retry(tmpdir, repos_yaml_bad, mocker, test_product):
 def test_fetch_bad_git_checkout_retry(tmpdir, repos_yaml_good, mocker, test_product):
     """Verify that repo is recloned after checkout on an existing clone fails"""
     tries = 3
-    refs = [MAIN_BRANCH_NAME]
+    refs = [DEFAULT_BRANCH_NAME]
 
     product_fetcher = ProductFetcher(
         tmpdir,
@@ -162,7 +161,7 @@ def test_fetch_bad_git_checkout_retry(tmpdir, repos_yaml_good, mocker, test_prod
 
 def test_fetch_products(tmpdir, repos_yaml_good, test_product):
     """Clone git repo from a valid repos.yaml"""
-    refs = [MAIN_BRANCH_NAME]
+    refs = [DEFAULT_BRANCH_NAME]
     product_fetcher = ProductFetcher(
         tmpdir,
         repos_yaml_good,

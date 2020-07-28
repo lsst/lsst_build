@@ -4,6 +4,8 @@ from typing import List, Set, Optional, Dict
 
 from lsst.ci import tsort
 
+DEFAULT_BRANCH_NAME = "master"
+
 
 class ProductIndex(dict):
     """
@@ -67,24 +69,18 @@ class ProductIndex(dict):
         return list(resolved)
 
 
+@dataclass
 class Product:
     """Class representing an EUPS product to be built."""
 
-    def __init__(
-        self,
-        name: str,
-        sha1: str,
-        version,
-        dependencies: List[str],
-        optional_dependencies: Optional[List[str]] = None,
-        ref: Optional[Ref] = None,
-    ):
-        self.name = name
-        self.sha1 = sha1
-        self.version = version
-        self.dependencies = dependencies
-        self.optional_dependencies = optional_dependencies
-        self.ref = ref
+    name: str  # The name of the product
+    sha1: str  # The sha1 of the product
+    version: str  # The version of the product (from VersionDb)
+    dependencies: List[str]  # A list of declared dependencies
+    # A list of optional dependencies
+    optional_dependencies: Optional[List[str]] = None
+    # used in prepare for additional information on what was checked out
+    ref: Optional[Ref] = None
 
 
 @dataclass
@@ -129,14 +125,14 @@ class Ref:
         return Ref(name=ref, sha=sha, ref_type=ref_type)
 
 
+@dataclass
 class RepoSpec:
     """Represents a git repo specification in repos.yaml. """
 
-    def __init__(self, product: str, url: str, ref: str = "master", lfs: bool = False):
-        self.product = product
-        self.url = url
-        self.ref = ref
-        self.lfs = lfs
+    product: str
+    url: str
+    ref: str = DEFAULT_BRANCH_NAME
+    lfs: bool = False
 
     def __str__(self):
         return self.url
