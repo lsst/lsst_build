@@ -216,17 +216,18 @@ class ProductFetcher:
 
         return refs
 
-    async def fetch(self, product: str, refs: List[str]):
-        """ Clone the product repository and checkout the first matching ref.
+    async def fetch(self, product: str, refs: List[str]) -> Tuple[Ref, List[str]]:
+        """Clone the product repository and checkout the first matching ref.
 
         Args:
             product (str): the product to fetch
+            refs (List[str]): List of user-specified refs to check out
 
         Returns:
-            (ref, sha1) tuple where::
+            (ref, dependencies) tuple where::
 
-                 ref -- the checked out ref (e.g., 'master')
-                 sha1 -- the corresponding commit's SHA1
+                 ref -- A `Ref` object for checked out ref (e.g., 'master')
+                 dependencies -- list of declared dependencies for the product
 
         If $build_dir/$product does not exist, discovers the product
         repository by attempting a git clone from the list of URLs
@@ -234,8 +235,8 @@ class ProductFetcher:
         on self.repository_patterns. Otherwise, intelligently fetches
         any new commits.
 
-        Next, attempts to check out the refs listed in self.ref,
-        until the first one succeeds.
+        Next, attempts to check out the refs listed in `refs`, along with the
+        default branch for the repo, until the first one succeeds.
 
         """
 
@@ -445,11 +446,9 @@ class ProductFetcher:
         Parameters
         ----------
         products
+            List of top-level products we will checkout.
         refs
-
-        Returns
-        -------
-
+            List of refs the user specified.
         """
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.fetch_products(products, refs))
@@ -515,10 +514,11 @@ class ProductFetcher:
         return resolved
 
     async def resolve_versions(self):
-        """
-        Resolve product versions.
+        """Resolve product versions.
 
-        We do this after everything is fetched so we can use flat dependencies
+        We do not typically know the git shas of a product's dependencies at
+        fetch time, so we wait until we've built the product index to
+        resolve versions.
         """
         logger.debug("Resolving product versions")
         exceptions = []
@@ -551,9 +551,12 @@ class ProductFetcher:
             raise first_exception
 
     async def lfs_checkout(self):
-        """
-        Parallel LFS checkout
-        We do this after everything is fetched so we can use flat dependencies
+        """Perform parallel LFS checkout on LFS repos.
+
+        This is performed after the git repos are fetched so we can process
+        dependency files (e.g. eups Table files) more quickly, and it also
+        let's us perform git-lfs pulls in parallel, for better utilization
+        on fast connections.
         """
         print("Performing git-lfs pulls...", file=self.out)
         exceptions = []

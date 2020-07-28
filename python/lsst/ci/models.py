@@ -77,15 +77,29 @@ class ProductIndex(dict):
 
 @dataclass
 class Product:
-    """Class representing an EUPS product to be built."""
+    """Class representing an EUPS product to be built.
 
-    name: str  # The name of the product
-    sha1: str  # The sha1 of the product
-    version: str  # The version of the product (from VersionDb)
-    dependencies: List[str]  # A list of declared dependencies
-    # A list of optional dependencies
+    Parameters
+    ----------
+    name
+        The name of the product
+    sha1
+        The sha1 of the product
+    version
+        The version of the product (from VersionDb)
+    dependencies
+        A list of declared dependencies
+    optional_dependencies
+        A list of optional declared dependencies
+    ref
+        Used in prepare for additional information on what was checked out
+    """
+
+    name: str
+    sha1: str
+    version: str
+    dependencies: List[str]
     optional_dependencies: Optional[List[str]] = None
-    # used in prepare for additional information on what was checked out
     ref: Optional[Ref] = None
 
 
@@ -95,11 +109,20 @@ class Ref:
 
     This includes information about the type of reference (branch or tag)
     and the unabbreviated object name.
+
+    Parameters
+    ----------
+    sha
+        sha of the git object
+    name
+        branch or tag name
+    ref_type
+        type of ref - branch, tag, or head (if unknown)
     """
 
-    sha: str  # sha of the git object
-    name: str  # branch or tag name
-    ref_type: str  # branch, tag, or head (if unknown)
+    sha: str
+    name: str
+    ref_type: str
 
     HEAD_PREFIX = "refs/heads/"
     TAG_PREFIX = "refs/tags/"
@@ -119,7 +142,7 @@ class Ref:
 
         Returns
         -------
-
+            A new Ref object
         """
         ref_type = "head"
         if Ref.HEAD_PREFIX in ref:
@@ -133,7 +156,17 @@ class Ref:
 
 @dataclass
 class RepoSpec:
-    """Represents a git repo specification in repos.yaml. """
+    """Represents a git repo specification in repos.yaml.
+
+    Parameters
+    ----------
+    product
+        name of the product
+    url
+        git remote url for the repo
+    ref
+        the default ref for this branch, if a user-specified ref is not found
+    """
 
     product: str
     url: str
