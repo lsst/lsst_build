@@ -1,5 +1,6 @@
 #############################################################################
 # Preparer
+from __future__ import annotations
 import asyncio
 from io import open
 
@@ -21,7 +22,6 @@ import abc
 import yaml
 import copy
 
-from . import tsort
 from .eups import EupsModule
 
 from .git import Git, GitError
@@ -70,7 +70,7 @@ class Manifest:
         """Construct the manifest
 
         Args:
-            product_index (OrderedDict): A topologically sorted dict of `Product`s
+            product_index (ProductIndex): A topologically sorted dict of `Product`s
             build_id (str): A unique identifier for this build
 
         """
@@ -149,7 +149,7 @@ class ProductFetcher:
                  repos: str,
                  repository_patterns: Optional[str] = None,
                  dependency_module: Optional[EupsModule] = None,
-                 version_db: Optional["VersionDb"] = None,
+                 version_db: Optional[VersionDb] = None,
                  no_fetch: bool = False,
                  out=sys.stdout,
                  tries=1):
@@ -455,7 +455,7 @@ class ProductFetcher:
             sort_groups = self.product_index.sorted_groups
             for idx, group in enumerate(sort_groups):
                 for dependency in group:
-                    deps = " ".join(self.product_index[dependency].dependencies)
+                    deps = " ".join(self.product_index[dependency].dependency_nodes)
                     logger.debug(f"{(' ' * idx + dependency):<46} -> {deps}")
 
         self.validate_refs(refs)
@@ -523,7 +523,7 @@ class ProductFetcher:
                 try:
                     repo_dir = os.path.join(self.build_dir, product.name)
                     product.version = await self.version_db.version(
-                        product.name, repo_dir, product.treeish, product.dependencies, self.product_index
+                        product.name, repo_dir, product.treeish, product.dependency_nodes, self.product_index
                     )
                     queue.task_done()
                 except Exception as e:

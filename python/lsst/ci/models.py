@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Set, Optional, Dict
 
@@ -17,15 +18,15 @@ class ProductIndex(dict):
         self.toposorted = False
         self.sorted_groups = []
 
-    def toposort(self) -> Dict[str, "Product"]:
+    def toposort(self) -> Dict[str, Product]:
         """Topologically sort the product index and return it.
 
-        This mutates this object.
+        This mutates this object, and it returns itself for convenience.
 
         Returns
         -------
-        Dict[str, `Product`]
-            Topologically sorted OrderedDict
+        Dict[str, Product]
+            Topologically sorted Dict (self)
         """
         dep_graph = {name: set(product.dependencies) for name, product in self.items()}
         topo_sorted_product_lists = tsort.toposort_mapping(dep_graph)
@@ -40,7 +41,7 @@ class ProductIndex(dict):
         self.toposorted = True
         return self
 
-    def flat_dependencies(self, product: "Product", resolved: Optional[Set["Product"]] = None) -> List["Product"]:
+    def flat_dependencies(self, product: Product, resolved: Optional[Set[Product]] = None) -> List[Product]:
         """Return and calculate the set of flat dependencies for this product.
 
         Parameters
