@@ -43,6 +43,19 @@ def toposort(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
     Each list that is yielded is, by definition, independent of the other
     items in that list, which means each list may be processed in any order
     (or in parallel).
+
+    see http://en.wikipedia.org/wiki/Topological_sorting
+
+    Parameters
+    ----------
+    graph_set
+        A dependency graph dictionary, with names associated to the set of
+        dependencies of a product.
+
+    Returns
+    -------
+        An iterator which produces lists of dependencies in a bottom-up
+        topological sort
     """
     all_dependencies = set()
     self_including_nodes = []
@@ -86,6 +99,16 @@ def toposort_dfs(graph: Mapping[str, Set[str]]) -> List[str]:
 
     In practical terms, this may be useful in producing builds that build
     products with more dependencies earlier in the build cycle.
+
+    Parameters
+    ----------
+    graph_set
+        A dependency graph dictionary, with names associated to the set of
+        dependencies of a product.
+
+    Returns
+    -------
+        bottom-up topologically sorted list of products
     """
 
     class Node:
