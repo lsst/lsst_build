@@ -29,7 +29,7 @@ class ProductIndex(dict):
             Topologically sorted Dict (self)
         """
         dep_graph = {name: set(product.dependencies) for name, product in self.items()}
-        topo_sorted_product_lists = tsort.toposort_mapping(dep_graph)
+        topo_sorted_product_lists = tsort.toposort(dep_graph)
         ordered_product_list = []
         for group_idx, sort_group in enumerate(topo_sorted_product_lists):
             self.sorted_groups.append(sort_group)

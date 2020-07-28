@@ -30,27 +30,7 @@ def to_dep_graph(edges: Iterable[Tuple[str, Optional[str]]]) -> Dict[str, Set[st
     return graph
 
 
-def toposort(edges: Iterable[Tuple[str, Optional[str]]]) -> Iterator[List[str]]:
-    """Topologically sort an iterable collection of (node, dependency) pairs
-    with Kahn's algorithm, returning an iterator of ordered dependency lists.
-
-    The items in each list can be processed in any order.
-
-    See `topsort_mapping` for more details about the sort.
-    """
-    return toposort_mapping(to_dep_graph(edges))
-
-
-def toposort_dfs(edges: Iterable[Tuple[str, Optional[str]]]) -> List[str]:
-    """Topologicall sort an interable collection of (node, dependency) pairs
-    using a depth-first search, returning the list.
-
-    See `toposort_dfs_mapping` for details about the sort.
-    """
-    return toposort_dfs_mapping(to_dep_graph(edges))
-
-
-def toposort_mapping(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
+def toposort(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
     """Perform a topological sort based on Kahn's algorithm.
 
     This function produces an iterator of topologically sorted dependency
@@ -93,7 +73,7 @@ def toposort_mapping(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
         raise GraphError(f"Cycle among nodes: {remaining_nodes}")
 
 
-def toposort_dfs_mapping(graph: Mapping[str, Set[str]]) -> List[str]:
+def toposort_dfs(graph: Mapping[str, Set[str]]) -> List[str]:
     """Perform a depth-first search topological sort on the mapping of
     dependencies and return an ordered list.
 
