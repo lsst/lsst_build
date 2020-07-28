@@ -8,14 +8,11 @@ DEFAULT_BRANCH_NAME = "master"
 
 
 class ProductIndex(dict):
-    """
-    Container class for a product index with index-related operations.
+    """Container class for a product index with index-related operations,
+    such as topological sorting.
     """
 
     def __init__(self, *args, **kwargs):
-        """Create a new product index object.
-
-        """
         super().__init__(*args, **kwargs)
         self.toposorted = False
         self.sorted_groups = []
@@ -23,13 +20,16 @@ class ProductIndex(dict):
     def toposort(self) -> Dict[str, Product]:
         """Topologically sort the product index and return it.
 
-        This mutates this object, and it returns itself for convenience.
+        This mutates this object if it is not already sorted, and it returns
+        itself for convenience.
 
         Returns
         -------
         Dict[str, Product]
             Topologically sorted Dict (self)
         """
+        if self.toposorted:
+            return self
         dep_graph = {name: set(product.dependencies) for name, product in self.items()}
         topo_sorted_product_lists = tsort.toposort(dep_graph)
         ordered_product_list = []
@@ -67,6 +67,12 @@ class ProductIndex(dict):
                 resolved.add(dependency_product)
                 self.flat_dependencies(dependency_product, resolved)
         return list(resolved)
+
+    def __setitem__(self, key, value):
+        # invalidate the toposort if an item is set
+        self.toposorted = False
+        self.sorted_groups = []
+        super(ProductIndex, self).__setitem__(key, value)
 
 
 @dataclass
