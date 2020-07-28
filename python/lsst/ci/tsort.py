@@ -6,8 +6,20 @@ class GraphError(Exception):
 
 
 def to_dep_graph(edges: Iterable[Tuple[str, Optional[str]]]) -> Dict[str, Set[str]]:
-    """Takes an iterable collection of (object, dependency) pairs and returns
-    as a graph set"""
+    """Take an iterable collection of (node, dependency) pairs and return
+    a mapping of nodes to the set of dependencies for that node.
+
+    Parameters
+    ----------
+    edges
+        An iterable of tuples of (node, dependency). If the dependency
+        is None or an empty string, a node will be added.
+
+    Returns
+    -------
+        The values in the graph dictionary associated as name to the set of
+        dependencies.
+    """
     graph = {}
     for node, dep in edges:
         node_set = graph.setdefault(node, set())
@@ -18,25 +30,39 @@ def to_dep_graph(edges: Iterable[Tuple[str, Optional[str]]]) -> Dict[str, Set[st
     return graph
 
 
-def toposort(edges: Iterable[Tuple[str, Optional[str]]]) -> Iterator[List]:
-    """Takes an iterable collection of (object, dependency) pairs
-    and returns an iterator of ordered dependency lists.
+def toposort(edges: Iterable[Tuple[str, Optional[str]]]) -> Iterator[List[str]]:
+    """Topologically sort an iterable collection of (node, dependency) pairs
+    with Kahn's algorithm, returning an iterator of ordered dependency lists.
+
     The items in each list can be processed in any order.
+
+    See `topsort_mapping` for more details about the sort.
     """
     return toposort_mapping(to_dep_graph(edges))
 
 
 def toposort_dfs(edges: Iterable[Tuple[str, Optional[str]]]) -> List[str]:
-    """Takes an iterable collection of (object, dependency) pairs
-    and returns an list of ordered dependencies.
+    """Topologicall sort an interable collection of (node, dependency) pairs
+    using a depth-first search, returning the list.
+
+    See `toposort_dfs_mapping` for details about the sort.
     """
     return toposort_dfs_mapping(to_dep_graph(edges))
 
 
 def toposort_mapping(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
-    """Returns an iterator of ordered dependency lists from a
-    graph dictionary.
-    The items in each list can be processed in any order.
+    """Perform a topological sort based on Kahn's algorithm.
+
+    This function produces an iterator of topologically sorted dependency
+    lists from a graph dictionary.
+
+    This algorithm sorts by removing childless nodes first, adds them to a
+    list which it will sort and yield, and removes references to the nodes
+    which were removed from the remaining dependency in the graph dictionary.
+
+    Each list that is yielded is, by definition, independent of the other
+    items in that list, which means each list may be processed in any order
+    (or in parallel).
     """
     all_dependencies = set()
     self_including_nodes = []
@@ -68,8 +94,18 @@ def toposort_mapping(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
 
 
 def toposort_dfs_mapping(graph: Mapping[str, Set[str]]) -> List[str]:
-    """Topological sort - Depth-first search.
-    The results are already flattened
+    """Perform a depth-first search topological sort on the mapping of
+    dependencies and return an ordered list.
+
+    This uses a postorder tree-traversal in sorted order of
+    the child nodes.
+
+    Compared to the flattened version of toposort_mapping output, this
+    sort produces a list of dependencies which will go deeper, faster,
+    on the sorted list of dependencies for a product.
+
+    In practical terms, this may be useful in producing builds that build
+    products with more dependencies earlier in the build cycle.
     """
 
     class Node:
@@ -94,7 +130,7 @@ def toposort_dfs_mapping(graph: Mapping[str, Set[str]]) -> List[str]:
             except GraphError as e:
                 # unroll cycle
                 raise GraphError(e.args[0] + f" <- {n.name}")
-        n.proccessing = False
+        n.processing = False
         n.processed = True
         sorted_node_names.append(n.name)
 
@@ -104,7 +140,12 @@ def toposort_dfs_mapping(graph: Mapping[str, Set[str]]) -> List[str]:
 
 
 def flatten(dependency_lists: Iterable[List]) -> List[str]:
-    """Flattens an iterable collection of dependency lists for serial processing"""
+    """Flatten an iterable collection of dependency lists for serial
+    processing.
+
+    `toposort` returns an iterable of lists, this is a convenience function
+    to flatten the list for serial processing.
+    """
     flattened = []
     for sorted_list in dependency_lists:
         flattened.extend(sorted_list)
