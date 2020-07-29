@@ -148,7 +148,7 @@ class Builder:
 
         # construct the tags file with exact dependencies
         setups = ["\t%-20s %s" % (dep.name, dep.version)
-                  for dep in self.manifest.products.flat_dependencies(product)]
+                  for dep in self.manifest.product_index.flat_dependencies(product)]
 
         # create the buildscript
         with open(buildscript, 'w', encoding='utf-8') as fp:
@@ -257,7 +257,7 @@ class Builder:
             declare_eups_tag(self.manifest.build_id, self.eups)
 
         # Build all products
-        for product in self.manifest.products.values():
+        for product in self.manifest.product_index.values():
             if not self._build_product_if_needed(product):
                 self.failed_at = product
                 return False

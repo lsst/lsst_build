@@ -1,5 +1,3 @@
-#############################################################################
-# Preparer
 from __future__ import annotations
 import asyncio
 from io import open
@@ -61,26 +59,23 @@ class RemoteError(Exception):
 class Manifest:
     """A representation of topologically ordered list of EUPS products to be built
 
-       :ivar product_index: topologically sorted list of `Product`s
-       :ivar build_id:  unique build identifier
+    Parameters
+    ----------
+    product_index
+        A topologically sorted dict of `Product`s
+    build_id
+        A unique identifier for this build
     """
 
     def __init__(self, product_index: ProductIndex, build_id: Optional[str] = None):
-        """Construct the manifest
-
-        Args:
-            product_index (ProductIndex): A topologically sorted dict of `Product`s
-            build_id (str): A unique identifier for this build
-
-        """
         self.build_id = build_id
-        self.products = product_index
+        self.product_index = product_index
 
     def to_file(self, file_object):
         """ Serialize the manifest to a file object """
         print(u'# %-23s %-41s %-30s' % ("product", "SHA1", "Version"), file=file_object)
         print(u'BUILD=%s' % self.build_id, file=file_object)
-        for prod in self.products.values():
+        for prod in self.product_index.values():
             print(u'%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version,
                                              ','.join(dep for dep in prod.dependencies)),
                   file=file_object)
@@ -88,7 +83,7 @@ class Manifest:
     def content_hash(self):
         """ Return a hash of the manifest, based on the products it contains. """
         m = hashlib.sha1()
-        for prod in self.products.values():
+        for prod in self.product_index.values():
             s = '%s\t%s\t%s\n' % (prod.name, prod.sha1, prod.version)
             m.update(s.encode("ascii"))
 
@@ -130,19 +125,29 @@ class Manifest:
 
 
 class ProductFetcher:
-    """ Fetches products from remote git repositories and checks out matching refs.
+    """Fetches products from remote git repositories and checks out matching refs.
 
-        See `fetch` for further documentation.
+    See `fetch` for further documentation.
 
-        :ivar build_dir: The product will be cloned to build_dir/product_name
-        :ivar repos: The path to the repos.yaml file
-        :ivar repository_patterns: A list of str.format() patterns used discover the URL of the remote git
-              repository.
-        :ivar dependency_module: A module to help with eups-related operations.
-        :ivar version_db: VersionDb implementation
-        :ivar no_fetch: If true, don't fetch, just checkout the first matching ref.
-        :ivar out: FD which to send console output.
-        :ivar tries: The number of times to attempt to 'fetch' a product.
+    Parameters
+    ----------
+    build_dir
+        The root for product repos. Products are cloned in this directory.
+    repos
+        The path to the repos.yaml file
+    repository_patterns
+        A list of str.format() patterns used discover the URL of the remote
+        git repository.
+    dependency_module
+        A module to help with eups-related operations.
+    version_db
+        VersionDb implementation
+    no_fetch
+        If true, don't fetch, just checkout the first matching ref.
+    out
+        FD which to send console output.
+    tries
+        The number of times to attempt to 'fetch' a product.
     """
     def __init__(self,
                  build_dir: Optional[str],
@@ -189,7 +194,7 @@ class ProductFetcher:
             self.repo_specs[product] = rs
 
     def _origin_candidates(self, product):
-        """ Expand repository_patterns into URLs. """
+        """Expand repository_patterns into URLs."""
         data = {'product': product}
         locations = []
         repo_spec = self.repo_specs[product]
@@ -201,7 +206,7 @@ class ProductFetcher:
         return locations
 
     def ref_candidates(self, repo_spec: RepoSpec, refs: List[str]) -> List[str]:
-        """ Generate a list of refs to attempt to checkout. """
+        """Generate a list of refs to attempt to checkout."""
 
         # ref precedence should be:
         # user specified refs > repos.yaml default ref > implicit master
@@ -219,25 +224,28 @@ class ProductFetcher:
     async def fetch(self, product: str, refs: List[str]) -> Tuple[Ref, List[str]]:
         """Clone the product repository and checkout the first matching ref.
 
-        Args:
-            product (str): the product to fetch
-            refs (List[str]): List of user-specified refs to check out
-
-        Returns:
-            (ref, dependencies) tuple where::
-
-                 ref -- A `Ref` object for checked out ref (e.g., 'master')
-                 dependencies -- list of declared dependencies for the product
-
-        If $build_dir/$product does not exist, discovers the product
+        If `self.build_dir`/`product` does not exist, discover the product
         repository by attempting a git clone from the list of URLs
-        constructed by running str.format() with { 'product': product}
-        on self.repository_patterns. Otherwise, intelligently fetches
+        constructed by running str.format() with { 'product': `product` }
+        on self.repository_patterns. Otherwise, intelligently fetch
         any new commits.
 
-        Next, attempts to check out the refs listed in `refs`, along with the
-        default branch for the repo, until the first one succeeds.
+        Following this, attempt to check out the refs listed in `refs`, along
+        with the default branch for the repo, until the first one succeeds.
 
+        Parameters
+        ----------
+        product
+            the product to fetch
+        refs
+            the list of user-specified refs to check out
+
+        Returns
+        -------
+        ref
+            A `Ref` object describing the checked out ref (e.g., 'master')
+        dependencies
+            list of declared dependencies for the product
         """
 
         # do not handle exceptions unless there will be multiple tries
@@ -423,8 +431,9 @@ class ProductFetcher:
         Parameters
         ----------
         worker_function
+            A worker function is returns a task, taking `queue` as a parameter
         queue
-
+            The parameter for the worker function to be instantiated.
         """
         tasks = []
         for i in range(ASYNC_QUEUE_WORKERS):
@@ -484,7 +493,6 @@ class ProductFetcher:
                     queue.task_done()
                     continue
                 try:
-                    # ref, dependencies = await self.fetch_ref_and_dependency_names(product_name, refs)
                     ref, dependencies = await self.fetch(product_name, refs)
                     for dependency_name in dependencies:
                         if dependency_name not in resolved and dependency_name not in queued:

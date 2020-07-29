@@ -92,7 +92,8 @@ class Product:
     optional_dependencies
         A list of optional declared dependencies
     ref
-        Used in prepare for additional information on what was checked out
+        Information about `Ref` checked out in `prepare`. This parameter is
+        available during the `prepare` phase.
     """
 
     name: str
@@ -105,10 +106,10 @@ class Product:
 
 @dataclass
 class Ref:
-    """A Ref object includes information about a checked-out git ref.
+    """Represents a git reference, colloquially referred as a "ref" in git
+    (e.g. `git show-ref`).
 
-    This includes information about the type of reference (branch or tag)
-    and the unabbreviated object name.
+    See https://git-scm.com/book/en/v2/Git-Internals-Git-References
 
     Parameters
     ----------
@@ -165,7 +166,8 @@ class RepoSpec:
     url
         git remote url for the repo
     ref
-        the default ref for this branch, if a user-specified ref is not found
+        default ref name for this branch. This is the fallback used when a
+        user-specified ref name is not found for the represented repo.
     """
 
     product: str
