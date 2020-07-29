@@ -6,10 +6,10 @@ import os
 import os.path
 import sys
 
-from typing import Dict, Optional, List, Callable, Set, Tuple
+from typing import Dict, Optional, List, Callable, Set, Tuple, Awaitable
 
-import eups
-import eups.tags
+import eups  # type: ignore
+import eups.tags  # type: ignore
 import hashlib
 import shutil
 import time
@@ -158,10 +158,9 @@ class ProductFetcher:
                  no_fetch: bool = False,
                  out=sys.stdout,
                  tries=1):
-
-        self.build_dir = os.path.abspath(build_dir)
+        self.build_dir = os.path.abspath(build_dir) if build_dir else None
         if repository_patterns:
-            self.repository_patterns = repository_patterns.split('|')
+            self.repository_patterns: Optional[List[str]] = repository_patterns.split('|')
         else:
             self.repository_patterns = None
         self.no_fetch = no_fetch
@@ -178,7 +177,7 @@ class ProductFetcher:
         self.dependency_module = dependency_module
         self.version_db = version_db
         self.product_index = ProductIndex()
-        self.lfs_product_names = []
+        self.lfs_product_names: List[str] = []
 
         self.repo_specs: Dict[str, RepoSpec] = {}
         for product, spec in self.repos.items():
@@ -256,6 +255,7 @@ class ProductFetcher:
                 print('<error>', file=self.out)
                 print(e, file=self.out)
                 # ensure retry is starting from a clean slate
+                assert self.build_dir is not None
                 productdir = os.path.join(self.build_dir, product)
                 if os.path.exists(productdir):
                     shutil.rmtree(productdir)
@@ -277,6 +277,7 @@ class ProductFetcher:
         print("Fetching %s..." % product, file=self.out)
         self.out.flush()
 
+        assert self.build_dir is not None
         productdir = os.path.join(self.build_dir, product)
         git = Git(productdir)
 
@@ -425,7 +426,9 @@ class ProductFetcher:
             raise RuntimeError("Did not checkout any products with the following refs:"
                                " {}".format(",".join(missed)))
 
-    async def run_async_tasks(self, worker_function: Callable, queue: asyncio.Queue):
+    async def run_async_tasks(
+            self, worker_function: Callable[[asyncio.Queue], Awaitable[None]], queue: asyncio.Queue
+    ):
         """Instantiate async worker tasks and process a queue.
 
         Parameters
@@ -508,7 +511,7 @@ class ProductFetcher:
                     queue.task_done()
                     continue
 
-        queue = asyncio.Queue()
+        queue = asyncio.Queue()  # type: ignore
 
         for product_name in product_names:
             queue.put_nowait((product_name, refs))
@@ -536,6 +539,8 @@ class ProductFetcher:
                 product = await queue.get()
                 assert product.ref is not None
                 try:
+                    assert self.build_dir is not None
+                    assert self.version_db is not None
                     repo_dir = os.path.join(self.build_dir, product.name)
                     product.version = await self.version_db.version(
                         product.name, repo_dir, product.ref.name, product.dependencies, self.product_index
@@ -575,6 +580,7 @@ class ProductFetcher:
                 try:
                     print(f"Pulling {lfs_product_name} LFS data...")
                     t0 = time.time()
+                    assert self.build_dir is not None
                     repo_dir = os.path.join(self.build_dir, lfs_product_name)
                     git = Git(repo_dir)
                     await git.lfs("pull")

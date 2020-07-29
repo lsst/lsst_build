@@ -20,7 +20,7 @@ def to_dep_graph(edges: Iterable[Tuple[str, Optional[str]]]) -> Dict[str, Set[st
         The values in the graph dictionary associated as name to the set of
         dependencies.
     """
-    graph = {}
+    graph: Dict[str, Set] = {}
     for node, dep in edges:
         node_set = graph.setdefault(node, set())
         if dep:  # has an edge
@@ -57,7 +57,7 @@ def toposort(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
         An iterator which produces lists of dependencies in a bottom-up
         topological sort
     """
-    all_dependencies = set()
+    all_dependencies: Set[str] = set()
     self_including_nodes = []
     for node, dependencies in graph_set.items():
         if node in dependencies:
@@ -82,8 +82,8 @@ def toposort(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
                 more_nodes[node] = dependencies - childless_nodes
         remaining_nodes = more_nodes
     if remaining_nodes:
-        remaining_nodes = sorted(remaining_nodes)
-        raise GraphError(f"Cycle among nodes: {remaining_nodes}")
+        remaining_nodes_list = sorted(remaining_nodes)
+        raise GraphError(f"Cycle among nodes: {remaining_nodes_list}")
 
 
 def toposort_dfs(graph: Mapping[str, Set[str]]) -> List[str]:

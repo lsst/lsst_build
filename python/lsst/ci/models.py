@@ -43,7 +43,7 @@ class ProductIndex(dict):
         self.toposorted = True
         return self
 
-    def flat_dependencies(self, product: Product, resolved: Optional[Set[Product]] = None) -> List[Product]:
+    def flat_dependencies(self, product: Product, resolved: Optional[Set[str]] = None) -> List[Product]:
         """Return and calculate the set of flat dependencies for this product.
 
         Parameters
@@ -51,7 +51,7 @@ class ProductIndex(dict):
         product
             The product we are calculating the flat dependencies for.
         resolved
-            A set which holds dependencies which we have have previously
+            A set which holds dependency names which we have have previously
             processed, and which we will add to as we process.
 
         Returns
@@ -62,11 +62,11 @@ class ProductIndex(dict):
         if resolved is None:
             resolved = set()
         for dependency_name in product.dependencies:
-            dependency_product = self[dependency_name]
-            if dependency_product not in resolved:
-                resolved.add(dependency_product)
+            dependency_product: Product = self[dependency_name]
+            if dependency_product.name not in resolved:
+                resolved.add(dependency_product.name)
                 self.flat_dependencies(dependency_product, resolved)
-        return list(resolved)
+        return list(self[resolved_name] for resolved_name in resolved)
 
     def __setitem__(self, key, value):
         # invalidate the toposort if an item is set
@@ -98,7 +98,7 @@ class Product:
 
     name: str
     sha1: str
-    version: str
+    version: Optional[str]
     dependencies: List[str]
     optional_dependencies: Optional[List[str]] = None
     ref: Optional[Ref] = None

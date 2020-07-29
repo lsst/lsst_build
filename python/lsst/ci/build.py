@@ -1,5 +1,6 @@
 #############################################################################
 # Builder
+from typing import List
 
 from io import open
 import eups
@@ -125,12 +126,12 @@ class Builder:
 
        The result is tagged with the `Manifest`s build ID, if any.
     """
-    def __init__(self, build_dir, manifest, progress, eups):
+    def __init__(self, build_dir, manifest: Manifest, progress, eups):
         self.build_dir = build_dir
         self.manifest = manifest
         self.progress = progress
         self.eups = eups
-        self.built = []
+        self.built: List[models.Product] = []
         self.failed_at = None
 
     def _tag_product(self, name, version, tag):

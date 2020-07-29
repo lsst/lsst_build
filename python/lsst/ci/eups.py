@@ -4,8 +4,8 @@ from typing import List
 
 import re
 
-import eups
-import eups.tags
+import eups  # type: ignore
+import eups.tags  # type: ignore
 
 from lsst.ci.git import Git
 
