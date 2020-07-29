@@ -2,7 +2,6 @@
 # Builder
 from typing import List
 
-from io import open
 import eups
 
 import subprocess

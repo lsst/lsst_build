@@ -1,6 +1,5 @@
 from __future__ import annotations
 import asyncio
-from io import open
 
 import os
 import os.path
