@@ -729,7 +729,6 @@ class VersionDbGit(VersionDbHash):
         super(VersionDbGit, self).__init__(sha_abbrev_len, eups_obj)
         self.dbdir = dbdir
         self.eups = eups_obj
-        self.version_maps = dict()
 
     def __shafn(self):
         return os.path.join("manifests", 'content_sha.db.txt')
@@ -768,11 +767,6 @@ class VersionDbGit(VersionDbHash):
 
         manifest_sha = manifest.content_hash()
         manifest.build_id = self.__get_build_id(manifest_sha) if build_id is None else build_id
-
-        # Write files
-        for (product_name, vm) in self.version_maps.items():
-            if not vm.dirty:
-                continue
 
         # Store a copy of the manifest
         manfn = os.path.join('manifests', "%s.txt" % manifest.build_id)
