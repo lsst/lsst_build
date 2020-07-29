@@ -22,7 +22,7 @@ import copy
 from .eups import EupsModule
 
 from .git import Git, GitError
-from .models import Product, RepoSpec, ProductIndex, Ref, DEFAULT_BRANCH_NAME
+from . import models
 
 import logging
 logger = logging.getLogger("lsst.ci")
@@ -66,7 +66,7 @@ class Manifest:
         A unique identifier for this build
     """
 
-    def __init__(self, product_index: ProductIndex, build_id: Optional[str] = None):
+    def __init__(self, product_index: models.ProductIndex, build_id: Optional[str] = None):
         self.build_id = build_id
         self.product_index = product_index
 
@@ -92,7 +92,7 @@ class Manifest:
     def from_file(file_object):
         varre = re.compile(r'^(\w+)=(.*)$')
 
-        product_index = ProductIndex()
+        product_index = models.ProductIndex()
         build_id = None
         for line in file_object:
             line = line.strip()
@@ -118,7 +118,7 @@ class Manifest:
                 (name, sha1, version) = arr
                 deps = []
 
-            product_index[name] = Product(name, sha1, version, deps)
+            product_index[name] = models.Product(name, sha1, version, deps)
         product_index.toposort()
         return Manifest(product_index, build_id)
 
@@ -175,17 +175,17 @@ class ProductFetcher:
         self.tries = tries
         self.dependency_module = dependency_module
         self.version_db = version_db
-        self.product_index = ProductIndex()
+        self.product_index = models.ProductIndex()
         self.lfs_product_names: List[str] = []
 
-        self.repo_specs: Dict[str, RepoSpec] = {}
+        self.repo_specs: Dict[str, models.RepoSpec] = {}
         for product, spec in self.repos.items():
             if isinstance(spec, str):
-                rs = RepoSpec(product, spec)
+                rs = models.RepoSpec(product, spec)
             elif isinstance(spec, dict):
                 # the repos.yaml hash *must* not have keys that are not a
                 # RepoSpec constructor args
-                rs = RepoSpec(product, **spec)
+                rs = models.RepoSpec(product, **spec)
             else:
                 raise Exception('invalid repos.yaml repo specification'
                                 ' -- please check the file with repos-lint')
@@ -203,7 +203,7 @@ class ProductFetcher:
             locations += [pat % data for pat in self.repository_patterns]
         return locations
 
-    def ref_candidates(self, repo_spec: RepoSpec, refs: List[str]) -> List[str]:
+    def ref_candidates(self, repo_spec: models.RepoSpec, refs: List[str]) -> List[str]:
         """Generate a list of refs to attempt to checkout."""
 
         # ref precedence should be:
@@ -214,12 +214,12 @@ class ProductFetcher:
             refs.append(repo_spec.ref)
 
         # Add main branch to list of refs, if not there already
-        if DEFAULT_BRANCH_NAME not in refs:
-            refs.append(DEFAULT_BRANCH_NAME)
+        if models.DEFAULT_BRANCH_NAME not in refs:
+            refs.append(models.DEFAULT_BRANCH_NAME)
 
         return refs
 
-    async def fetch(self, product: str, refs: List[str]) -> Tuple[Ref, List[str]]:
+    async def fetch(self, product: str, refs: List[str]) -> Tuple[models.Ref, List[str]]:
         """Clone the product repository and checkout the first matching ref.
 
         If `self.build_dir`/`product` does not exist, discover the product
@@ -269,7 +269,7 @@ class ProductFetcher:
         # debugging + allow an exception to propagate from the final attempt
         return await self._fetch(product, refs)
 
-    async def _fetch(self, product: str, refs: List[str]) -> Tuple[Ref, List[str]]:
+    async def _fetch(self, product: str, refs: List[str]) -> Tuple[models.Ref, List[str]]:
         """This method should be considered private to fetch(d)"""
         repo_spec = self.repo_specs[product]
         t0 = time.time()
@@ -386,8 +386,8 @@ class ProductFetcher:
         # Find out if we are in a branch or a tag (branches get precedence)
         show_ref_output = await git("show-ref", "--heads")
         heads = [i.split()[1] for i in show_ref_output.splitlines()]
-        is_branch = ref in [head[len(Ref.HEAD_PREFIX) :] for head in heads]
-        target_ref = Ref(name=ref, sha=sha1, ref_type="branch" if is_branch else "tag")
+        is_branch = ref in [head[len(models.Ref.HEAD_PREFIX):] for head in heads]
+        target_ref = models.Ref(name=ref, sha=sha1, ref_type="branch" if is_branch else "tag")
 
         finish_msg = f"{product} ok [{target_ref.name}] ({time.time() - t0:.1f} sec)."
         print(f"{finish_msg:>80}", file=self.out)
@@ -406,8 +406,8 @@ class ProductFetcher:
             dependency_names = []
             optional_dependency_names = []
 
-        product_obj = Product(product, target_ref.sha, None, dependency_names,
-                              optional_dependencies=optional_dependency_names, ref=target_ref)
+        product_obj = models.Product(product, target_ref.sha, None, dependency_names,
+                                     optional_dependencies=optional_dependency_names, ref=target_ref)
         self.product_index[product] = product_obj
         return target_ref, dependency_names
 
@@ -616,7 +616,7 @@ class VersionDb(metaclass=abc.ABCMeta):
             product_name: str,
             product_version: str,
             dependencies: List[str],
-            product_index: ProductIndex
+            product_index: models.ProductIndex
     ) -> str:
         """Return a unique +YYY version suffix for a product given its dependencies
 
@@ -624,7 +624,7 @@ class VersionDb(metaclass=abc.ABCMeta):
                 product_name (str): name of the product
                 product_version (str): primary version of the product
                 dependencies (list): Names of the immediate dependencies of product_name
-                product_index (ProductIndex): The product index
+                product_index (models.ProductIndex): The product index
 
             Returns:
                 str. the +YYY suffix (w/o the + sign).
@@ -652,7 +652,7 @@ class VersionDb(metaclass=abc.ABCMeta):
             productdir: str,
             ref: str,
             dependencies: List[str],
-            product_index: ProductIndex
+            product_index: models.ProductIndex
     ) -> str:
         """ Return a standardized XXX+YYY EUPS version, that includes the dependencies.
 
@@ -688,7 +688,7 @@ class VersionDbHash(VersionDb):
         self.sha_abbrev_len = sha_abbrev_len
         self.eups = eups
 
-    def hash_dependencies(self, dependencies: List[str], product_index: ProductIndex) -> str:
+    def hash_dependencies(self, dependencies: List[str], product_index: models.ProductIndex) -> str:
         m = hashlib.sha1()
         for dep_name in sorted(dependencies):
             dep = product_index[dep_name]
@@ -701,7 +701,7 @@ class VersionDbHash(VersionDb):
             product_name: str,
             product_version: str,
             dependencies: List[str],
-            product_index: ProductIndex
+            product_index: models.ProductIndex
     ) -> str:
         """ Return a hash of the sorted list of printed (dep_name, dep_version) tuples """
         hash = self.hash_dependencies(dependencies, product_index)

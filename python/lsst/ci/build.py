@@ -18,7 +18,7 @@ import datetime
 import yaml
 
 from .prepare import Manifest
-from .models import Product
+from . import models
 
 
 def product_representer(dumper, data):
@@ -30,7 +30,7 @@ def product_representer(dumper, data):
     return dumper.represent_mapping('tag:yaml.org,2002:map', obj)
 
 
-yaml.add_representer(Product, product_representer)
+yaml.add_representer(models.Product, product_representer)
 
 
 def declare_eups_tag(tag, eups_obj):
