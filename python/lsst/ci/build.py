@@ -230,7 +230,7 @@ class Builder:
             process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        cwd=productdir)
             for line in iter(process.stdout.readline, b''):
-                line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), line.decode("utf-8"))
+                line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), line.decode())
                 logfp.write(line)
                 progress.report_progress()
 

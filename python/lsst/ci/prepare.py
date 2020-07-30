@@ -687,7 +687,7 @@ class VersionDb(metaclass=abc.ABCMeta):
         cmd = "cd %s && pkgautoversion %s" % (q(productdir), q(ref))
         process = await asyncio.create_subprocess_shell(cmd, stdout=subprocess.PIPE)
         (stdout, stderr) = await process.communicate()
-        product_version = stdout.decode("utf-8").strip()
+        product_version = stdout.decode().strip()
         if process.returncode != 0:
             print(f"{product_name} failed for {ref} in {productdir}")
         # add +XXXX suffix, if any

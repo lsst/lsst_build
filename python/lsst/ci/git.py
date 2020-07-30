@@ -42,8 +42,8 @@ class Git:
             cwd=self.cwd
         )
         (stdout, stderr) = await process.communicate()
-        stdout = stdout.decode('utf-8')
-        stderr = stderr.decode('utf-8')
+        stdout = stdout.decode()
+        stderr = stderr.decode()
         retcode = process.returncode
 
         if retcode and not return_status:
@@ -65,8 +65,8 @@ class Git:
             cwd=self.cwd
         )
         (stdout, stderr) = process.communicate()
-        stdout = stdout.decode('utf-8')
-        stderr = stderr.decode('utf-8')
+        stdout = stdout.decode()
+        stderr = stderr.decode()
         retcode = process.returncode
 
         if retcode and not return_status:
