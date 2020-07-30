@@ -20,11 +20,10 @@ def test_flatten_dependencies():
     graph = {"z": {"y"}, "y": {"x"}, "b": {"a"}, "a": set(), "c": {"a", "b"}, "x": set()}
 
     sha1 = "c0ffeecafe"
-    treeish = "main"
     version = "0.0"
 
     for product_name, dependency_set in graph.items():
-        product = Product(product_name, sha1, version, list(dependency_set), treeish=treeish)
+        product = Product(product_name, sha1, version, list(dependency_set))
         product_index[product_name] = product
 
     z = product_index["z"]
