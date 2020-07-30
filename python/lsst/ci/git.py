@@ -25,7 +25,7 @@ class Git:
 
     @staticmethod
     async def clone(*args, **kwargs):
-        return await Git().__call__('clone', *args, **kwargs)
+        return await Git()('clone', *args, **kwargs)
 
     async def __call__(self, *args, **kwargs):
         # Run git with the given arguments, returning stdout.
