@@ -67,7 +67,7 @@ class ProductIndex(dict):
         # invalidate the toposort if an item is set
         self.toposorted = False
         self.sorted_groups = []
-        super(ProductIndex, self).__setitem__(key, value)
+        super().__setitem__(key, value)
 
 
 @dataclass
