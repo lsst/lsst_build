@@ -19,7 +19,7 @@ import abc
 import yaml
 import copy
 
-from .eups import EupsModule
+from .eups_module import EupsModule
 
 from .git import Git, GitError
 from . import models
