@@ -388,7 +388,7 @@ class ProductFetcher:
         show_ref_output = await git("show-ref", "--heads")
         heads = [i.split()[1] for i in show_ref_output.splitlines()]
         is_branch = ref in [head[len(models.Ref.HEAD_PREFIX):] for head in heads]
-        target_ref = models.Ref(name=ref, sha=sha1, ref_type="branch" if is_branch else "tag")
+        target_ref = models.Ref(name=ref, sha1=sha1, ref_type="branch" if is_branch else "tag")
 
         finish_msg = f"{product} ok [{target_ref.name}] ({time.time() - t0:.1f} sec)."
         print(f"{finish_msg:>80}", file=self.out)
@@ -407,7 +407,7 @@ class ProductFetcher:
             dependency_names = []
             optional_dependency_names = []
 
-        product_obj = models.Product(product, target_ref.sha, None, dependency_names,
+        product_obj = models.Product(product, target_ref.sha1, None, dependency_names,
                                      optional_dependencies=optional_dependency_names, ref=target_ref)
         self.product_index[product] = product_obj
         return target_ref, dependency_names

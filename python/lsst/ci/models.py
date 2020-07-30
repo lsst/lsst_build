@@ -108,7 +108,7 @@ class Ref:
 
     Parameters
     ----------
-    sha
+    sha1
         sha of the git object
     name
         branch or tag name
@@ -116,7 +116,7 @@ class Ref:
         type of ref - branch, tag, or head (if unknown)
     """
 
-    sha: str
+    sha1: str
     name: str
     ref_type: str
 
@@ -124,15 +124,15 @@ class Ref:
     TAG_PREFIX = "refs/tags/"
 
     @staticmethod
-    def from_commit_and_ref(sha: str, ref: str) -> Ref:
+    def from_commit_and_ref(sha1: str, ref: str) -> Ref:
         """Take in a commit sha and possibly an unabbreviated ref name.
         If the ref name is unabbreviated, we will use that to determine the
         ref type as well, and shorten it to the abbreviated form.
 
         Parameters
         ----------
-        sha
-            git commit sha
+        sha1
+            git commit SHA-1 hash
         ref
             name of a branch or tag - can be unabbreviated.
 
@@ -148,7 +148,7 @@ class Ref:
         elif Ref.TAG_PREFIX in ref:
             ref_type = "tag"
             ref = ref[len(Ref.HEAD_PREFIX) :]
-        return Ref(name=ref, sha=sha, ref_type=ref_type)
+        return Ref(name=ref, sha1=sha1, ref_type=ref_type)
 
 
 @dataclass
