@@ -61,14 +61,14 @@ class Manifest:
     Parameters
     ----------
     product_index
-        A topologically sorted dict of `Product`s
+        A topologically sorted `ProductIndex`
     build_id
         A unique identifier for this build
     """
 
     def __init__(self, product_index: models.ProductIndex, build_id: Optional[str] = None):
         self.build_id = build_id
-        assert self.product_index.toposorted
+        assert product_index.toposorted
         self.product_index = product_index
 
     def to_file(self, file_object):
