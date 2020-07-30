@@ -9,7 +9,8 @@ DEFAULT_BRANCH_NAME = "master"
 
 class ProductIndex(dict):
     """Container class for a product index with index-related operations,
-    such as topological sorting.
+    such as topological sorting. This class extends `dict` and has the same
+    parameters.
     """
 
     def __init__(self, *args, **kwargs):
