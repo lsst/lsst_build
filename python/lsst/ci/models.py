@@ -56,6 +56,7 @@ class ProductIndex(dict):
 
         Returns
         -------
+        list
             A list of the resolved set of dependencies.
 
         """
@@ -143,6 +144,7 @@ class Ref:
 
         Returns
         -------
+        `Ref`
             A new Ref object
         """
         ref_type = "head"

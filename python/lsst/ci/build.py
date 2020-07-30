@@ -1,6 +1,6 @@
 #############################################################################
 # Builder
-from typing import List
+from typing import List, TextIO
 
 import eups
 
@@ -34,9 +34,10 @@ yaml.add_representer(models.Product, product_representer)
 
 
 def declare_eups_tag(tag, eups_obj):
-    """ Declare a new EUPS tag
-        FIXME: Not sure if this is the right way to programmatically
-               define and persist a new tag. Ask RHL.
+    """Declare a new EUPS tag.
+
+    FIXME: Not sure if this is the right way to programmatically
+           define and persist a new tag. Ask RHL.
     """
     tags = eups_obj.tags
     if tag not in tags.getTagNames():
@@ -46,10 +47,19 @@ def declare_eups_tag(tag, eups_obj):
 
 
 class ProgressReporter:
-    # progress reporter: display the version string as progress bar, character by character
+    """Class that that displays the version string as a progress bar as an
+    indicator of liveness.
+
+    Parameters
+    ----------
+    out
+        file this class will write the progress to
+    product
+        name of the product to indicate progress on
+    """
 
     class ProductProgressReporter:
-        def __init__(self, out_file_obj, product):
+        def __init__(self, out_file_obj: TextIO, product: models.Product):
             self.out = out_file_obj
             self.product = product
 
@@ -123,7 +133,7 @@ class ProgressReporter:
 class Builder:
     """Class that builds and installs all products in a manifest.
 
-       The result is tagged with the `Manifest`s build ID, if any.
+    The result is tagged with the `Manifest`s build ID, if any.
     """
     def __init__(self, build_dir, manifest: Manifest, progress, eups):
         self.build_dir = build_dir

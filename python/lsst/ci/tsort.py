@@ -17,6 +17,7 @@ def to_dep_graph(edges: Iterable[Tuple[str, Optional[str]]]) -> Dict[str, Set[st
 
     Returns
     -------
+    dict
         The values in the graph dictionary associated as name to the set of
         dependencies.
     """
@@ -54,6 +55,7 @@ def toposort(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
 
     Returns
     -------
+    iterator
         An iterator which produces lists of dependencies in a bottom-up
         topological sort
     """
@@ -108,6 +110,7 @@ def toposort_dfs(graph: Mapping[str, Set[str]]) -> List[str]:
 
     Returns
     -------
+    list
         bottom-up topologically sorted list of products
     """
 

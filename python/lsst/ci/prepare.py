@@ -620,29 +620,39 @@ class VersionDb(metaclass=abc.ABCMeta):
     ) -> str:
         """Return a unique +YYY version suffix for a product given its dependencies
 
-            Args:
-                product_name (str): name of the product
-                product_version (str): primary version of the product
-                dependencies (list): Names of the immediate dependencies of product_name
-                product_index (models.ProductIndex): The product index
+        Parameters
+        ----------
+        product_name
+            name of the product
+        product_version
+            primary version of the product
+        dependencies
+            Names of the immediate dependencies of product_name
+        product_index
+            The product index
 
-            Returns:
-                str. the +YYY suffix (w/o the + sign).
+        Returns
+        -------
+        suffix
+            the +YYY suffix (w/o the + sign).
         """
         pass
 
     @abc.abstractmethod
     def commit(self, manifest: Manifest, build_id: str):
-        """Commit the changes to the version database
+        """Commit the changes to the version database.
 
-           Args:
-               manifest (`Manifest`): a manifest of products from this run
-               build_id (str): the build identifier
+        A subclass must override this method to commit to
+        permanent storage any changes to the underlying database
+        caused by get_suffix() invocations, and to assign the
+        build_id to manifest.build_id.
 
-           A subclass must override this method to commit to
-           permanent storage any changes to the underlying database
-           caused by get_suffix() invocations, and to assign the
-           build_id to manifest.build_id.
+        Parameters
+        ----------
+        manifest
+            a manifest of products from this run
+        build_id
+            the build identifier
         """
         pass
 
@@ -654,16 +664,23 @@ class VersionDb(metaclass=abc.ABCMeta):
             dependencies: List[str],
             product_index: models.ProductIndex
     ) -> str:
-        """ Return a standardized XXX+YYY EUPS version, that includes the dependencies.
+        """Return a standardized XXX+YYY EUPS version, that includes the dependencies.
 
-            Args:
-                product_name (str): name of the product to version
-                productdir (str): the directory with product source code
-                ref (str): the git ref that has been checked out into productdir (e.g., 'master')
-                dependencies (list): A list of `Product`s that are the immediate dependencies of product_name
+        Parameters
+        ----------
+        product_name
+            name of the product to version
+        productdir
+            the directory with product source code
+        ref
+            the git ref that has been checked out into productdir (e.g., 'master')
+        dependencies (list):
+            A list of `Product`s that are the immediate dependencies of product_name
 
-            Returns:
-                str. the XXX+YYY version string.
+        Returns
+        -------
+        str
+            the XXX+YYY version string.
         """
         q = pipes.quote
         cmd = "cd %s && pkgautoversion %s" % (q(productdir), q(ref))
@@ -703,7 +720,7 @@ class VersionDbHash(VersionDb):
             dependencies: List[str],
             product_index: models.ProductIndex
     ) -> str:
-        """ Return a hash of the sorted list of printed (dep_name, dep_version) tuples """
+        """Return a hash of the sorted list of printed (dep_name, dep_version) tuples"""
         hash = self.hash_dependencies(dependencies, product_index)
         suffix = hash[:self.sha_abbrev_len]
         return suffix
