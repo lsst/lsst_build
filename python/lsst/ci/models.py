@@ -17,31 +17,25 @@ class ProductIndex(dict):
         self.toposorted = False
         self.sorted_groups = []
 
-    def toposort(self) -> Dict[str, Product]:
-        """Topologically sort the product index and return it.
-
-        This mutates this object if it is not already sorted, and it returns
-        itself for convenience.
+    def toposort(self) -> ProductIndex:
+        """Topologically sort the product index and return a copy.
 
         Returns
         -------
-        Dict[str, Product]
-            Topologically sorted Dict (self)
+        ProductIndex
+            Topologically sorted product index
         """
-        if self.toposorted:
-            return self
         dep_graph = {name: set(product.dependencies) for name, product in self.items()}
         topo_sorted_product_lists = tsort.toposort(dep_graph)
-        ordered_product_list = []
+        new_index = ProductIndex()
+        new_sorted_groups = []
         for group_idx, sort_group in enumerate(topo_sorted_product_lists):
-            self.sorted_groups.append(sort_group)
+            new_sorted_groups.append(sort_group)
             for product_name in sort_group:
-                ordered_product_list.append(self[product_name])
-        self.clear()
-        for product in ordered_product_list:
-            self[product.name] = product
-        self.toposorted = True
-        return self
+                new_index[product_name] = self[product_name]
+        new_index.toposorted = True
+        new_index.sorted_groups = new_sorted_groups
+        return new_index
 
     def flat_dependencies(self, product: Product, resolved: Optional[Set[str]] = None) -> List[Product]:
         """Return and calculate the set of flat dependencies for this product.

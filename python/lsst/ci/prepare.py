@@ -68,6 +68,7 @@ class Manifest:
 
     def __init__(self, product_index: models.ProductIndex, build_id: Optional[str] = None):
         self.build_id = build_id
+        assert self.product_index.toposorted
         self.product_index = product_index
 
     def to_file(self, file_object):
@@ -119,7 +120,7 @@ class Manifest:
                 deps = []
 
             product_index[name] = models.Product(name, sha1, version, deps)
-        product_index.toposort()
+        product_index = product_index.toposort()
         return Manifest(product_index, build_id)
 
 
@@ -465,7 +466,7 @@ class ProductFetcher:
         loop.run_until_complete(self.fetch_products(products, refs))
 
         # We have fetched everything - sort the index
-        self.product_index.toposort()
+        self.product_index = self.product_index.toposort()
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug("Topologically sorted groups:")
             sort_groups = self.product_index.sorted_groups
