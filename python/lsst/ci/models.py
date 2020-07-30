@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Set, Optional, Dict
 
-from lsst.ci import tsort
+from . import tsort
 
 DEFAULT_BRANCH_NAME = "master"
 
@@ -79,7 +79,7 @@ class Product:
     name
         The name of the product
     sha1
-        The sha1 of the product
+        the SHA-1 git commit hash of the product
     version
         The version of the product (from VersionDb)
     dependencies
@@ -109,7 +109,7 @@ class Ref:
     Parameters
     ----------
     sha1
-        sha of the git object
+        the SHA-1 git commit hash of the ref
     name
         branch or tag name
     ref_type
@@ -132,7 +132,7 @@ class Ref:
         Parameters
         ----------
         sha1
-            git commit SHA-1 hash
+            the SHA-1 git commit hash of the ref
         ref
             name of a branch or tag - can be unabbreviated.
 
