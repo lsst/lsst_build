@@ -59,7 +59,7 @@ class Git:
         cmd = ['git'] + [str(x) for x in args]
 
         process = subprocess.Popen(
-            *cmd,
+            cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=self.cwd
