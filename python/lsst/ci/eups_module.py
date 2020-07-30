@@ -68,7 +68,7 @@ class EupsModule:
             # Find the next unused tag that matches the bNNNN pattern
             # and isn't defined in EUPS yet
             git = Git(version_db_path)
-            tags = asyncio.run(git.tag("-l", "b[0-9]*")).split()
+            tags = git.sync_tag("-l", "b[0-9]*").split()
             btre = re.compile("^b[0-9]+$")
             btags = [0]
             btags += [int(t[1:]) for t in tags if btre.match(t)]
