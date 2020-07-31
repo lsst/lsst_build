@@ -134,8 +134,19 @@ class Builder:
     """Class that builds and installs all products in a manifest.
 
     The result is tagged with the `Manifest`s build ID, if any.
+
+    Parameters
+    ----------
+    build_dir
+        the root directory of the build
+    manifest
+        the manifest we are building against
+    progress
+        the `ProgressReporter` reporting for this build
+    eups
+        an eups object for eups operations (e.g. discovering product info)
     """
-    def __init__(self, build_dir, manifest: Manifest, progress: ProgressReporter, eups: eups.Eups):
+    def __init__(self, build_dir: str, manifest: Manifest, progress: ProgressReporter, eups: eups.Eups):
         self.build_dir = build_dir
         self.manifest = manifest
         self.progress = progress
