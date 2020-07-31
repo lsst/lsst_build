@@ -55,7 +55,7 @@ class ProgressReporter:
     out
         file this class will write the progress to
     product
-        name of the product to indicate progress on
+        the product which we are reporting progress on
     """
 
     class ProductProgressReporter:
@@ -135,7 +135,7 @@ class Builder:
 
     The result is tagged with the `Manifest`s build ID, if any.
     """
-    def __init__(self, build_dir, manifest: Manifest, progress, eups):
+    def __init__(self, build_dir, manifest: Manifest, progress: ProgressReporter, eups: eups.Eups):
         self.build_dir = build_dir
         self.manifest = manifest
         self.progress = progress
