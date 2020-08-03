@@ -586,7 +586,10 @@ class ProductFetcher:
                     assert self.build_dir is not None
                     repo_dir = os.path.join(self.build_dir, lfs_product_name)
                     git = Git(repo_dir)
+                    # pull is equivalent to performing fetch and checkout
                     await git.lfs("pull")
+                    # Reconfigure LFS smudge filter after LFS checkout
+                    await git("config", "--local", "filter.lfs.smudge", "git-lfs smudge %f")
                     finish_msg = f"{lfs_product_name} ok ({time.time() - t0:.1f} sec)."
                     print(f"{finish_msg:>80}", file=self.out)
                     queue.task_done()
