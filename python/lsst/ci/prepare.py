@@ -125,7 +125,7 @@ class Manifest:
 
 
 class ProductFetcher:
-    """Fetches products from remote git repositories and checks out matching refs.
+    """Fetch products from remote git repositories and checks out matching refs.
 
     See `fetch` for further documentation.
 
@@ -323,6 +323,9 @@ class ProductFetcher:
                     # the default ref during clone.  Config options set on the
                     # cli during the clone get recorded in `.git/config'
                     args += ['-c', 'filter.lfs.required=false']
+                    # We DO NOT want smudge on, because we want to download
+                    # only with `git lfs pull`. We do this so we can defer the
+                    # download of the LFS files, in case it's not necessary.
                     args += ['-c', 'filter.lfs.smudge=']
                     args += ['-c', 'filter.lfs.clean=git-lfs clean %f']
                     args += ['-c', ('credential.helper=%s' % helper)]
