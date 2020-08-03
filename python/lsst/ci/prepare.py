@@ -590,6 +590,7 @@ class ProductFetcher:
                     await git.lfs("pull")
                     # Reconfigure LFS smudge filter after LFS checkout
                     await git("config", "--local", "filter.lfs.smudge", "git-lfs smudge %f")
+                    await git("config", "--local", "filter.lfs.required", "true")
                     finish_msg = f"{lfs_product_name} ok ({time.time() - t0:.1f} sec)."
                     print(f"{finish_msg:>80}", file=self.out)
                     queue.task_done()
