@@ -523,7 +523,7 @@ class ProductFetcher:
 
         if len(exceptions):
             first_exception = exceptions[0]
-            logger.error("At least one error occurred during while fetching products")
+            logger.error("At least one error occurred during while resolving versions")
             raise first_exception
         return resolved
 
