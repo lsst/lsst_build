@@ -1,7 +1,7 @@
 #############################################################################
 # Builder
+from typing import List, TextIO
 
-from io import open
 import eups
 
 import subprocess
@@ -18,7 +18,7 @@ import datetime
 import yaml
 
 from .prepare import Manifest
-from .prepare import Product
+from . import models
 
 
 def product_representer(dumper, data):
@@ -30,13 +30,14 @@ def product_representer(dumper, data):
     return dumper.represent_mapping('tag:yaml.org,2002:map', obj)
 
 
-yaml.add_representer(Product, product_representer)
+yaml.add_representer(models.Product, product_representer)
 
 
 def declare_eups_tag(tag, eups_obj):
-    """ Declare a new EUPS tag
-        FIXME: Not sure if this is the right way to programmatically
-               define and persist a new tag. Ask RHL.
+    """Declare a new EUPS tag.
+
+    FIXME: Not sure if this is the right way to programmatically
+           define and persist a new tag. Ask RHL.
     """
     tags = eups_obj.tags
     if tag not in tags.getTagNames():
@@ -46,10 +47,19 @@ def declare_eups_tag(tag, eups_obj):
 
 
 class ProgressReporter:
-    # progress reporter: display the version string as progress bar, character by character
+    """Class that that displays the version string as a progress bar as an
+    indicator of liveness.
+
+    Parameters
+    ----------
+    out
+        file this class will write the progress to
+    product
+        the product which we are reporting progress on
+    """
 
     class ProductProgressReporter:
-        def __init__(self, out_file_obj, product):
+        def __init__(self, out_file_obj: TextIO, product: models.Product):
             self.out = out_file_obj
             self.product = product
 
@@ -123,14 +133,25 @@ class ProgressReporter:
 class Builder:
     """Class that builds and installs all products in a manifest.
 
-       The result is tagged with the `Manifest`s build ID, if any.
+    The result is tagged with the `Manifest`s build ID, if any.
+
+    Parameters
+    ----------
+    build_dir
+        the root directory of the build
+    manifest
+        the manifest we are building against
+    progress
+        the `ProgressReporter` reporting for this build
+    eups
+        an eups object for eups operations (e.g. discovering product info)
     """
-    def __init__(self, build_dir, manifest, progress, eups):
+    def __init__(self, build_dir: str, manifest: Manifest, progress: ProgressReporter, eups: eups.Eups):
         self.build_dir = build_dir
         self.manifest = manifest
         self.progress = progress
         self.eups = eups
-        self.built = []
+        self.built: List[models.Product] = []
         self.failed_at = None
 
     def _tag_product(self, name, version, tag):
@@ -148,7 +169,7 @@ class Builder:
 
         # construct the tags file with exact dependencies
         setups = ["\t%-20s %s" % (dep.name, dep.version)
-                  for dep in product.flat_dependencies()]
+                  for dep in self.manifest.product_index.flat_dependencies(product)]
 
         # create the buildscript
         with open(buildscript, 'w', encoding='utf-8') as fp:
@@ -220,7 +241,7 @@ class Builder:
             process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        cwd=productdir)
             for line in iter(process.stdout.readline, b''):
-                line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), line.decode("utf-8"))
+                line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), line.decode())
                 logfp.write(line)
                 progress.report_progress()
 
@@ -257,7 +278,7 @@ class Builder:
             declare_eups_tag(self.manifest.build_id, self.eups)
 
         # Build all products
-        for product in self.manifest.products.values():
+        for product in self.manifest.product_index.values():
             if not self._build_product_if_needed(product):
                 self.failed_at = product
                 return False
