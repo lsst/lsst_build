@@ -511,12 +511,18 @@ class ProductFetcher:
                 except Exception as e:
                     print(f"Fetch failed for {product_name}")
                     exceptions.append(e)
+                    # Remove from queued and add to resolved
+                    # so it's never considered again.
+                    resolved.add(product_name)
+                    if product_name in queued:
+                        queued.remove(product_name)
                     queue.task_done()
                     continue
 
         queue = asyncio.Queue()  # type: ignore
 
         for product_name in product_names:
+            queued.add(product_name)
             queue.put_nowait((product_name, refs))
 
         await self.run_async_tasks(fetch_worker, queue)
