@@ -27,7 +27,7 @@ from . import models
 import logging
 logger = logging.getLogger("lsst.ci")
 
-ASYNC_QUEUE_WORKERS = 16
+ASYNC_QUEUE_WORKERS = 8
 
 
 class RemoteError(Exception):
@@ -551,8 +551,9 @@ class ProductFetcher:
                     assert self.build_dir is not None
                     assert self.version_db is not None
                     repo_dir = os.path.join(self.build_dir, product.name)
+                    all_dependencies = self.product_index.flat_dependencies(product)
                     product.version = await self.version_db.version(
-                        product.name, repo_dir, product.ref.name, product.dependencies, self.product_index
+                        product.name, repo_dir, product.ref.name, all_dependencies
                     )
                     queue.task_done()
                 except Exception as e:
@@ -629,8 +630,7 @@ class VersionDb(metaclass=abc.ABCMeta):
             self,
             product_name: str,
             product_version: str,
-            dependencies: List[str],
-            product_index: models.ProductIndex
+            dependencies: List[models.Product]
     ) -> str:
         """Return a unique +YYY version suffix for a product given its dependencies
 
@@ -641,9 +641,7 @@ class VersionDb(metaclass=abc.ABCMeta):
         product_version
             primary version of the product
         dependencies
-            Names of the immediate dependencies of product_name
-        product_index
-            The product index
+            dependency `Product`s used for calculating suffix of product_name
 
         Returns
         -------
@@ -675,8 +673,7 @@ class VersionDb(metaclass=abc.ABCMeta):
             product_name: str,
             productdir: str,
             ref: str,
-            dependencies: List[str],
-            product_index: models.ProductIndex
+            dependencies: List[models.Product]
     ) -> str:
         """Return a standardized XXX+YYY EUPS version, that includes the dependencies.
 
@@ -706,7 +703,7 @@ class VersionDb(metaclass=abc.ABCMeta):
         # add +XXXX suffix, if any
         suffix = ""
         if len(dependencies):
-            suffix = self.get_suffix(product_name, product_version, dependencies, product_index)
+            suffix = self.get_suffix(product_name, product_version, dependencies)
         assert suffix.__class__ == str
         suffix = "+%s" % suffix if suffix else ""
         return "%s%s" % (product_version, suffix)
@@ -719,10 +716,9 @@ class VersionDbHash(VersionDb):
         self.sha_abbrev_len = sha_abbrev_len
         self.eups = eups
 
-    def hash_dependencies(self, dependencies: List[str], product_index: models.ProductIndex) -> str:
+    def hash_dependencies(self, dependencies: List[models.Product]) -> str:
         m = hashlib.sha1()
-        for dep_name in sorted(dependencies):
-            dep = product_index[dep_name]
+        for dep in sorted(dependencies, key=lambda d: d.name):
             s = '%s\t%s\n' % (dep.name, dep.sha1)
             m.update(s.encode("ascii"))
         return m.hexdigest()
@@ -731,11 +727,10 @@ class VersionDbHash(VersionDb):
             self,
             product_name: str,
             product_version: str,
-            dependencies: List[str],
-            product_index: models.ProductIndex
+            dependencies: List[models.Product]
     ) -> str:
         """Return a hash of the sorted list of printed (dep_name, dep_version) tuples"""
-        hash = self.hash_dependencies(dependencies, product_index)
+        hash = self.hash_dependencies(dependencies)
         suffix = hash[:self.sha_abbrev_len]
         return suffix
 

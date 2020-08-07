@@ -145,10 +145,12 @@ class Ref:
         ref_type = "head"
         if Ref.HEAD_PREFIX in ref:
             ref_type = "branch"
-            ref = ref[len(Ref.HEAD_PREFIX) :]
+            prefix_len = len(Ref.HEAD_PREFIX)
+            ref = ref[prefix_len:]
         elif Ref.TAG_PREFIX in ref:
             ref_type = "tag"
-            ref = ref[len(Ref.HEAD_PREFIX) :]
+            prefix_len = len(Ref.TAG_PREFIX)
+            ref = ref[prefix_len:]
         return Ref(name=ref, sha1=sha1, ref_type=ref_type)
 
 
