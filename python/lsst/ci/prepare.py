@@ -27,7 +27,7 @@ from . import models
 import logging
 logger = logging.getLogger("lsst.ci")
 
-ASYNC_QUEUE_WORKERS = 16
+ASYNC_QUEUE_WORKERS = 8
 
 
 class RemoteError(Exception):
