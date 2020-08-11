@@ -1,7 +1,18 @@
+import asyncio
+import logging
+import subprocess
 from typing import List
 
 import eups  # type: ignore
 import eups.tags  # type: ignore
+from .models import Product
+
+logger = logging.getLogger("lsst.ci")
+
+INSTALL_TIMEOUT = 30.0
+
+class InstallException(Exception):
+    """Generic error when attempting installation"""
 
 
 class EupsModule:
@@ -73,3 +84,22 @@ class EupsModule:
             if is_optional and not self.exclusion_resolver.is_excluded(dependency.name, product_name):
                 dependency_names.append(dependency.name)
         return dependency_names
+
+    async def install_prebuilt(self, product: Product) -> None:
+        cmd = ["eups", "distrib", "install", "-t", "",
+               "-U", "--nolocks", "--nodepend", f"{product.name}", f"{product.version}"]
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        try:
+            (stdout, stderr) = await asyncio.wait_for(process.communicate(), timeout=INSTALL_TIMEOUT)
+            stdout_str = stdout.decode()
+            stderr_str = stderr.decode()
+            retcode = process.returncode
+            if retcode != 0:
+                raise InstallException(stdout_str, stderr_str)
+        except asyncio.TimeoutError as e:
+            raise InstallException(str(e))
+

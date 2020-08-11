@@ -19,7 +19,7 @@ import abc
 import yaml
 import copy
 
-from .eups_module import EupsModule
+from .eups_module import EupsModule, InstallException
 
 from .git import Git, GitError
 from . import models
@@ -481,6 +481,7 @@ class ProductFetcher:
         self.validate_refs(refs)
         if self.version_db:
             loop.run_until_complete(self.resolve_versions())
+        loop.run_until_complete(self.install_prebuilt_dependencies())
         if not self.no_fetch and len(self.lfs_product_names):
             loop.run_until_complete(self.lfs_checkout())
         loop.close()
@@ -571,6 +572,71 @@ class ProductFetcher:
         if len(exceptions):
             first_exception = exceptions[0]
             logger.error("At least one error occurred during while resolving versions")
+            raise first_exception
+
+    async def install_prebuilt_dependencies(self):
+        """Install available prebuilt packages.
+
+        This is performed after the git repos are fetched so we can process
+        dependency files (e.g. eups Table files) more quickly, but before
+        the lfs_checkout occurs, in case the lfs repo is an optional
+        dependency and we can skip it's checkout.
+        """
+        print("Checking for prebuilt products...", file=self.out)
+        exceptions = []
+        assert self.product_index.toposorted
+        # reverse so it's we pop with no params
+        sorted_group_stack = self.product_index.sorted_groups.copy()
+        sorted_group_stack.reverse()
+        installed_name_set = set()
+
+        async def install_worker(queue: asyncio.Queue):
+            while True:
+                product_name = await queue.get()
+                try:
+                    product: models.Product = self.product_index[product_name]
+                    if not set(product.dependencies).issubset(installed_name_set):
+                        missing_set = set(product.dependencies).difference(installed_name_set)
+                        missing = [d for d in product.dependencies if d in missing_set]
+                        logger.debug(f"Skipping {product_name} - dependencies not installed: {missing}")
+                        queue.task_done()
+                        continue
+
+                    print(f"Checking for prebuilt {product_name}...", file=self.out)
+                    status = "ok"
+                    t0 = time.time()
+                    try:
+                        await self.dependency_module.install_prebuilt(product)
+                        installed_name_set.add(product_name)
+                    except InstallException as e:
+                        status = "not installed"
+                        logger.debug(f"Prebuilt install for {product_name} not installed")
+                        logger.debug(e)
+
+                    finish_msg = f"{product_name} {status} ({time.time() - t0:.1f} sec)."
+                    print(f"{finish_msg:>80}", file=self.out)
+                    queue.task_done()
+
+                except Exception as e:
+                    logger.error(f"Failed prebuilt install for for {product_name}")
+                    exceptions.append(e)
+                    queue.task_done()
+                    continue
+
+        queue = asyncio.Queue()
+        group = 0
+        while len(sorted_group_stack):
+            group_t0 = time.time()
+            next_group = sorted_group_stack.pop()
+            for product_name in next_group:
+                queue.put_nowait(product_name)
+            await self.run_async_tasks(install_worker, queue)
+            logger.debug(f"group {group} finished in ({time.time() - group_t0:.1f} sec).")
+            group += 1
+
+        if len(exceptions):
+            first_exception = exceptions[0]
+            logger.error("At least one error occurred during while performing LFS pulls")
             raise first_exception
 
     async def lfs_checkout(self):
