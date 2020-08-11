@@ -28,6 +28,8 @@ import logging
 logger = logging.getLogger("lsst.ci")
 
 ASYNC_QUEUE_WORKERS = 8
+SKIP_LFS_ON_INSTALLED_DEPENDANTS = False
+REWRITE_PRODUCTS_INDEX_ON_SKIPPED_LFS_PRODUCTS = False
 
 
 class RemoteError(Exception):
@@ -178,6 +180,8 @@ class ProductFetcher:
         self.version_db = version_db
         self.product_index = models.ProductIndex()
         self.lfs_product_names: List[str] = []
+        self.installed_name_set: Set[str] = set()
+        self.skipped_lfs_product_names: List[str] = []
 
         self.repo_specs: Dict[str, models.RepoSpec] = {}
         for product, spec in self.repos.items():
@@ -588,15 +592,14 @@ class ProductFetcher:
         # reverse so it's we pop with no params
         sorted_group_stack = self.product_index.sorted_groups.copy()
         sorted_group_stack.reverse()
-        installed_name_set = set()
 
         async def install_worker(queue: asyncio.Queue):
             while True:
                 product_name = await queue.get()
                 try:
                     product: models.Product = self.product_index[product_name]
-                    if not set(product.dependencies).issubset(installed_name_set):
-                        missing_set = set(product.dependencies).difference(installed_name_set)
+                    missing_set = set(product.dependencies).difference(self.installed_name_set)
+                    if missing_set:
                         missing = [d for d in product.dependencies if d in missing_set]
                         logger.debug(f"Skipping {product_name} - dependencies not installed: {missing}")
                         queue.task_done()
@@ -607,7 +610,7 @@ class ProductFetcher:
                     t0 = time.time()
                     try:
                         await self.dependency_module.install_prebuilt(product)
-                        installed_name_set.add(product_name)
+                        self.installed_name_set.add(product_name)
                     except InstallException as e:
                         status = "not installed"
                         logger.debug(f"Prebuilt install for {product_name} not installed")
@@ -654,6 +657,21 @@ class ProductFetcher:
             while True:
                 lfs_product_name = await queue.get()
                 try:
+                    lfs_product = self.product_index[lfs_product_name]
+                    if SKIP_LFS_ON_INSTALLED_DEPENDANTS:
+                        dependants: List[models.Product] = self.product_index.dependants(lfs_product)
+                        # Look if products dependant on this were installed
+                        installed_dependants = set()
+                        for dependant in dependants:
+                            dependant_installed = dependant.name in self.installed_name_set
+                            lfs_product_optional = lfs_product_name in dependant.optional_dependencies
+                            if dependant_installed and lfs_product_optional:
+                                installed_dependants.add(dependant.name)
+                        if installed_dependants == dependants:
+                            print(f"Skipping {lfs_product_name} checkout - all dependants installed")
+                            self.skipped_lfs_product_names.append(lfs_product_name)
+                            queue.task_done()
+                            continue
                     print(f"Pulling {lfs_product_name} LFS data...")
                     t0 = time.time()
                     assert self.build_dir is not None
@@ -682,6 +700,36 @@ class ProductFetcher:
             first_exception = exceptions[0]
             logger.error("At least one error occurred during while performing LFS pulls")
             raise first_exception
+
+
+def remove_products(product_index: models.ProductIndex, product_names: List[str]) -> models.ProductIndex:
+    """Remove products from a product index.
+
+    This mutates the underlying `Products`s in the index, as well as
+    topologically sorting the index before returning it.
+
+    Parameters
+    ----------
+    product_index
+        product index we are to modify
+    product_names
+        products to remove from the index and the `Product`s in it
+
+    Returns
+    -------
+    ProductIndex
+        the modified index.
+    """
+    for product_name in product_names:
+        lfs_product = product_index[product_name]
+        del product_index[product_name]
+        dependants: List[models.Product] = product_index.dependants(lfs_product)
+        for dependant in dependants:
+            dependant.dependencies.remove(product_name)
+            if dependant.optional_dependencies:
+                dependant.optional_dependencies.remove(product_name)
+    # sort it to rebuild for the manifest
+    return product_index.toposort()
 
 
 class VersionDb(metaclass=abc.ABCMeta):
@@ -949,7 +997,12 @@ class BuildDirectoryConstructor:
 
     def construct(self, product_names, refs):
         self.product_fetcher.do_fetch_products(product_names, refs)
-        return Manifest(self.product_fetcher.product_index, None)
+        product_index = self.product_fetcher.product_index
+        if SKIP_LFS_ON_INSTALLED_DEPENDANTS:
+            print(f"Skipped checkouts for {self.product_fetcher.skipped_lfs_product_names}")
+        if REWRITE_PRODUCTS_INDEX_ON_SKIPPED_LFS_PRODUCTS:
+            product_index = remove_products(product_index, self.product_fetcher.skipped_lfs_product_names)
+        return Manifest(product_index, None)
 
     @staticmethod
     def run(args):

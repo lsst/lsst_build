@@ -17,6 +17,7 @@ class ProductIndex(dict):
         super().__init__(*args, **kwargs)
         self.toposorted = False
         self.sorted_groups = []
+        self._dependants: Dict[str, Set[str]] = {}
 
     def toposort(self) -> ProductIndex:
         """Topologically sort the product index and return a copy.
@@ -64,10 +65,32 @@ class ProductIndex(dict):
                 self.flat_dependencies(dependency_product, resolved)
         return list(self[resolved_name] for resolved_name in resolved)
 
+    def dependants(self, product: Product) -> List[Product]:
+        """Return a list of products which require this product.
+
+        The first time this is called, it will build a new index for this
+        and future lookups.
+
+        Raises a `KeyError` if the product does not exist in the index.
+
+        Parameters
+        ----------
+        product
+            the product we want to check
+
+        Returns
+        -------
+        list
+            the products which require `product`
+        """
+        return [self[dependant] for dependant in self._dependants[product.name]]
+
     def __setitem__(self, key, value):
         # invalidate the toposort if an item is set
         self.toposorted = False
         self.sorted_groups = []
+        for dependency in value.dependencies:
+            self._dependants.setdefault(dependency, set()).add(key)
         super().__setitem__(key, value)
 
 
