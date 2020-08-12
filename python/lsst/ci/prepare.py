@@ -619,7 +619,11 @@ class ProductFetcher:
                     status = "ok"
                     t0 = time.time()
                     try:
-                        await self.dependency_module.install_prebuilt(product)
+                        is_installed = await self.dependency_module.is_installed(product)
+                        if not is_installed:
+                            await self.dependency_module.install_prebuilt(product)
+                        else:
+                            status = "already installed"
                         self.installed_name_set.add(product_name)
                     except InstallException as e:
                         status = "not installed"

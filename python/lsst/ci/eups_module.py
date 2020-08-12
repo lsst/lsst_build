@@ -103,3 +103,22 @@ class EupsModule:
         except asyncio.TimeoutError as e:
             raise InstallException(str(e))
 
+    async def is_installed(self, product: Product) -> bool:
+        cmd = ["eups", "list", "--nolocks", f"{product.name}", f"{product.version}"]
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        try:
+            (stdout, stderr) = await asyncio.wait_for(process.communicate(), timeout=INSTALL_TIMEOUT)
+            stdout_str = stdout.decode()
+            stderr_str = stderr.decode()
+            retcode = process.returncode
+            if retcode == 0:
+                return True
+            if retcode == 1:
+                return False
+            raise InstallException(stdout_str, stderr_str)
+        except asyncio.TimeoutError as e:
+            raise InstallException(str(e))
