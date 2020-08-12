@@ -589,6 +589,8 @@ class ProductFetcher:
         dependency and we can skip it's checkout.
         """
         print("Checking for prebuilt products...", file=self.out)
+        install_t0 = time.time()
+
         exceptions = []
         assert self.product_index.toposorted
         # reverse so it's we pop with no params
@@ -649,6 +651,8 @@ class ProductFetcher:
             first_exception = exceptions[0]
             logger.error("At least one error occurred during while performing LFS pulls")
             raise first_exception
+
+        logger.debug(f"Prebuilt installation finished in ({time.time() - install_t0:.1f} sec).")
 
     async def lfs_checkout(self):
         """Perform parallel LFS checkout on LFS repos.
