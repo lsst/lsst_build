@@ -182,7 +182,7 @@ class ProductFetcher:
         self.product_index = models.ProductIndex()
         self.lfs_product_names: List[str] = []
         self.installed_name_set: Set[str] = set()
-        self.skipped_optionals: Set[str] = []
+        self.skipped_optionals: Set[str] = set()
 
         self.repo_specs: Dict[str, models.RepoSpec] = {}
         for product, spec in self.repos.items():
@@ -677,6 +677,7 @@ class ProductFetcher:
                             dependants = set(d.name for d in self.product_index.dependants(lfs_product))
                             if dependants.issubset(self.installed_name_set):
                                 print(f"Skipping {lfs_product_name} checkout - all dependants installed")
+                                self.skipped_optionals.add(lfs_product_name)
                                 queue.task_done()
                                 continue
                     print(f"Pulling {lfs_product_name} LFS data...")
