@@ -28,8 +28,9 @@ import logging
 logger = logging.getLogger("lsst.ci")
 
 ASYNC_QUEUE_WORKERS = 8
-SKIP_LFS_ON_INSTALLED_DEPENDANTS = False
-REWRITE_PRODUCTS_INDEX_ON_SKIPPED_LFS_PRODUCTS = False
+USE_PREBUILT_VERSIONS = True
+INSTALL_IGNORES_OPTIONAL_DEPENDENCIES = False
+REWRITE_PRODUCTS_INDEX_ON_SKIPPED_OPTIONALS = False
 
 
 class RemoteError(Exception):
@@ -181,7 +182,7 @@ class ProductFetcher:
         self.product_index = models.ProductIndex()
         self.lfs_product_names: List[str] = []
         self.installed_name_set: Set[str] = set()
-        self.skipped_lfs_product_names: List[str] = []
+        self.skipped_optionals: Set[str] = []
 
         self.repo_specs: Dict[str, models.RepoSpec] = {}
         for product, spec in self.repos.items():
@@ -485,7 +486,8 @@ class ProductFetcher:
         self.validate_refs(refs)
         if self.version_db:
             loop.run_until_complete(self.resolve_versions())
-        loop.run_until_complete(self.install_prebuilt_dependencies())
+        if USE_PREBUILT_VERSIONS:
+            loop.run_until_complete(self.install_prebuilt_dependencies())
         if not self.no_fetch and len(self.lfs_product_names):
             loop.run_until_complete(self.lfs_checkout())
         loop.close()
@@ -592,20 +594,26 @@ class ProductFetcher:
         # reverse so it's we pop with no params
         sorted_group_stack = self.product_index.sorted_groups.copy()
         sorted_group_stack.reverse()
+        index_optionals = self.product_index.optionals()
 
         async def install_worker(queue: asyncio.Queue):
             while True:
                 product_name = await queue.get()
                 try:
                     product: models.Product = self.product_index[product_name]
+                    # Find the uninstalled dependencies
                     missing_set = set(product.dependencies).difference(self.installed_name_set)
-                    if missing_set:
-                        missing = [d for d in product.dependencies if d in missing_set]
-                        logger.debug(f"Skipping {product_name} - dependencies not installed: {missing}")
+                    # if the feature is active and all uninstalled dependencies are optional
+                    if INSTALL_IGNORES_OPTIONAL_DEPENDENCIES and missing_set.issubset(index_optionals):
+                        logger.debug(f"{product_name} may be installable")
+                    elif missing_set:
+                        # We can't install this dependency - skip it
+                        missing_names = [d for d in product.dependencies if d in missing_set]
+                        logger.debug(f"Skipping {product_name} - missing dependencies: {missing_names}")
                         queue.task_done()
                         continue
 
-                    print(f"Checking for prebuilt {product_name}...", file=self.out)
+                    print(f"Checking if {product_name} {product.version} is available...", file=self.out)
                     status = "ok"
                     t0 = time.time()
                     try:
@@ -652,26 +660,21 @@ class ProductFetcher:
         """
         print("Performing git-lfs pulls...", file=self.out)
         exceptions = []
+        index_optionals = self.product_index.optionals()
 
         async def pull_worker(queue):
             while True:
                 lfs_product_name = await queue.get()
                 try:
-                    lfs_product = self.product_index[lfs_product_name]
-                    if SKIP_LFS_ON_INSTALLED_DEPENDANTS:
-                        dependants: List[models.Product] = self.product_index.dependants(lfs_product)
-                        # Look if products dependant on this were installed
-                        installed_dependants = set()
-                        for dependant in dependants:
-                            dependant_installed = dependant.name in self.installed_name_set
-                            lfs_product_optional = lfs_product_name in dependant.optional_dependencies
-                            if dependant_installed and lfs_product_optional:
-                                installed_dependants.add(dependant.name)
-                        if installed_dependants == dependants:
-                            print(f"Skipping {lfs_product_name} checkout - all dependants installed")
-                            self.skipped_lfs_product_names.append(lfs_product_name)
-                            queue.task_done()
-                            continue
+                    if INSTALL_IGNORES_OPTIONAL_DEPENDENCIES:
+                        if lfs_product_name in index_optionals:
+                            # might be skippable if dependants are installed
+                            lfs_product = self.product_index[lfs_product_name]
+                            dependants = set(d.name for d in self.product_index.dependants(lfs_product))
+                            if dependants.issubset(self.installed_name_set):
+                                print(f"Skipping {lfs_product_name} checkout - all dependants installed")
+                                queue.task_done()
+                                continue
                     print(f"Pulling {lfs_product_name} LFS data...")
                     t0 = time.time()
                     assert self.build_dir is not None
@@ -998,10 +1001,10 @@ class BuildDirectoryConstructor:
     def construct(self, product_names, refs):
         self.product_fetcher.do_fetch_products(product_names, refs)
         product_index = self.product_fetcher.product_index
-        if SKIP_LFS_ON_INSTALLED_DEPENDANTS:
-            print(f"Skipped checkouts for {self.product_fetcher.skipped_lfs_product_names}")
-        if REWRITE_PRODUCTS_INDEX_ON_SKIPPED_LFS_PRODUCTS:
-            product_index = remove_products(product_index, self.product_fetcher.skipped_lfs_product_names)
+        if INSTALL_IGNORES_OPTIONAL_DEPENDENCIES:
+            print(f"Skipped install/checkout for {self.product_fetcher.skipped_optionals}")
+        if REWRITE_PRODUCTS_INDEX_ON_SKIPPED_OPTIONALS:
+            product_index = remove_products(product_index, self.product_fetcher.skipped_optionals)
         return Manifest(product_index, None)
 
     @staticmethod

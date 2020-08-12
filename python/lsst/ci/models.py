@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Set, Optional, Dict
+from typing import List, Set, Optional, Dict, Iterable
 
 from . import tsort
 
@@ -84,6 +84,27 @@ class ProductIndex(dict):
             the products which require `product`
         """
         return [self[dependant] for dependant in self._dependants[product.name]]
+
+    def optionals(self) -> Set[str]:
+        """Find the full set of dependencies which are purely optional.
+
+        Returns
+        -------
+        set
+            names of products which are not explicitly required in the product
+            index.
+        """
+        optionals = set()
+        for dependency, dependant_names in self._dependants.items():
+            optional = True
+            for dependant_name in dependant_names:
+                # We know it's a dependency of the dependant - only check optionals
+                dependant_optionals = self[dependant_name].optional_dependencies or set()
+                if dependency not in dependant_optionals:
+                    optional = False
+            if optional:
+                optionals.add(dependency)
+        return optionals
 
     def __setitem__(self, key, value):
         # invalidate the toposort if an item is set
