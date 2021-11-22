@@ -4,7 +4,7 @@ from typing import List, Set, Optional, Dict
 
 from . import tsort
 
-DEFAULT_BRANCH_NAME = "master"
+DEFAULT_BRANCH_NAME = "main"
 
 
 class ProductIndex(dict):
