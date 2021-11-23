@@ -3,4 +3,10 @@ extends: default
 
 rules:
   # 80 chars should be enough, but don't fail if a line is longer
+  document-start:
+    ignore: |
+      /.github/workflows/
   line-length: disable
+  truthy:
+    ignore: |
+      /.github/workflows/
