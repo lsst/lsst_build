@@ -10,7 +10,7 @@ from unittest.mock import Mock
 sys.modules['eups'] = Mock()
 sys.modules['eups.tags'] = Mock()
 
-from lsst.ci.models import DEFAULT_BRANCH_NAME
+from lsst.ci.models import DEFAULT_BRANCH_NAME # NOQA
 from lsst.ci.prepare import ProductFetcher, RemoteError, VersionDbHash  # NOQA
 from lsst.ci.git import GitError # NOQA
 import lsst.ci.git # NOQA

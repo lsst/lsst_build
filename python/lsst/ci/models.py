@@ -1,10 +1,10 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import List, Set, Optional, Dict
+from typing import List, Set, Optional
 
 from . import tsort
 
-DEFAULT_BRANCH_NAME = "master"
+DEFAULT_BRANCH_NAME = "main"
 
 
 class ProductIndex(dict):

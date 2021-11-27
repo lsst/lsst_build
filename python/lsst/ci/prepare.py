@@ -208,7 +208,7 @@ class ProductFetcher:
         """Generate a list of refs to attempt to checkout."""
 
         # ref precedence should be:
-        # user specified refs > repos.yaml default ref > implicit master
+        # user specified refs > repos.yaml default ref > implicit main
         refs = copy.copy(refs)
 
         if repo_spec.ref:
@@ -242,7 +242,7 @@ class ProductFetcher:
         Returns
         -------
         ref
-            A `Ref` object describing the checked out ref (e.g., 'master')
+            A `Ref` object describing the checked out ref (e.g., 'main')
         dependencies
             list of declared dependencies for the product
         """
@@ -684,7 +684,7 @@ class VersionDb(metaclass=abc.ABCMeta):
         productdir
             the directory with product source code
         ref
-            the git ref that has been checked out into productdir (e.g., 'master')
+            the git ref that has been checked out into productdir (e.g., 'main')
         dependencies (list):
             A list of `Product`s that are the immediate dependencies of product_name
 

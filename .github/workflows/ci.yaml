@@ -1,0 +1,27 @@
+name: Acceptance tests
+
+on:
+  - pull_request
+
+jobs:
+  accept:
+    name: Acceptance test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: deploy and rebuild
+        run: |
+          set -e
+          export LSST_BUILD_GITREV="$GITHUB_SHA"
+          echo "GITHUB_SHA: ${GITHUB_SHA}"
+          LSSTSW="${PWD}/lsstsw"
+          git clone https://github.com/lsst/lsstsw.git "$LSSTSW"
+          ln -s .. "${LSSTSW}/lsst_build"
+          # prevent ./bin/deploy from trying to [re]clone lsst_build
+          touch "${LSSTSW}/lsst_build/.deployed"
+          cd "$LSSTSW"
+          ./bin/deploy
+          . "${LSSTSW}/bin/envconfig"
+          rebuild utils
+          python -c "import yaml as y;print(y.dump(y.load(open('./build/status.yaml'), Loader=y.SafeLoader)))"
