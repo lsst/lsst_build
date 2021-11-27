@@ -107,6 +107,9 @@ class Git:
     async def lfs(self, *args, **kwargs):
         return await self('lfs', *args, **kwargs)
 
+    async def remote(self, *args, **kwargs):
+        return await self('remote', *args, **kwargs)
+
     def sync_checkout(self, *args, **kwargs):
         return self._sync('checkout', *args, **kwargs)
 
@@ -139,3 +142,6 @@ class Git:
 
     def sync_lfs(self, *args, **kwargs):
         return self._sync('lfs', *args, **kwargs)
+
+    def sync_remote(self, *args, **kwargs):
+        return self._sync('remote', *args, **kwargs)
