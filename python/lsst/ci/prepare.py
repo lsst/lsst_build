@@ -358,6 +358,10 @@ class ProductFetcher:
                             "+refs/heads/*:refs/remotes/origin/*",
                             "refs/tags/*:refs/tags/*")
 
+            # ensure default branch matches origin
+            # (mostly for eups pkgautoversion)
+            await git.remote("set-head", "origin", "-a")
+
         # find a ref that matches, checkout it
         for ref in self.ref_candidates(repo_spec, refs):
             sha1, _ = await git.rev_parse("-q", "--verify", "refs/remotes/origin/" + ref, return_status=True)
