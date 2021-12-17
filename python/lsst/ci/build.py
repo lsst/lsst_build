@@ -3,20 +3,20 @@
 from typing import List, TextIO
 
 import eups
-
-import subprocess
-import textwrap
-import os
-import stat
-import sys
-import shutil
-import pipes
-import time
 import eups.tags
+
 import contextlib
 import datetime
-import yaml
+import os
+import pipes
 import select
+import shutil
+import stat
+import subprocess
+import sys
+import textwrap
+import time
+import yaml
 
 from .prepare import Manifest
 from . import models
