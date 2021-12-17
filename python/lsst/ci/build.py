@@ -16,6 +16,7 @@ import eups.tags
 import contextlib
 import datetime
 import yaml
+import select
 
 from .prepare import Manifest
 from . import models
@@ -240,9 +241,21 @@ class Builder:
             # execute the build file from the product directory, capturing the output and return code
             process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                        cwd=productdir)
-            for line in iter(process.stdout.readline, b''):
-                line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), line.decode())
-                logfp.write(line)
+            selectList = [process.stdout]
+            buf = b""
+            while True:
+                # Wait up to 2 seconds for output
+                readyToRead, _, _ = select.select(selectList, [], [], 2)
+                if readyToRead:
+                    c = process.stdout.read(1)
+                    buf += c
+                    if (c == b"" or c == b"\n") and buf:
+                        line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), buf.decode())
+                        logfp.write(line)
+                        buf = b""
+                    # Ready to read but nothing there means end of file
+                    if c == b"":
+                        break
                 progress.report_progress()
 
         retcode = process.poll()
