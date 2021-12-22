@@ -692,7 +692,7 @@ class VersionDb(metaclass=abc.ABCMeta):
         str
             the XXX+YYY version string.
         """
-        product_version = product.sha1[:self.sha_abbrev_len]
+        product_version = "g" + product.sha1[:self.sha_abbrev_len]
         # add +XXXX suffix, if any
         suffix = ""
         if len(dependencies):
