@@ -13,8 +13,6 @@ import hashlib
 import shutil
 import time
 import re
-import pipes
-import subprocess
 import abc
 import yaml
 import copy
@@ -557,7 +555,7 @@ class ProductFetcher:
                     repo_dir = os.path.join(self.build_dir, product.name)
                     all_dependencies = self.product_index.flat_dependencies(product)
                     product.version = await self.version_db.version(
-                        product.name, repo_dir, product.ref.name, all_dependencies
+                        product, repo_dir, all_dependencies
                     )
                     queue.task_done()
                 except Exception as e:
@@ -674,21 +672,18 @@ class VersionDb(metaclass=abc.ABCMeta):
 
     async def version(
             self,
-            product_name: str,
+            product: models.Product,
             productdir: str,
-            ref: str,
             dependencies: List[models.Product]
     ) -> str:
         """Return a standardized XXX+YYY EUPS version, that includes the dependencies.
 
         Parameters
         ----------
-        product_name
-            name of the product to version
+        product
+            the product to version
         productdir
             the directory with product source code
-        ref
-            the git ref that has been checked out into productdir (e.g., 'main')
         dependencies (list):
             A list of `Product`s that are the immediate dependencies of product_name
 
@@ -697,17 +692,11 @@ class VersionDb(metaclass=abc.ABCMeta):
         str
             the XXX+YYY version string.
         """
-        q = pipes.quote
-        cmd = "cd %s && pkgautoversion %s" % (q(productdir), q(ref))
-        process = await asyncio.create_subprocess_shell(cmd, stdout=subprocess.PIPE)
-        (stdout, stderr) = await process.communicate()
-        product_version = stdout.decode().strip()
-        if process.returncode != 0:
-            print(f"{product_name} failed for {ref} in {productdir}")
+        product_version = product.sha1[:self.sha_abbrev_len]
         # add +XXXX suffix, if any
         suffix = ""
         if len(dependencies):
-            suffix = self.get_suffix(product_name, product_version, dependencies)
+            suffix = self.get_suffix(product.name, product_version, dependencies)
         assert suffix.__class__ == str
         suffix = "+%s" % suffix if suffix else ""
         return "%s%s" % (product_version, suffix)
