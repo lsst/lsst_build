@@ -209,7 +209,6 @@ class ProductFetcher:
 
     def ref_candidates(self, repo_spec: models.RepoSpec, refs: List[str]) -> List[str]:
         """Generate a list of refs to attempt to checkout."""
-
         # ref precedence should be:
         # user specified refs > repos.yaml default ref > implicit main
         refs = copy.copy(refs)
@@ -249,7 +248,6 @@ class ProductFetcher:
         dependencies
             list of declared dependencies for the product
         """
-
         # do not handle exceptions unless there will be multiple tries
         for i in range(self.tries - 1):
             try:
@@ -433,7 +431,8 @@ class ProductFetcher:
 
     def validate_refs(self, refs: List[str]):
         """Validate that all external refs were found at least once.
-        Raises RuntimeError if some have not been found."""
+        Raises RuntimeError if some have not been found.
+        """
         matched_refs = {ref: 0 for ref in refs}
         for product in self.product_index.values():
             assert product.ref is not None
@@ -736,7 +735,6 @@ class VersionDbHash(VersionDb):
 
     def __get_build_id(self):
         """Allocate the next unused EUPS tag that matches the bNNNN pattern"""
-
         tags = eups.tags.Tags()
         tags.loadFromEupsPath(self.eups.path)
 
@@ -873,7 +871,8 @@ class ExclusionResolver:
 
 class BuildDirectoryConstructor:
     """A class that, given one or more top level packages, recursively
-    clones them to a build directory thus preparing them to be built."""
+    clones them to a build directory thus preparing them to be built.
+    """
 
     def __init__(self, build_dir, eups, product_fetcher, version_db, exclusion_resolver):
         self.build_dir = os.path.abspath(build_dir)

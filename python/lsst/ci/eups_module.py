@@ -36,6 +36,7 @@ class EupsModule:
             the name of this product we are investigating
         table_file_path
             the path of the table file with information about dependencies
+
         Returns
         -------
         list
@@ -61,6 +62,7 @@ class EupsModule:
             the name of this product we are investigating
         table_file_path
             the path of the table file with information about dependencies
+
         Returns
         -------
         list
