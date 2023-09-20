@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Set
 
 from . import tsort
 
@@ -39,7 +38,7 @@ class ProductIndex(dict):
         new_index.sorted_groups = new_sorted_groups
         return new_index
 
-    def flat_dependencies(self, product: Product, resolved: Optional[Set[str]] = None) -> List[Product]:
+    def flat_dependencies(self, product: Product, resolved: set[str] | None = None) -> list[Product]:
         """Return and calculate the set of flat dependencies for this product.
 
         Parameters
@@ -95,10 +94,10 @@ class Product:
 
     name: str
     sha1: str
-    version: Optional[str]
-    dependencies: List[str]
-    optional_dependencies: Optional[List[str]] = None
-    ref: Optional[Ref] = None
+    version: str | None
+    dependencies: list[str]
+    optional_dependencies: list[str] | None = None
+    ref: Ref | None = None
 
 
 @dataclass

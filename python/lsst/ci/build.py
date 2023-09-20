@@ -1,4 +1,5 @@
-#############################################################################
+from __future__ import annotations
+
 # Builder
 import contextlib
 import datetime
@@ -11,7 +12,7 @@ import subprocess
 import sys
 import textwrap
 import time
-from typing import List, TextIO
+from typing import TextIO
 
 import eups
 import eups.tags
@@ -156,7 +157,7 @@ class Builder:
         self.manifest = manifest
         self.progress = progress
         self.eups = eups
-        self.built: List[models.Product] = []
+        self.built: list[models.Product] = []
         self.failed_at = None
 
     def _tag_product(self, name, version, tag):

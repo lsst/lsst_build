@@ -1,4 +1,4 @@
-from typing import List
+from __future__ import annotations
 
 import eups  # type: ignore
 import eups.tags  # type: ignore
@@ -27,7 +27,7 @@ class EupsModule:
         """Return the table file location for a package"""
         return f"ups/{package_name}.table"
 
-    def dependencies(self, product_name: str, table_file_path: str) -> List[str]:
+    def dependencies(self, product_name: str, table_file_path: str) -> list[str]:
         """Parse the table file to discover explicit dependencies.
 
         Parameters
@@ -53,7 +53,7 @@ class EupsModule:
             dependency_names.append(dependency.name)
         return dependency_names
 
-    def optional_dependencies(self, product_name: str, table_file_path: str) -> List[str]:
+    def optional_dependencies(self, product_name: str, table_file_path: str) -> list[str]:
         """Parse the table file to discover optional dependencies.
 
         Parameters

@@ -1,11 +1,13 @@
-from typing import Dict, Iterable, Iterator, List, Mapping, Optional, Set, Tuple
+from __future__ import annotations
+
+from collections.abc import Iterable, Iterator, Mapping
 
 
 class GraphError(Exception):
     """An exception when there is a problem with the graph."""
 
 
-def to_dep_graph(edges: Iterable[Tuple[str, Optional[str]]]) -> Dict[str, Set[str]]:
+def to_dep_graph(edges: Iterable[tuple[str, str | None]]) -> dict[str, set[str]]:
     """Take an iterable collection of (node, dependency) pairs and return
     a mapping of nodes to the set of dependencies for that node.
 
@@ -21,7 +23,7 @@ def to_dep_graph(edges: Iterable[Tuple[str, Optional[str]]]) -> Dict[str, Set[st
         The values in the graph dictionary associated as name to the set of
         dependencies.
     """
-    graph: Dict[str, Set] = {}
+    graph: dict[str, set] = {}
     for node, dep in edges:
         node_set = graph.setdefault(node, set())
         if dep:  # has an edge
@@ -31,7 +33,7 @@ def to_dep_graph(edges: Iterable[Tuple[str, Optional[str]]]) -> Dict[str, Set[st
     return graph
 
 
-def toposort(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
+def toposort(graph_set: dict[str, set[str]]) -> Iterator[list]:
     """Perform a topological sort based on Kahn's algorithm.
 
     This function produces an iterator of topologically sorted dependency
@@ -59,7 +61,7 @@ def toposort(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
         An iterator which produces lists of dependencies in a bottom-up
         topological sort
     """
-    all_dependencies: Set[str] = set()
+    all_dependencies: set[str] = set()
     self_including_nodes = []
     for node, dependencies in graph_set.items():
         if node in dependencies:
@@ -88,7 +90,7 @@ def toposort(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
         raise GraphError(f"Cycle among nodes: {remaining_nodes_list}")
 
 
-def toposort_dfs(graph: Mapping[str, Set[str]]) -> List[str]:
+def toposort_dfs(graph: Mapping[str, set[str]]) -> list[str]:
     """Perform a depth-first search topological sort on the mapping of
     dependencies and return an ordered list.
 
@@ -145,7 +147,7 @@ def toposort_dfs(graph: Mapping[str, Set[str]]) -> List[str]:
     return sorted_node_names
 
 
-def flatten(dependency_lists: Iterable[List]) -> List[str]:
+def flatten(dependency_lists: Iterable[list]) -> list[str]:
     """Flatten an iterable collection of dependency lists for serial
     processing.
 

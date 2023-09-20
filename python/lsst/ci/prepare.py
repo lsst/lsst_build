@@ -11,7 +11,7 @@ import re
 import shutil
 import sys
 import time
-from typing import Awaitable, Callable, Dict, List, Optional, Set, Tuple
+from collections.abc import Awaitable, Callable
 
 import eups  # type: ignore
 import eups.tags  # type: ignore
@@ -62,7 +62,7 @@ class Manifest:
         A unique identifier for this build
     """
 
-    def __init__(self, product_index: models.ProductIndex, build_id: Optional[str] = None):
+    def __init__(self, product_index: models.ProductIndex, build_id: str | None = None):
         self.build_id = build_id
         assert product_index.toposorted
         self.product_index = product_index
@@ -151,18 +151,18 @@ class ProductFetcher:
 
     def __init__(
         self,
-        build_dir: Optional[str],
+        build_dir: str | None,
         repos: str,
-        repository_patterns: Optional[str] = None,
-        dependency_module: Optional[EupsModule] = None,
-        version_db: Optional[VersionDb] = None,
+        repository_patterns: str | None = None,
+        dependency_module: EupsModule | None = None,
+        version_db: VersionDb | None = None,
         no_fetch: bool = False,
         out=sys.stdout,
         tries=1,
     ):
         self.build_dir = os.path.abspath(build_dir) if build_dir else None
         if repository_patterns:
-            self.repository_patterns: Optional[List[str]] = repository_patterns.split("|")
+            self.repository_patterns: list[str] | None = repository_patterns.split("|")
         else:
             self.repository_patterns = None
         self.no_fetch = no_fetch
@@ -179,9 +179,9 @@ class ProductFetcher:
         self.dependency_module = dependency_module
         self.version_db = version_db
         self.product_index = models.ProductIndex()
-        self.lfs_product_names: List[str] = []
+        self.lfs_product_names: list[str] = []
 
-        self.repo_specs: Dict[str, models.RepoSpec] = {}
+        self.repo_specs: dict[str, models.RepoSpec] = {}
         for product, spec in self.repos.items():
             if isinstance(spec, str):
                 rs = models.RepoSpec(product, spec)
@@ -207,7 +207,7 @@ class ProductFetcher:
             locations += [pat % data for pat in self.repository_patterns]
         return locations
 
-    def ref_candidates(self, repo_spec: models.RepoSpec, refs: List[str]) -> List[str]:
+    def ref_candidates(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
         """Generate a list of refs to attempt to checkout."""
         # ref precedence should be:
         # user specified refs > repos.yaml default ref > implicit main
@@ -222,7 +222,7 @@ class ProductFetcher:
 
         return refs
 
-    async def fetch(self, product: str, refs: List[str]) -> Tuple[models.Ref, List[str]]:
+    async def fetch(self, product: str, refs: list[str]) -> tuple[models.Ref, list[str]]:
         """Clone the product repository and checkout the first matching ref.
 
         If `self.build_dir`/`product` does not exist, discover the product
@@ -271,7 +271,7 @@ class ProductFetcher:
         # debugging + allow an exception to propagate from the final attempt
         return await self._fetch(product, refs)
 
-    async def _fetch(self, product: str, refs: List[str]) -> Tuple[models.Ref, List[str]]:
+    async def _fetch(self, product: str, refs: list[str]) -> tuple[models.Ref, list[str]]:
         """Retrieve target and dependencies.
 
         This method should be considered private to fetch(d)
@@ -432,7 +432,7 @@ class ProductFetcher:
         self.product_index[product] = product_obj
         return target_ref, dependency_names
 
-    def validate_refs(self, refs: List[str]):
+    def validate_refs(self, refs: list[str]):
         """Validate that all external refs were found at least once.
         Raises RuntimeError if some have not been found.
         """
@@ -473,7 +473,7 @@ class ProductFetcher:
         # Wait until all worker tasks are cancelled.
         await asyncio.gather(*tasks, return_exceptions=True)
 
-    def do_fetch_products(self, products: List[str], refs: List[str]):
+    def do_fetch_products(self, products: list[str], refs: list[str]):
         """Perform various product fetching tasks asynchronously while
         building the product index.
 
@@ -504,9 +504,9 @@ class ProductFetcher:
             loop.run_until_complete(self.lfs_checkout())
         loop.close()
 
-    async def fetch_products(self, product_names: List[str], refs: List[str]) -> Set[str]:
-        resolved: Set[str] = set()
-        queued: Set[str] = set()
+    async def fetch_products(self, product_names: list[str], refs: list[str]) -> set[str]:
+        resolved: set[str] = set()
+        queued: set[str] = set()
         print("Fetching Products...", file=self.out)
         exceptions = []
 
@@ -643,7 +643,7 @@ class VersionDb(metaclass=abc.ABCMeta):
     """
 
     @abc.abstractmethod
-    def get_suffix(self, product_name: str, product_version: str, dependencies: List[models.Product]) -> str:
+    def get_suffix(self, product_name: str, product_version: str, dependencies: list[models.Product]) -> str:
         """Return a unique +YYY version suffix for a product given its
         dependencies.
 
@@ -682,7 +682,7 @@ class VersionDb(metaclass=abc.ABCMeta):
         pass
 
     async def version(
-        self, product: models.Product, productdir: str, dependencies: List[models.Product]
+        self, product: models.Product, productdir: str, dependencies: list[models.Product]
     ) -> str:
         """Return a standardized XXX+YYY EUPS version, that includes the
         dependencies.
@@ -721,14 +721,14 @@ class VersionDbHash(VersionDb):
         self.sha_abbrev_len = sha_abbrev_len
         self.eups = eups
 
-    def hash_dependencies(self, dependencies: List[models.Product]) -> str:
+    def hash_dependencies(self, dependencies: list[models.Product]) -> str:
         m = hashlib.sha1()
         for dep in sorted(dependencies, key=lambda d: d.name):
             s = "%s\t%s\n" % (dep.name, dep.sha1)
             m.update(s.encode("ascii"))
         return m.hexdigest()
 
-    def get_suffix(self, product_name: str, product_version: str, dependencies: List[models.Product]) -> str:
+    def get_suffix(self, product_name: str, product_version: str, dependencies: list[models.Product]) -> str:
         """Return a hash of the sorted list of printed (dep_name, dep_version)
         tuples.
         """
