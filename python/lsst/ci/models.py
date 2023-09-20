@@ -31,7 +31,7 @@ class ProductIndex(dict):
         topo_sorted_product_lists = tsort.toposort(dep_graph)
         new_index = ProductIndex()
         new_sorted_groups = []
-        for group_idx, sort_group in enumerate(topo_sorted_product_lists):
+        for sort_group in topo_sorted_product_lists:
             new_sorted_groups.append(sort_group)
             for product_name in sort_group:
                 new_index[product_name] = self[product_name]

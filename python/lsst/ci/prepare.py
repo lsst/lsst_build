@@ -249,7 +249,7 @@ class ProductFetcher:
             list of declared dependencies for the product
         """
         # do not handle exceptions unless there will be multiple tries
-        for i in range(self.tries - 1):
+        for _ in range(self.tries - 1):
             try:
                 return await self._fetch(product, refs)
             except (GitError, RemoteError, OSError) as e:
@@ -461,7 +461,7 @@ class ProductFetcher:
             The parameter for the worker function to be instantiated.
         """
         tasks = []
-        for i in range(ASYNC_QUEUE_WORKERS):
+        for _ in range(ASYNC_QUEUE_WORKERS):
             task = asyncio.create_task(worker_function(queue))
             tasks.append(task)
 
