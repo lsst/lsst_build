@@ -1,4 +1,4 @@
-from lsst.ci.models import ProductIndex, Product
+from lsst.ci.models import Product, ProductIndex
 
 dependency_nodes = [
     ("z", "y"),  # z depends on y

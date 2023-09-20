@@ -18,6 +18,7 @@ class EupsModule:
     exclusion_resolver : ExclusionResolver
         object to help exclude products when getting declared dependencies
     """
+
     def __init__(self, eups: eups.Eups, exclusion_resolver):
         self.eups = eups
         self.exclusion_resolver = exclusion_resolver

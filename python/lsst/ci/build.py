@@ -1,10 +1,5 @@
 #############################################################################
 # Builder
-from typing import List, TextIO
-
-import eups
-import eups.tags
-
 import contextlib
 import datetime
 import os
@@ -16,19 +11,23 @@ import subprocess
 import sys
 import textwrap
 import time
+from typing import List, TextIO
+
+import eups
+import eups.tags
 import yaml
 
-from .prepare import Manifest
 from . import models
+from .prepare import Manifest
 
 
 def product_representer(dumper, data):
     obj = {
-        'name': str(data.name),
-        'sha1': str(data.sha1),
-        'version': str(data.version),
+        "name": str(data.name),
+        "sha1": str(data.sha1),
+        "version": str(data.version),
     }
-    return dumper.represent_mapping('tag:yaml.org,2002:map', obj)
+    return dumper.represent_mapping("tag:yaml.org,2002:map", obj)
 
 
 yaml.add_representer(models.Product, product_representer)
@@ -65,7 +64,7 @@ class ProgressReporter:
             self.product = product
 
         def _build_started(self):
-            self.out.write('%20s: ' % self.product.name)
+            self.out.write("%20s: " % self.product.name)
             self.out.flush()
             self.progress_bar = self.product.version + " "
             self.t0 = self.t = time.time()
@@ -83,7 +82,7 @@ class ProgressReporter:
                     self.out.write(self.progress_bar[0])
                     self.progress_bar = self.progress_bar[1:]
                 else:
-                    self.out.write('.')
+                    self.out.write(".")
 
                 self.out.flush()
                 self.t += 2
@@ -96,7 +95,7 @@ class ProgressReporter:
 
             # If logfile is None, the product was already installed
             if logfile is None:
-                self.out.write('(already installed).\n')
+                self.out.write("(already installed).\n")
                 self.out.flush()
             else:
                 elapsed_time = time.time() - self.t0
@@ -147,6 +146,7 @@ class Builder:
     eups
         an eups object for eups operations (e.g. discovering product info)
     """
+
     def __init__(self, build_dir: str, manifest: Manifest, progress: ProgressReporter, eups: eups.Eups):
         self.build_dir = build_dir
         self.manifest = manifest
@@ -163,18 +163,21 @@ class Builder:
         # run the eupspkg sequence for the product
         #
         productdir = os.path.abspath(os.path.join(self.build_dir, product.name))
-        buildscript = os.path.join(productdir, '_build.sh')
-        logfile = os.path.join(productdir, '_build.log')
+        buildscript = os.path.join(productdir, "_build.sh")
+        logfile = os.path.join(productdir, "_build.log")
         eupsdir = eups.productDir("eups")
         eupspath = os.environ["EUPS_PATH"]
 
         # construct the tags file with exact dependencies
-        setups = ["\t%-20s %s" % (dep.name, dep.version)
-                  for dep in self.manifest.product_index.flat_dependencies(product)]
+        setups = [
+            "\t%-20s %s" % (dep.name, dep.version)
+            for dep in self.manifest.product_index.flat_dependencies(product)
+        ]
 
         # create the buildscript
-        with open(buildscript, 'w', encoding='utf-8') as fp:
-            text = textwrap.dedent(u"""\
+        with open(buildscript, "w", encoding="utf-8") as fp:
+            text = textwrap.dedent(
+                """\
             #!/bin/bash
 
             # redirect stderr to stdin
@@ -220,15 +223,17 @@ class Builder:
 
             # explicitly append SHA1 to pkginfo
             echo SHA1=%(sha1)s >> $(eups list %(product)s %(version)s -d)/ups/pkginfo
-            """ % {
-                'product': product.name,
-                'version': product.version,
-                'sha1': product.sha1,
-                'productdir': productdir,
-                'setups': '\n            '.join(setups),
-                'eupsdir': eupsdir,
-                'eupspath': eupspath,
-            })
+            """
+                % {
+                    "product": product.name,
+                    "version": product.version,
+                    "sha1": product.sha1,
+                    "productdir": productdir,
+                    "setups": "\n            ".join(setups),
+                    "eupsdir": eupsdir,
+                    "eupspath": eupspath,
+                }
+            )
 
             fp.write(text)
 
@@ -237,10 +242,11 @@ class Builder:
         os.chmod(buildscript, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         # Run the build script
-        with open(logfile, 'w', encoding='utf-8') as logfp:
+        with open(logfile, "w", encoding="utf-8") as logfp:
             # execute the build file from the product directory, capturing the output and return code
-            process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                       cwd=productdir)
+            process = subprocess.Popen(
+                buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir
+            )
             selectList = [process.stdout]
             buf = b""
             while True:
@@ -302,18 +308,18 @@ class Builder:
             os.remove(self.status_file())
 
     def status_file(self):
-        return os.path.join(self.build_dir, 'status.yaml')
+        return os.path.join(self.build_dir, "status.yaml")
 
     def write_status(self):
         status = {
-            'built': self.built,
+            "built": self.built,
         }
 
         if self.failed_at is not None:
-            status['failed_at'] = self.failed_at
+            status["failed_at"] = self.failed_at
 
-        with open(self.status_file(), 'w', encoding='utf-8') as sf:
-            yaml.dump(status, sf, encoding='utf-8', default_flow_style=False)
+        with open(self.status_file(), "w", encoding="utf-8") as sf:
+            yaml.dump(status, sf, encoding="utf-8", default_flow_style=False)
 
     @staticmethod
     def run(args):
@@ -327,8 +333,8 @@ class Builder:
 
         progress = ProgressReporter(sys.stdout)
 
-        manifest_fn = os.path.join(build_dir, 'manifest.txt')
-        with open(manifest_fn, encoding='utf-8') as fp:
+        manifest_fn = os.path.join(build_dir, "manifest.txt")
+        with open(manifest_fn, encoding="utf-8") as fp:
             manifest = Manifest.from_file(fp)
 
         b = Builder(build_dir, manifest, progress, eups_obj)

@@ -6,8 +6,8 @@
 import argparse
 import os
 
-from lsst.ci.prepare import BuildDirectoryConstructor
 from lsst.ci.build import Builder
+from lsst.ci.prepare import BuildDirectoryConstructor
 
 parser = argparse.ArgumentParser(
     description='Build LSST Software Stack from git source',

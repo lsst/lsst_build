@@ -1,4 +1,4 @@
-from typing import Iterator, Iterable, List, Mapping, Set, Tuple, Dict, Optional
+from typing import Dict, Iterable, Iterator, List, Mapping, Optional, Set, Tuple
 
 
 class GraphError(Exception):
