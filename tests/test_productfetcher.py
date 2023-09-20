@@ -101,7 +101,8 @@ def test_fetch_bad_remote_retry(tmpdir, repos_yaml_bad, mocker, test_product):
 
 
 def test_fetch_bad_git_checkout_retry(tmpdir, repos_yaml_good, mocker, test_product):
-    """Verify that repo is recloned after checkout on an existing clone fails"""
+    """Verify that repo is recloned after checkout on an existing clone fails.
+    """
     tries = 3
     refs = [DEFAULT_BRANCH_NAME]
 

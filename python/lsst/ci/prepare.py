@@ -51,7 +51,8 @@ class RemoteError(Exception):
 
 
 class Manifest:
-    """A representation of topologically ordered list of EUPS products to be built
+    """A representation of topologically ordered list of EUPS products to be
+    built.
 
     Parameters
     ----------
@@ -122,7 +123,8 @@ class Manifest:
 
 
 class ProductFetcher:
-    """Fetch products from remote git repositories and checks out matching refs.
+    """Fetch products from remote git repositories and checks out matching
+    refs.
 
     See `fetch` for further documentation.
 
@@ -345,15 +347,17 @@ class ProductFetcher:
 
         # update from origin
         if not self.no_fetch:
-            # in order to avoid broken HEAD in case the checkout branch is removed
-            # we detach the HEAD of the local repository.
+            # in order to avoid broken HEAD in case the checkout branch is
+            # removed we detach the HEAD of the local repository.
             await git.checkout("--detach")
-            # the line below ensures with a single git command that the refspecs
+            # the line below ensures with a single git command that the
+            # refspecs
             #     refs/heads/*
             #     refs/remotes/origin*
             #     refs/tags/*
             # are synchronized between local repository and remote repository
-            # this ensures that branches deleted remotely, will also be deleted locally
+            # this ensures that branches deleted remotely, will also be deleted
+            # locally
             await git.fetch(
                 "-fp",
                 "origin",
@@ -382,8 +386,8 @@ class ProductFetcher:
 
             if branch:
                 # profiling showed that git-pull took a lot of time; since
-                # we know we want the checked out branch to be at the remote sha1
-                # we'll just reset it
+                # we know we want the checked out branch to be at the remote
+                # sha1 we'll just reset it
                 await git.reset("--hard", sha1)
 
             assert await git.rev_parse("HEAD") == sha1
@@ -638,7 +642,8 @@ class VersionDb(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     def get_suffix(self, product_name: str, product_version: str, dependencies: List[models.Product]) -> str:
-        """Return a unique +YYY version suffix for a product given its dependencies
+        """Return a unique +YYY version suffix for a product given its
+        dependencies.
 
         Parameters
         ----------
@@ -677,16 +682,18 @@ class VersionDb(metaclass=abc.ABCMeta):
     async def version(
         self, product: models.Product, productdir: str, dependencies: List[models.Product]
     ) -> str:
-        """Return a standardized XXX+YYY EUPS version, that includes the dependencies.
+        """Return a standardized XXX+YYY EUPS version, that includes the
+        dependencies.
 
         Parameters
         ----------
         product
-            the product to version
+            the product to version.
         productdir
-            the directory with product source code
+            the directory with product source code.
         dependencies (list):
-            A list of `Product`s that are the immediate dependencies of product_name
+            A list of `Product`s that are the immediate dependencies of
+            product_name.
 
         Returns
         -------
@@ -704,7 +711,9 @@ class VersionDb(metaclass=abc.ABCMeta):
 
 
 class VersionDbHash(VersionDb):
-    """Subclass of `VersionDb` that generates +YYY suffixes by hashing the dependency names and versions"""
+    """Subclass of `VersionDb` that generates +YYY suffixes by hashing the
+    dependency names and versions.
+    """
 
     def __init__(self, sha_abbrev_len: int, eups: eups.Eups):
         self.sha_abbrev_len = sha_abbrev_len
@@ -718,7 +727,9 @@ class VersionDbHash(VersionDb):
         return m.hexdigest()
 
     def get_suffix(self, product_name: str, product_version: str, dependencies: List[models.Product]) -> str:
-        """Return a hash of the sorted list of printed (dep_name, dep_version) tuples"""
+        """Return a hash of the sorted list of printed (dep_name, dep_version)
+        tuples.
+        """
         hash = self.hash_dependencies(dependencies)
         suffix = hash[: self.sha_abbrev_len]
         return suffix
@@ -741,8 +752,8 @@ class VersionDbHash(VersionDb):
 
 
 class VersionDbGit(VersionDbHash):
-    """Subclass of `VersionDb` that generates +DEADBEEF suffixes based on git commits,
-    but still tracks manifests in a repository.
+    """Subclass of `VersionDb` that generates +DEADBEEF suffixes based on git
+    commits, but still tracks manifests in a repository.
     """
 
     def __init__(self, dbdir: str, sha_abbrev_len: int, eups_obj: eups.Eups):
@@ -754,8 +765,8 @@ class VersionDbGit(VersionDbHash):
         return os.path.join("manifests", "content_sha.db.txt")
 
     def __get_build_id(self, manifest_sha: str):
-        """Return a build ID unique to this manifest. If a matching manifest already
-        exists in the database, its build ID will be used.
+        """Return a build ID unique to this manifest. If a matching manifest
+        already exists in the database, its build ID will be used.
         """
         with open(os.path.join(self.dbdir, "manifests", "content_sha.db.txt"), "a+", encoding="utf-8") as fp:
             # Try to find a manifest with existing matching content
@@ -795,7 +806,8 @@ class VersionDbGit(VersionDbHash):
             manifest.to_file(fp)
 
         if git.sync_tag("-l", manifest.build_id) == manifest.build_id:
-            # If the build_id/manifest are being reused, VersionDB repository must be clean
+            # If the build_id/manifest are being reused, VersionDB repository
+            # must be clean.
             if git.sync_describe("--always", "--dirty=-prljavonakraju").endswith("-prljavonakraju"):
                 raise Exception("Trying to reuse the build_id, but the versionDB repository is dirty!")
         else:

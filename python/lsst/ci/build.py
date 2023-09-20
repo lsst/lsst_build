@@ -70,12 +70,12 @@ class ProgressReporter:
             self.t0 = self.t = time.time()
 
         def report_progress(self):
-            # throttled progress reporting
+            # throttled progress reporting.
             #
-            # Write out the version string as a progress bar, character by character, and
-            # then continue with dots.
+            # Write out the version string as a progress bar, character by
+            # character, and then continue with dots.
             #
-            # Throttle updates to one character every 2 seconds
+            # Throttle updates to one character every 2 seconds.
             t1 = time.time()
             while self.t <= t1:
                 if self.progress_bar:
@@ -88,12 +88,13 @@ class ProgressReporter:
                 self.t += 2
 
         def report_result(self, retcode, logfile):
-            # Make sure we write out the full version string, even if the build ended quickly
+            # Make sure we write out the full version string, even if the build
+            # ended quickly.
             if self.progress_bar:
                 self.out.write(self.progress_bar)
                 self.out.flush()
 
-            # If logfile is None, the product was already installed
+            # If logfile is None, the product was already installed.
             if logfile is None:
                 self.out.write("(already installed).\n")
                 self.out.flush()
@@ -114,7 +115,7 @@ class ProgressReporter:
             self.product = None
 
         def _finalize(self):
-            # Usually called only when an exception is thrown
+            # Usually called only when an exception is thrown.
             if self.product is not None:
                 self.out.write("\n")
                 self.out.flush()
@@ -243,7 +244,8 @@ class Builder:
 
         # Run the build script
         with open(logfile, "w", encoding="utf-8") as logfp:
-            # execute the build file from the product directory, capturing the output and return code
+            # execute the build file from the product directory, capturing the
+            # output and return code.
             process = subprocess.Popen(
                 buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir
             )
