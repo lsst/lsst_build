@@ -135,7 +135,7 @@ def toposort_dfs(graph: Mapping[str, Set[str]]) -> List[str]:
                 visit(node_map[dep])
             except GraphError as e:
                 # unroll cycle
-                raise GraphError(e.args[0] + f" <- {n.name}")
+                raise GraphError(e.args[0] + f" <- {n.name}") from e
         n.processing = False
         n.processed = True
         sorted_node_names.append(n.name)
