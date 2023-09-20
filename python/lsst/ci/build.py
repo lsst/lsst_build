@@ -249,12 +249,12 @@ class Builder:
             process = subprocess.Popen(
                 buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir
             )
-            selectList = [process.stdout]
+            select_list = [process.stdout]
             buf = b""
             while True:
                 # Wait up to 2 seconds for output
-                readyToRead, _, _ = select.select(selectList, [], [], 2)
-                if readyToRead:
+                ready_to_read, _, _ = select.select(select_list, [], [], 2)
+                if ready_to_read:
                     c = process.stdout.read(1)
                     buf += c
                     if (c == b"" or c == b"\n") and buf:
