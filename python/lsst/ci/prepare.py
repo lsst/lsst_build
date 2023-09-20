@@ -272,7 +272,10 @@ class ProductFetcher:
         return await self._fetch(product, refs)
 
     async def _fetch(self, product: str, refs: List[str]) -> Tuple[models.Ref, List[str]]:
-        """This method should be considered private to fetch(d)"""
+        """Retrieve target and dependencies.
+
+        This method should be considered private to fetch(d)
+        """
         repo_spec = self.repo_specs[product]
         t0 = time.time()
         print("Fetching %s..." % product, file=self.out)

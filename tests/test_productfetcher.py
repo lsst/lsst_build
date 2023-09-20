@@ -18,22 +18,26 @@ from lsst.ci.prepare import ProductFetcher, RemoteError, VersionDbHash  # NOQA
 
 @pytest.fixture
 def fixture_dir():
+    """Return the data directory."""
     d = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(d, "data")
 
 
 @pytest.fixture
 def repos_yaml_good(fixture_dir):
+    """Return path to good yaml file."""
     return os.path.join(fixture_dir, "good", "repos.yaml")
 
 
 @pytest.fixture
 def repos_yaml_bad(fixture_dir):
+    """Return path to bad yaml file."""
     return os.path.join(fixture_dir, "bad", "repos.yaml")
 
 
 @pytest.fixture
 def test_product():
+    """Return representative product name."""
     return "base"
 
 

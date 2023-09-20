@@ -6,6 +6,8 @@ import subprocess
 
 
 class GitError(Exception):
+    """Represent a Git Error."""
+
     def __init__(self, returncode, cmd, output, stderr):
         self.returncode = returncode
         self.cmd = cmd
@@ -22,6 +24,8 @@ class GitError(Exception):
 
 
 class Git:
+    """Manipulate git repos."""
+
     def __init__(self, cwd=None):
         self.cwd = cwd
 

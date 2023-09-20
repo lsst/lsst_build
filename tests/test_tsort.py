@@ -57,6 +57,7 @@ multigraph_data = tsort.to_dep_graph(multigraph_data_edges)
 
 
 def test_toposort():
+    """Test topological sort."""
     sorted_lists = list(tsort.toposort(edgeless_data))
     assert sorted_lists == [["a", "b", "x"], ["y"], ["z"]]
 
@@ -71,6 +72,7 @@ def test_toposort():
 
 
 def test_toposort_dfs():
+    """Test depth first topological sort."""
     dfs_sorted = tsort.toposort_dfs(good_data)
     assert dfs_sorted == ["a", "b", "c", "x", "y", "z"]
 
@@ -82,6 +84,7 @@ def test_toposort_dfs():
 
 
 def test_flatten():
+    """Test flattening."""
     sorted_lists = tsort.toposort(good_data)
     flattened = tsort.flatten(sorted_lists)
     assert flattened == ["a", "x", "b", "y", "c", "z"]
@@ -92,6 +95,7 @@ def test_flatten():
 
 
 def test_graph_error():
+    """Test graph errors."""
     try:
         tsort.toposort(bad_data)
         assert False

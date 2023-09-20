@@ -22,6 +22,7 @@ from .prepare import Manifest
 
 
 def product_representer(dumper, data):
+    """Return YAML serialization."""
     obj = {
         "name": str(data.name),
         "sha1": str(data.sha1),
@@ -59,6 +60,8 @@ class ProgressReporter:
     """
 
     class ProductProgressReporter:
+        """Progress bar helper class."""
+
         def __init__(self, out_file_obj: TextIO, product: models.Product):
             self.out = out_file_obj
             self.product = product

@@ -2,7 +2,7 @@ from typing import Dict, Iterable, Iterator, List, Mapping, Optional, Set, Tuple
 
 
 class GraphError(Exception):
-    pass
+    """An exception when there is a problem with the graph."""
 
 
 def to_dep_graph(edges: Iterable[Tuple[str, Optional[str]]]) -> Dict[str, Set[str]]:
