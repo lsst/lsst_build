@@ -261,7 +261,7 @@ class Builder:
                     c = process.stdout.read(1)
                     buf += c
                     if (c == b"" or c == b"\n") and buf:
-                        line = "[{}Z] {}".format(datetime.datetime.utcnow().isoformat(), buf.decode())
+                        line = f"[{datetime.datetime.utcnow().isoformat()}Z] {buf.decode()}"
                         logfp.write(line)
                         buf = b""
                     # Ready to read but nothing there means end of file
