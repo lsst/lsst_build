@@ -62,7 +62,7 @@ class ProductIndex(dict):
             if dependency_product.name not in resolved:
                 resolved.add(dependency_product.name)
                 self.flat_dependencies(dependency_product, resolved)
-        return list(self[resolved_name] for resolved_name in resolved)
+        return [self[resolved_name] for resolved_name in resolved]
 
     def __setitem__(self, key, value):
         # invalidate the toposort if an item is set

@@ -112,7 +112,7 @@ class Manifest:
             arr = line.split()
             if len(arr) == 4:
                 (name, sha1, version, deps) = arr
-                deps = [dep_name for dep_name in deps.split(",")]
+                deps = list(deps.split(","))
             else:
                 (name, sha1, version) = arr
                 deps = []
@@ -847,7 +847,7 @@ class ExclusionResolver:
         try:
             rc = self._exclusion_regex_cache
         except AttributeError:
-            rc = self._exclusion_regex_cache = dict()
+            rc = self._exclusion_regex_cache = {}
 
         if product not in rc:
             rc[product] = [dep_re for (dep_re, prod_re) in self.exclusions if prod_re.match(product)]

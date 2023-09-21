@@ -69,16 +69,16 @@ def toposort(graph_set: dict[str, set[str]]) -> Iterator[list]:
         all_dependencies.union(dependencies)
     if self_including_nodes:
         raise GraphError(f"Self-including nodes: {self_including_nodes}")
-    missing_nodes = list(sorted(all_dependencies - set(graph_set.keys())))
+    missing_nodes = sorted(all_dependencies - set(graph_set.keys()))
     if missing_nodes:
         raise GraphError(f"Missing nodes in mapping: {missing_nodes}")
     remaining_nodes = graph_set.copy()
     while True:
         # Visit all nodes, remove nodes without dependencies
-        childless_nodes = set(node for node, dependencies in remaining_nodes.items() if not dependencies)
+        childless_nodes = {node for node, dependencies in remaining_nodes.items() if not dependencies}
         if not childless_nodes:
             break
-        yield list(sorted(childless_nodes))
+        yield sorted(childless_nodes)
         more_nodes = {}
         # Remove nodes we returned from dependency lists
         for node, dependencies in remaining_nodes.items():
