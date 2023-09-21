@@ -15,7 +15,7 @@ class GitError(Exception):
         self.stderr = stderr
 
     def __str__(self):
-        return "Command '%s' returned non-zero exit status %d.\nstdout:\n%s\nstderr:\n%s" % (
+        return "Command '{}' returned non-zero exit status {}.\nstdout:\n{}\nstderr:\n{}".format(
             self.cmd,
             self.returncode,
             self.output,

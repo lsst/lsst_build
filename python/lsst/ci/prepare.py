@@ -42,7 +42,7 @@ class RemoteError(Exception):
         self.git_errors = git_errors
 
     def __str__(self):
-        message = "Failed to clone product '%s' from any of the offered repositories" % self.product
+        message = f"Failed to clone product {self.product!r} from any of the offered repositories"
 
         for e in self.git_errors:
             message += "\n" + str(e)
@@ -69,14 +69,11 @@ class Manifest:
 
     def to_file(self, file_object):
         """Serialize the manifest to a file object"""
-        print("# %-23s %-41s %-30s" % ("product", "SHA1", "Version"), file=file_object)
-        print("BUILD=%s" % self.build_id, file=file_object)
+        print("# {:<23s} {:<41s} {:<30s}".format("product", "SHA1", "Version"), file=file_object)
+        print(f"BUILD={self.build_id}", file=file_object)
         for prod in self.product_index.values():
-            print(
-                "%-25s %-41s %-40s %s"
-                % (prod.name, prod.sha1, prod.version, ",".join(dep for dep in prod.dependencies)),
-                file=file_object,
-            )
+            deps = ",".join(dep for dep in prod.dependencies)
+            print(f"{prod.name:<25s} {prod.sha1:<41s} {prod.version:<40s} {deps}", file=file_object)
 
     def content_hash(self):
         """Return a hash of the manifest, based on the products it contains."""
@@ -171,7 +168,7 @@ class ProductFetcher:
                 with open(repos, "r", encoding="utf-8") as f:
                     self.repos = yaml.safe_load(f)
             else:
-                raise Exception("YAML repos file '%s' does not exist" % repos)
+                raise Exception(f"YAML repos file {repos!r} does not exist")
         else:
             self.repos = None
         self.out = out
@@ -332,7 +329,7 @@ class ProductFetcher:
                     # download of the LFS files, in case it's not necessary.
                     args += ["-c", "filter.lfs.smudge="]
                     args += ["-c", "filter.lfs.clean=git-lfs clean %f"]
-                    args += ["-c", "credential.helper=%s" % helper]
+                    args += ["-c", f"credential.helper={helper}"]
 
                 args += [url, productdir]
 
@@ -394,7 +391,7 @@ class ProductFetcher:
             assert await git.rev_parse("HEAD") == sha1
             break
         else:
-            raise Exception("None of the specified refs exist in product '%s'" % product)
+            raise Exception(f"None of the specified refs exist in product {product!r}")
 
         # clean up the working directory (eg., remove remnants of
         # previous builds)
@@ -708,7 +705,7 @@ class VersionDb(metaclass=abc.ABCMeta):
         if len(dependencies):
             suffix = self.get_suffix(product.name, product_version, dependencies)
         assert suffix.__class__ == str
-        suffix = "+%s" % suffix if suffix else ""
+        suffix = f"+{suffix}" if suffix else ""
         return f"{product_version}{suffix}"
 
 
@@ -744,7 +741,7 @@ class VersionDbHash(VersionDb):
         btre = re.compile("^b[0-9]+$")
         btags = [0]
         btags += [int(tag[1:]) for tag in tags.getTagNames() if btre.match(tag)]
-        tag = "b%s" % (max(btags) + 1)
+        tag = f"b{max(btags) + 1}"
 
         return tag
 
@@ -788,7 +785,7 @@ class VersionDbGit(VersionDbHash):
             defined_tags = self.eups.tags.getTagNames()
             while True:
                 btag += 1
-                tag = "b%s" % btag
+                tag = f"b{btag}"
                 if tag not in defined_tags:
                     break
 
@@ -801,7 +798,7 @@ class VersionDbGit(VersionDbHash):
         manifest.build_id = self.__get_build_id(manifest_sha) if build_id is None else build_id
 
         # Store a copy of the manifest
-        manfn = os.path.join("manifests", "%s.txt" % manifest.build_id)
+        manfn = os.path.join("manifests", f"{manifest.build_id}.txt")
         absmanfn = os.path.join(self.dbdir, manfn)
         with open(absmanfn, "w", encoding="utf-8") as fp:
             manifest.to_file(fp)
@@ -823,11 +820,11 @@ class VersionDbGit(VersionDbHash):
             git.sync_add(shafn)
 
             # git-commit
-            msg = "Updates for build %s." % manifest.build_id
+            msg = f"Updates for build {manifest.build_id}."
             git.sync_commit("-m", msg)
 
             # git-tag
-            msg = "Build ID %s" % manifest.build_id
+            msg = "Build ID {manifest.build_id}"
             git.sync_tag("-a", "-m", msg, manifest.build_id)
 
 
@@ -892,7 +889,7 @@ class BuildDirectoryConstructor:
         #
         build_dir = args.build_dir
         if not os.access(build_dir, os.W_OK):
-            raise Exception("Directory '%s' does not exist or isn't writable." % build_dir)
+            raise Exception(f"Directory {build_dir!r} does not exist or isn't writable.")
 
         refs = args.ref
 

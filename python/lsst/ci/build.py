@@ -68,7 +68,7 @@ class ProgressReporter:
             self.product = product
 
         def _build_started(self):
-            self.out.write("%20s: " % self.product.name)
+            self.out.write(f"{self.product.name:>20s}: ")
             self.out.flush()
             self.progress_bar = self.product.version + " "
             self.t0 = self.t = time.time()
@@ -175,7 +175,7 @@ class Builder:
 
         # construct the tags file with exact dependencies
         setups = [
-            "\t%-20s %s" % (dep.name, dep.version)
+            f"\t{dep.name:20s} {dep.version}"
             for dep in self.manifest.product_index.flat_dependencies(product)
         ]
 
@@ -331,7 +331,7 @@ class Builder:
         # Ensure build directory exists and is writable
         build_dir = args.build_dir
         if not os.access(build_dir, os.W_OK):
-            raise Exception("Directory '%s' does not exist or isn't writable." % build_dir)
+            raise Exception(f"Directory {build_dir!r} does not exist or isn't writable.")
 
         # Build products
         eups_obj = eups.Eups()
