@@ -7,13 +7,14 @@ from unittest.mock import Mock
 
 import pytest
 
+# Pretend eups is available.
 sys.modules["eups"] = Mock()
 sys.modules["eups.tags"] = Mock()
 
-import lsst.ci.git  # NOQA
-from lsst.ci.git import GitError  # NOQA
-from lsst.ci.models import DEFAULT_BRANCH_NAME  # NOQA
-from lsst.ci.prepare import ProductFetcher, RemoteError, VersionDbHash  # NOQA
+import lsst.ci.git  # noqa: E402
+from lsst.ci.git import GitError  # noqa: E402
+from lsst.ci.models import DEFAULT_BRANCH_NAME  # noqa: E402
+from lsst.ci.prepare import ProductFetcher, RemoteError  # noqa: E402
 
 
 @pytest.fixture
