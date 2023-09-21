@@ -261,7 +261,7 @@ class ProductFetcher:
                 if os.path.exists(productdir):
                     shutil.rmtree(productdir)
 
-            print("%20s: <retrying...>" % (product), file=self.out)
+            print(f"{product:>20s}: <retrying...>", file=self.out)
             self.out.flush()
 
             # try to not hammer git remotes with retry attempts
@@ -278,7 +278,7 @@ class ProductFetcher:
         """
         repo_spec = self.repo_specs[product]
         t0 = time.time()
-        print("Fetching %s..." % product, file=self.out)
+        print(f"Fetching {product}...", file=self.out)
         self.out.flush()
 
         assert self.build_dir is not None

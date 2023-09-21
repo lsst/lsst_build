@@ -105,15 +105,15 @@ class ProgressReporter:
             else:
                 elapsed_time = time.time() - self.t0
                 if retcode:
-                    print("ERROR (%d sec)." % elapsed_time, file=self.out)
-                    print("*** error building product %s." % self.product.name, file=self.out)
-                    print("*** exit code = %d" % retcode, file=self.out)
-                    print("*** log is in %s" % logfile, file=self.out)
+                    print(f"ERROR ({int(elapsed_time)} sec).", file=self.out)
+                    print(f"*** error building product {self.product.name}.", file=self.out)
+                    print(f"*** exit code = {retcode}", file=self.out)
+                    print(f"*** log is in {logfile}", file=self.out)
                     print("*** last few lines:", file=self.out)
 
-                    os.system("tail -n 10 %s | sed -e 's/^/:::::  /'" % shlex.quote(logfile))
+                    os.system(f"tail -n 10 {shlex.quote(logfile)} | sed -e 's/^/:::::  /'")
                 else:
-                    print("ok (%.1f sec)." % elapsed_time, file=self.out)
+                    print(f"ok ({elapsed_time:.1f} sec).", file=self.out)
                 self.out.flush()
 
             self.product = None
