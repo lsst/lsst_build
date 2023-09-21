@@ -758,7 +758,7 @@ class VersionDbGit(VersionDbHash):
     """
 
     def __init__(self, dbdir: str, sha_abbrev_len: int, eups_obj: eups.Eups):
-        super(VersionDbGit, self).__init__(sha_abbrev_len, eups_obj)
+        super().__init__(sha_abbrev_len, eups_obj)
         self.dbdir = dbdir
         self.eups = eups_obj
 
