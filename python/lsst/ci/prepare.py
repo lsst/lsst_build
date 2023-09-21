@@ -852,11 +852,7 @@ class ExclusionResolver:
         if product not in rc:
             rc[product] = [dep_re for (dep_re, prod_re) in self.exclusions if prod_re.match(product)]
 
-        for dep_re in rc[product]:
-            if dep_re.match(dep):
-                return True
-
-        return False
+        return any(dep_re.match(dep) for dep_re in rc[product])
 
     @staticmethod
     def from_file(file_object):
