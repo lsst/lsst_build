@@ -4,8 +4,8 @@ from __future__ import annotations
 import contextlib
 import datetime
 import os
-import pipes
 import select
+import shlex
 import shutil
 import stat
 import subprocess
@@ -111,7 +111,7 @@ class ProgressReporter:
                     print("*** log is in %s" % logfile, file=self.out)
                     print("*** last few lines:", file=self.out)
 
-                    os.system("tail -n 10 %s | sed -e 's/^/:::::  /'" % pipes.quote(logfile))
+                    os.system("tail -n 10 %s | sed -e 's/^/:::::  /'" % shlex.quote(logfile))
                 else:
                     print("ok (%.1f sec)." % elapsed_time, file=self.out)
                 self.out.flush()
