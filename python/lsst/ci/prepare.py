@@ -616,7 +616,7 @@ class ProductFetcher:
                     print(f"{finish_msg:>80}", file=self.out)
                     queue.task_done()
                 except Exception as e:
-                    logger.error(f"Failed git-lfs pull for {lfs_product_name}")
+                    logger.error("Failed git-lfs pull for %s", lfs_product_name)
                     exceptions.append(e)
                     queue.task_done()
                     continue
