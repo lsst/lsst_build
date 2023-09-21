@@ -82,7 +82,7 @@ class Manifest:
         """Return a hash of the manifest, based on the products it contains."""
         m = hashlib.sha1()
         for prod in self.product_index.values():
-            s = "%s\t%s\t%s\n" % (prod.name, prod.sha1, prod.version)
+            s = "{}\t{}\t{}\n".format(prod.name, prod.sha1, prod.version)
             m.update(s.encode("ascii"))
 
         return m.hexdigest()
@@ -709,7 +709,7 @@ class VersionDb(metaclass=abc.ABCMeta):
             suffix = self.get_suffix(product.name, product_version, dependencies)
         assert suffix.__class__ == str
         suffix = "+%s" % suffix if suffix else ""
-        return "%s%s" % (product_version, suffix)
+        return "{}{}".format(product_version, suffix)
 
 
 class VersionDbHash(VersionDb):
@@ -724,7 +724,7 @@ class VersionDbHash(VersionDb):
     def hash_dependencies(self, dependencies: list[models.Product]) -> str:
         m = hashlib.sha1()
         for dep in sorted(dependencies, key=lambda d: d.name):
-            s = "%s\t%s\n" % (dep.name, dep.sha1)
+            s = "{}\t{}\n".format(dep.name, dep.sha1)
             m.update(s.encode("ascii"))
         return m.hexdigest()
 
@@ -819,7 +819,7 @@ class VersionDbGit(VersionDbHash):
             shafn = self.__shafn()
             absshafn = os.path.join(self.dbdir, shafn)
             with open(absshafn, "a+", encoding="utf-8") as fp:
-                fp.write("%s\t%s\n" % (manifest_sha, manifest.build_id))
+                fp.write("{}\t{}\n".format(manifest_sha, manifest.build_id))
             git.sync_add(shafn)
 
             # git-commit

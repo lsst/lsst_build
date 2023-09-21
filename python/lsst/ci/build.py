@@ -192,21 +192,21 @@ class Builder:
             set -ex
 
             # define the setup command, but preserve EUPS_PATH
-            . "%(eupsdir)s/bin/setups.sh"
-            export EUPS_PATH="%(eupspath)s"
+            . "{eupsdir}/bin/setups.sh"
+            export EUPS_PATH="{eupspath}"
 
-            cd "%(productdir)s"
+            cd "{productdir}"
 
             # clean up the working directory
             git reset --hard
             git clean -d -f -q -x -e '_build.*'
 
             # prepare
-            eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic prep
+            eupspkg PRODUCT={product} VERSION={version} FLAVOR=generic prep
 
             # setup the package with its exact dependencies
             cat > _build.tags <<-EOF
-            %(setups)s
+            {setups}
             EOF
             set +x
             echo "Setting up environment with EUPS"
@@ -214,30 +214,29 @@ class Builder:
             set -x
 
             # build
-            eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic config
-            eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic build
+            eupspkg PRODUCT={product} VERSION={version} FLAVOR=generic config
+            eupspkg PRODUCT={product} VERSION={version} FLAVOR=generic build
             if [ -d  tests/.tests ] && \
                 [ "`ls tests/.tests/*.failed 2> /dev/null | wc -l`" -ne 0 ]; then
                 echo "*** Failed unit tests.";
                 exit 1
             fi
-            eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic install
+            eupspkg PRODUCT={product} VERSION={version} FLAVOR=generic install
 
             # declare to EUPS
-            eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic decl
+            eupspkg PRODUCT={product} VERSION={version} FLAVOR=generic decl
 
             # explicitly append SHA1 to pkginfo
-            echo SHA1=%(sha1)s >> $(eups list %(product)s %(version)s -d)/ups/pkginfo
-            """
-                % {
-                    "product": product.name,
-                    "version": product.version,
-                    "sha1": product.sha1,
-                    "productdir": productdir,
-                    "setups": "\n            ".join(setups),
-                    "eupsdir": eupsdir,
-                    "eupspath": eupspath,
-                }
+            echo SHA1={sha1} >> $(eups list {product} {version} -d)/ups/pkginfo
+            """.format(
+                    product=product.name,
+                    version=product.version,
+                    sha1=product.sha1,
+                    productdir=productdir,
+                    setups="\n            ".join(setups),
+                    eupsdir=eupsdir,
+                    eupspath=eupspath,
+                )
             )
 
             fp.write(text)
@@ -262,7 +261,7 @@ class Builder:
                     c = process.stdout.read(1)
                     buf += c
                     if (c == b"" or c == b"\n") and buf:
-                        line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), buf.decode())
+                        line = "[{}Z] {}".format(datetime.datetime.utcnow().isoformat(), buf.decode())
                         logfp.write(line)
                         buf = b""
                     # Ready to read but nothing there means end of file
