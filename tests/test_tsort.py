@@ -97,7 +97,7 @@ def test_flatten():
 def test_graph_error():
     """Test graph errors."""
     try:
-        tsort.toposort(bad_data)
+        list(tsort.toposort(bad_data))
         assert False
     except tsort.GraphError as e:
         assert str(e) == "Cycle among nodes: ['a', 'b', 'c']"
