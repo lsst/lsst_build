@@ -33,7 +33,7 @@ setup(
         "Intended Audience :: Developers",
         "Topic :: Software Development :: Build Tools",
         "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.11",
     ],
     keywords="lsst lsst_build lsstsw eups eupspkg",
     packages=["lsst", "lsst.ci"],
