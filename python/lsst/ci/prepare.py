@@ -109,7 +109,7 @@ class Manifest:
             arr = line.split()
             if len(arr) == 4:
                 (name, sha1, version, deps) = arr
-                deps = list(deps.split(","))
+                deps = deps.split(",")
             else:
                 (name, sha1, version) = arr
                 deps = []
