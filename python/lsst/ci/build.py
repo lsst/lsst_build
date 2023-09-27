@@ -106,7 +106,7 @@ class ProgressReporter:
             else:
                 elapsed_time = time.time() - self.t0
                 if retcode:
-                    print(f"ERROR ({int(elapsed_time)} sec).", file=self.out)
+                    print(f"ERROR ({elapsed_time:.1f} sec).", file=self.out)
                     print(f"*** error building product {self.product.name}.", file=self.out)
                     print(f"*** exit code = {retcode}", file=self.out)
                     print(f"*** log is in {logfile}", file=self.out)
