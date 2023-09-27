@@ -1,6 +1,6 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import List, Set, Optional
 
 from . import tsort
 
@@ -30,7 +30,7 @@ class ProductIndex(dict):
         topo_sorted_product_lists = tsort.toposort(dep_graph)
         new_index = ProductIndex()
         new_sorted_groups = []
-        for group_idx, sort_group in enumerate(topo_sorted_product_lists):
+        for sort_group in topo_sorted_product_lists:
             new_sorted_groups.append(sort_group)
             for product_name in sort_group:
                 new_index[product_name] = self[product_name]
@@ -38,7 +38,7 @@ class ProductIndex(dict):
         new_index.sorted_groups = new_sorted_groups
         return new_index
 
-    def flat_dependencies(self, product: Product, resolved: Optional[Set[str]] = None) -> List[Product]:
+    def flat_dependencies(self, product: Product, resolved: set[str] | None = None) -> list[Product]:
         """Return and calculate the set of flat dependencies for this product.
 
         Parameters
@@ -62,7 +62,7 @@ class ProductIndex(dict):
             if dependency_product.name not in resolved:
                 resolved.add(dependency_product.name)
                 self.flat_dependencies(dependency_product, resolved)
-        return list(self[resolved_name] for resolved_name in resolved)
+        return [self[resolved_name] for resolved_name in resolved]
 
     def __setitem__(self, key, value):
         # invalidate the toposort if an item is set
@@ -94,10 +94,10 @@ class Product:
 
     name: str
     sha1: str
-    version: Optional[str]
-    dependencies: List[str]
-    optional_dependencies: Optional[List[str]] = None
-    ref: Optional[Ref] = None
+    version: str | None
+    dependencies: list[str]
+    optional_dependencies: list[str] | None = None
+    ref: Ref | None = None
 
 
 @dataclass

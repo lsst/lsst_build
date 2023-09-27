@@ -1,0 +1,73 @@
+[tool.black]
+line-length = 110
+target-version = ["py311"]
+
+[tool.isort]
+profile = "black"
+line_length = 110
+
+[tool.lsst_versions]
+write_to = "python/lsst/daf/butler/version.py"
+
+[tool.pytest.ini_options]
+# The matplotlib test may not release font files.
+# Some unit tests open registry database in setUpClass.
+open_files_ignore = ["*.ttf", "gen3.sqlite3"]
+
+[tool.pydocstyle]
+convention = "numpy"
+# Our coding style does not require docstrings for magic methods (D105)
+# Our docstyle documents __init__ at the class level (D107)
+# We allow methods to inherit docstrings and this is not compatible with D102.
+# Docstring at the very first line is not required
+# D200, D205 and D400 all complain if the first sentence of the docstring does
+# not fit on one line. We do not require docstrings in __init__ files (D104).
+add-ignore = ["D107", "D105", "D102", "D100", "D200", "D205", "D400", "D104"]
+
+[tool.ruff]
+exclude = [
+    "__init__.py",
+    "lex.py",
+    "yacc.py",
+]
+ignore = [
+    "N802",
+    "N803",
+    "N806",
+    "N812",
+    "N815",
+    "N816",
+    "N999",
+    "D107",
+    "D105",
+    "D102",
+    "D104",
+    "D100",
+    "D200",
+    "D205",
+    "D400",
+]
+line-length = 110
+select = [
+    "E",  # pycodestyle
+    "F",  # pycodestyle
+    "N",  # pep8-naming
+    "W",  # pycodestyle
+    "D",  # pydocstyle
+]
+target-version = "py311"
+# Commented out to suppress "unused noqa" in jenkins which has older ruff not
+# generating E721.
+#extend-select = [
+#    "RUF100", # Warn about unused noqa
+#]
+
+[tool.ruff.per-file-ignores]
+# parserYacc docstrings can not be fixed. Docstrings are used to define grammar.
+"python/lsst/daf/butler/registry/queries/expressions/parser/parserYacc.py" = ["D401", "D403"]
+
+[tool.ruff.pycodestyle]
+max-doc-length = 79
+
+[tool.ruff.pydocstyle]
+convention = "numpy"

@@ -1,34 +1,35 @@
-#############################################################################
+from __future__ import annotations
+
 # Builder
-from typing import List, TextIO
-
-import eups
-import eups.tags
-
 import contextlib
 import datetime
 import os
-import pipes
 import select
+import shlex
 import shutil
 import stat
 import subprocess
 import sys
 import textwrap
 import time
+from typing import TextIO
+
+import eups
+import eups.tags
 import yaml
 
-from .prepare import Manifest
 from . import models
+from .prepare import Manifest
 
 
 def product_representer(dumper, data):
+    """Return YAML serialization."""
     obj = {
-        'name': str(data.name),
-        'sha1': str(data.sha1),
-        'version': str(data.version),
+        "name": str(data.name),
+        "sha1": str(data.sha1),
+        "version": str(data.version),
     }
-    return dumper.represent_mapping('tag:yaml.org,2002:map', obj)
+    return dumper.represent_mapping("tag:yaml.org,2002:map", obj)
 
 
 yaml.add_representer(models.Product, product_representer)
@@ -60,62 +61,66 @@ class ProgressReporter:
     """
 
     class ProductProgressReporter:
+        """Progress bar helper class."""
+
         def __init__(self, out_file_obj: TextIO, product: models.Product):
             self.out = out_file_obj
             self.product = product
 
         def _build_started(self):
-            self.out.write('%20s: ' % self.product.name)
+            self.out.write(f"{self.product.name:>20s}: ")
             self.out.flush()
             self.progress_bar = self.product.version + " "
             self.t0 = self.t = time.time()
 
         def report_progress(self):
-            # throttled progress reporting
-            #
-            # Write out the version string as a progress bar, character by character, and
-            # then continue with dots.
-            #
-            # Throttle updates to one character every 2 seconds
+            """Throttled progress reporting.
+
+            Write out the version string as a progress bar, character by
+            character, and then continue with dots.
+
+            Throttle updates to one character every 2 seconds.
+            """
             t1 = time.time()
             while self.t <= t1:
                 if self.progress_bar:
                     self.out.write(self.progress_bar[0])
                     self.progress_bar = self.progress_bar[1:]
                 else:
-                    self.out.write('.')
+                    self.out.write(".")
 
                 self.out.flush()
                 self.t += 2
 
         def report_result(self, retcode, logfile):
-            # Make sure we write out the full version string, even if the build ended quickly
+            # Make sure we write out the full version string, even if the build
+            # ended quickly.
             if self.progress_bar:
                 self.out.write(self.progress_bar)
                 self.out.flush()
 
-            # If logfile is None, the product was already installed
+            # If logfile is None, the product was already installed.
             if logfile is None:
-                self.out.write('(already installed).\n')
+                self.out.write("(already installed).\n")
                 self.out.flush()
             else:
                 elapsed_time = time.time() - self.t0
                 if retcode:
-                    print("ERROR (%d sec)." % elapsed_time, file=self.out)
-                    print("*** error building product %s." % self.product.name, file=self.out)
-                    print("*** exit code = %d" % retcode, file=self.out)
-                    print("*** log is in %s" % logfile, file=self.out)
+                    print(f"ERROR ({elapsed_time:.1f} sec).", file=self.out)
+                    print(f"*** error building product {self.product.name}.", file=self.out)
+                    print(f"*** exit code = {retcode}", file=self.out)
+                    print(f"*** log is in {logfile}", file=self.out)
                     print("*** last few lines:", file=self.out)
 
-                    os.system("tail -n 10 %s | sed -e 's/^/:::::  /'" % pipes.quote(logfile))
+                    os.system(f"tail -n 10 {shlex.quote(logfile)} | sed -e 's/^/:::::  /'")
                 else:
-                    print("ok (%.1f sec)." % elapsed_time, file=self.out)
+                    print(f"ok ({elapsed_time:.1f} sec).", file=self.out)
                 self.out.flush()
 
             self.product = None
 
         def _finalize(self):
-            # Usually called only when an exception is thrown
+            # Usually called only when an exception is thrown.
             if self.product is not None:
                 self.out.write("\n")
                 self.out.flush()
@@ -147,12 +152,13 @@ class Builder:
     eups
         an eups object for eups operations (e.g. discovering product info)
     """
+
     def __init__(self, build_dir: str, manifest: Manifest, progress: ProgressReporter, eups: eups.Eups):
         self.build_dir = build_dir
         self.manifest = manifest
         self.progress = progress
         self.eups = eups
-        self.built: List[models.Product] = []
+        self.built: list[models.Product] = []
         self.failed_at = None
 
     def _tag_product(self, name, version, tag):
@@ -163,18 +169,21 @@ class Builder:
         # run the eupspkg sequence for the product
         #
         productdir = os.path.abspath(os.path.join(self.build_dir, product.name))
-        buildscript = os.path.join(productdir, '_build.sh')
-        logfile = os.path.join(productdir, '_build.log')
+        buildscript = os.path.join(productdir, "_build.sh")
+        logfile = os.path.join(productdir, "_build.log")
         eupsdir = eups.productDir("eups")
         eupspath = os.environ["EUPS_PATH"]
 
         # construct the tags file with exact dependencies
-        setups = ["\t%-20s %s" % (dep.name, dep.version)
-                  for dep in self.manifest.product_index.flat_dependencies(product)]
+        setups = [
+            f"\t{dep.name:20s} {dep.version}"
+            for dep in self.manifest.product_index.flat_dependencies(product)
+        ]
 
         # create the buildscript
-        with open(buildscript, 'w', encoding='utf-8') as fp:
-            text = textwrap.dedent(u"""\
+        with open(buildscript, "w", encoding="utf-8") as fp:
+            text = textwrap.dedent(
+                """\
             #!/bin/bash
 
             # redirect stderr to stdin
@@ -184,21 +193,21 @@ class Builder:
             set -ex
 
             # define the setup command, but preserve EUPS_PATH
-            . "%(eupsdir)s/bin/setups.sh"
-            export EUPS_PATH="%(eupspath)s"
+            . "{eupsdir}/bin/setups.sh"
+            export EUPS_PATH="{eupspath}"
 
-            cd "%(productdir)s"
+            cd "{productdir}"
 
             # clean up the working directory
             git reset --hard
             git clean -d -f -q -x -e '_build.*'
 
             # prepare
-            eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic prep
+            eupspkg PRODUCT={product} VERSION={version} FLAVOR=generic prep
 
             # setup the package with its exact dependencies
             cat > _build.tags <<-EOF
-            %(setups)s
+            {setups}
             EOF
             set +x
             echo "Setting up environment with EUPS"
@@ -206,29 +215,30 @@ class Builder:
             set -x
 
             # build
-            eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic config
-            eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic build
+            eupspkg PRODUCT={product} VERSION={version} FLAVOR=generic config
+            eupspkg PRODUCT={product} VERSION={version} FLAVOR=generic build
             if [ -d  tests/.tests ] && \
                 [ "`ls tests/.tests/*.failed 2> /dev/null | wc -l`" -ne 0 ]; then
                 echo "*** Failed unit tests.";
                 exit 1
             fi
-            eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic install
+            eupspkg PRODUCT={product} VERSION={version} FLAVOR=generic install
 
             # declare to EUPS
-            eupspkg PRODUCT=%(product)s VERSION=%(version)s FLAVOR=generic decl
+            eupspkg PRODUCT={product} VERSION={version} FLAVOR=generic decl
 
             # explicitly append SHA1 to pkginfo
-            echo SHA1=%(sha1)s >> $(eups list %(product)s %(version)s -d)/ups/pkginfo
-            """ % {
-                'product': product.name,
-                'version': product.version,
-                'sha1': product.sha1,
-                'productdir': productdir,
-                'setups': '\n            '.join(setups),
-                'eupsdir': eupsdir,
-                'eupspath': eupspath,
-            })
+            echo SHA1={sha1} >> $(eups list {product} {version} -d)/ups/pkginfo
+            """.format(
+                    product=product.name,
+                    version=product.version,
+                    sha1=product.sha1,
+                    productdir=productdir,
+                    setups="\n            ".join(setups),
+                    eupsdir=eupsdir,
+                    eupspath=eupspath,
+                )
+            )
 
             fp.write(text)
 
@@ -237,20 +247,22 @@ class Builder:
         os.chmod(buildscript, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
         # Run the build script
-        with open(logfile, 'w', encoding='utf-8') as logfp:
-            # execute the build file from the product directory, capturing the output and return code
-            process = subprocess.Popen(buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                       cwd=productdir)
-            selectList = [process.stdout]
+        with open(logfile, "w", encoding="utf-8") as logfp:
+            # execute the build file from the product directory, capturing the
+            # output and return code.
+            process = subprocess.Popen(
+                buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir
+            )
+            select_list = [process.stdout]
             buf = b""
             while True:
                 # Wait up to 2 seconds for output
-                readyToRead, _, _ = select.select(selectList, [], [], 2)
-                if readyToRead:
+                ready_to_read, _, _ = select.select(select_list, [], [], 2)
+                if ready_to_read:
                     c = process.stdout.read(1)
                     buf += c
                     if (c == b"" or c == b"\n") and buf:
-                        line = "[%sZ] %s" % (datetime.datetime.utcnow().isoformat(), buf.decode())
+                        line = f"[{datetime.datetime.utcnow().isoformat()}Z] {buf.decode()}"
                         logfp.write(line)
                         buf = b""
                     # Ready to read but nothing there means end of file
@@ -302,33 +314,33 @@ class Builder:
             os.remove(self.status_file())
 
     def status_file(self):
-        return os.path.join(self.build_dir, 'status.yaml')
+        return os.path.join(self.build_dir, "status.yaml")
 
     def write_status(self):
         status = {
-            'built': self.built,
+            "built": self.built,
         }
 
         if self.failed_at is not None:
-            status['failed_at'] = self.failed_at
+            status["failed_at"] = self.failed_at
 
-        with open(self.status_file(), 'w', encoding='utf-8') as sf:
-            yaml.dump(status, sf, encoding='utf-8', default_flow_style=False)
+        with open(self.status_file(), "w", encoding="utf-8") as sf:
+            yaml.dump(status, sf, encoding="utf-8", default_flow_style=False)
 
     @staticmethod
     def run(args):
         # Ensure build directory exists and is writable
         build_dir = args.build_dir
         if not os.access(build_dir, os.W_OK):
-            raise Exception("Directory '%s' does not exist or isn't writable." % build_dir)
+            raise Exception(f"Directory {build_dir!r} does not exist or isn't writable.")
 
         # Build products
         eups_obj = eups.Eups()
 
         progress = ProgressReporter(sys.stdout)
 
-        manifest_fn = os.path.join(build_dir, 'manifest.txt')
-        with open(manifest_fn, encoding='utf-8') as fp:
+        manifest_fn = os.path.join(build_dir, "manifest.txt")
+        with open(manifest_fn, encoding="utf-8") as fp:
             manifest = Manifest.from_file(fp)
 
         b = Builder(build_dir, manifest, progress, eups_obj)

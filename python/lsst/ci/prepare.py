@@ -1,28 +1,26 @@
 from __future__ import annotations
-import asyncio
 
+import abc
+import asyncio
+import copy
+import hashlib
+import logging
 import os
 import os.path
+import re
+import shutil
 import sys
-
-from typing import Dict, Optional, List, Callable, Set, Tuple, Awaitable
+import time
+from collections.abc import Awaitable, Callable
 
 import eups  # type: ignore
 import eups.tags  # type: ignore
-import hashlib
-import shutil
-import time
-import re
-import abc
 import yaml
-import copy
 
-from .eups_module import EupsModule
-
-from .git import Git, GitError
 from . import models
+from .eups_module import EupsModule
+from .git import Git, GitError
 
-import logging
 logger = logging.getLogger("lsst.ci")
 
 ASYNC_QUEUE_WORKERS = 8
@@ -44,8 +42,7 @@ class RemoteError(Exception):
         self.git_errors = git_errors
 
     def __str__(self):
-        message = "Failed to clone product '%s' from any of the offered " \
-            "repositories" % self.product
+        message = f"Failed to clone product {self.product!r} from any of the offered repositories"
 
         for e in self.git_errors:
             message += "\n" + str(e)
@@ -54,7 +51,8 @@ class RemoteError(Exception):
 
 
 class Manifest:
-    """A representation of topologically ordered list of EUPS products to be built
+    """A representation of topologically ordered list of EUPS products to be
+    built.
 
     Parameters
     ----------
@@ -64,32 +62,31 @@ class Manifest:
         A unique identifier for this build
     """
 
-    def __init__(self, product_index: models.ProductIndex, build_id: Optional[str] = None):
+    def __init__(self, product_index: models.ProductIndex, build_id: str | None = None):
         self.build_id = build_id
         assert product_index.toposorted
         self.product_index = product_index
 
     def to_file(self, file_object):
-        """ Serialize the manifest to a file object """
-        print(u'# %-23s %-41s %-30s' % ("product", "SHA1", "Version"), file=file_object)
-        print(u'BUILD=%s' % self.build_id, file=file_object)
+        """Serialize the manifest to a file object"""
+        print("# {:<23s} {:<41s} {:<30s}".format("product", "SHA1", "Version"), file=file_object)
+        print(f"BUILD={self.build_id}", file=file_object)
         for prod in self.product_index.values():
-            print(u'%-25s %-41s %-40s %s' % (prod.name, prod.sha1, prod.version,
-                                             ','.join(dep for dep in prod.dependencies)),
-                  file=file_object)
+            deps = ",".join(dep for dep in prod.dependencies)
+            print(f"{prod.name:<25s} {prod.sha1:<41s} {prod.version:<40s} {deps}", file=file_object)
 
     def content_hash(self):
-        """ Return a hash of the manifest, based on the products it contains. """
+        """Return a hash of the manifest, based on the products it contains."""
         m = hashlib.sha1()
         for prod in self.product_index.values():
-            s = '%s\t%s\t%s\n' % (prod.name, prod.sha1, prod.version)
+            s = f"{prod.name}\t{prod.sha1}\t{prod.version}\n"
             m.update(s.encode("ascii"))
 
         return m.hexdigest()
 
     @staticmethod
     def from_file(file_object):
-        varre = re.compile(r'^(\w+)=(.*)$')
+        varre = re.compile(r"^(\w+)=(.*)$")
 
         product_index = models.ProductIndex()
         build_id = None
@@ -97,7 +94,7 @@ class Manifest:
             line = line.strip()
             if not line:
                 continue
-            if line.startswith('#'):
+            if line.startswith("#"):
                 continue
 
             # Look for variable assignments
@@ -112,7 +109,7 @@ class Manifest:
             arr = line.split()
             if len(arr) == 4:
                 (name, sha1, version, deps) = arr
-                deps = [dep_name for dep_name in deps.split(',')]
+                deps = deps.split(",")
             else:
                 (name, sha1, version) = arr
                 deps = []
@@ -123,7 +120,8 @@ class Manifest:
 
 
 class ProductFetcher:
-    """Fetch products from remote git repositories and checks out matching refs.
+    """Fetch products from remote git repositories and checks out matching
+    refs.
 
     See `fetch` for further documentation.
 
@@ -147,27 +145,30 @@ class ProductFetcher:
     tries
         The number of times to attempt to 'fetch' a product.
     """
-    def __init__(self,
-                 build_dir: Optional[str],
-                 repos: str,
-                 repository_patterns: Optional[str] = None,
-                 dependency_module: Optional[EupsModule] = None,
-                 version_db: Optional[VersionDb] = None,
-                 no_fetch: bool = False,
-                 out=sys.stdout,
-                 tries=1):
+
+    def __init__(
+        self,
+        build_dir: str | None,
+        repos: str,
+        repository_patterns: str | None = None,
+        dependency_module: EupsModule | None = None,
+        version_db: VersionDb | None = None,
+        no_fetch: bool = False,
+        out=sys.stdout,
+        tries=1,
+    ):
         self.build_dir = os.path.abspath(build_dir) if build_dir else None
         if repository_patterns:
-            self.repository_patterns: Optional[List[str]] = repository_patterns.split('|')
+            self.repository_patterns: list[str] | None = repository_patterns.split("|")
         else:
             self.repository_patterns = None
         self.no_fetch = no_fetch
         if repos:
             if os.path.exists(repos):
-                with open(repos, 'r', encoding='utf-8') as f:
+                with open(repos, "r", encoding="utf-8") as f:
                     self.repos = yaml.safe_load(f)
             else:
-                raise Exception("YAML repos file '%s' does not exist" % repos)
+                raise Exception(f"YAML repos file {repos!r} does not exist")
         else:
             self.repos = None
         self.out = out
@@ -175,9 +176,9 @@ class ProductFetcher:
         self.dependency_module = dependency_module
         self.version_db = version_db
         self.product_index = models.ProductIndex()
-        self.lfs_product_names: List[str] = []
+        self.lfs_product_names: list[str] = []
 
-        self.repo_specs: Dict[str, models.RepoSpec] = {}
+        self.repo_specs: dict[str, models.RepoSpec] = {}
         for product, spec in self.repos.items():
             if isinstance(spec, str):
                 rs = models.RepoSpec(product, spec)
@@ -186,13 +187,14 @@ class ProductFetcher:
                 # RepoSpec constructor args
                 rs = models.RepoSpec(product, **spec)
             else:
-                raise Exception('invalid repos.yaml repo specification'
-                                ' -- please check the file with repos-lint')
+                raise Exception(
+                    "invalid repos.yaml repo specification -- please check the file with repos-lint"
+                )
             self.repo_specs[product] = rs
 
     def _origin_candidates(self, product):
         """Expand repository_patterns into URLs."""
-        data = {'product': product}
+        data = {"product": product}
         locations = []
         repo_spec = self.repo_specs[product]
 
@@ -202,9 +204,8 @@ class ProductFetcher:
             locations += [pat % data for pat in self.repository_patterns]
         return locations
 
-    def ref_candidates(self, repo_spec: models.RepoSpec, refs: List[str]) -> List[str]:
+    def ref_candidates(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
         """Generate a list of refs to attempt to checkout."""
-
         # ref precedence should be:
         # user specified refs > repos.yaml default ref > implicit main
         refs = copy.copy(refs)
@@ -218,7 +219,7 @@ class ProductFetcher:
 
         return refs
 
-    async def fetch(self, product: str, refs: List[str]) -> Tuple[models.Ref, List[str]]:
+    async def fetch(self, product: str, refs: list[str]) -> tuple[models.Ref, list[str]]:
         """Clone the product repository and checkout the first matching ref.
 
         If `self.build_dir`/`product` does not exist, discover the product
@@ -244,13 +245,12 @@ class ProductFetcher:
         dependencies
             list of declared dependencies for the product
         """
-
         # do not handle exceptions unless there will be multiple tries
-        for i in range(self.tries - 1):
+        for _ in range(self.tries - 1):
             try:
                 return await self._fetch(product, refs)
             except (GitError, RemoteError, OSError) as e:
-                print('<error>', file=self.out)
+                print("<error>", file=self.out)
                 print(e, file=self.out)
                 # ensure retry is starting from a clean slate
                 assert self.build_dir is not None
@@ -258,7 +258,7 @@ class ProductFetcher:
                 if os.path.exists(productdir):
                     shutil.rmtree(productdir)
 
-            print("%20s: <retrying...>" % (product), file=self.out)
+            print(f"{product:>20s}: <retrying...>", file=self.out)
             self.out.flush()
 
             # try to not hammer git remotes with retry attempts
@@ -268,11 +268,14 @@ class ProductFetcher:
         # debugging + allow an exception to propagate from the final attempt
         return await self._fetch(product, refs)
 
-    async def _fetch(self, product: str, refs: List[str]) -> Tuple[models.Ref, List[str]]:
-        """This method should be considered private to fetch(d)"""
+    async def _fetch(self, product: str, refs: list[str]) -> tuple[models.Ref, list[str]]:
+        """Retrieve target and dependencies.
+
+        This method should be considered private to fetch(d)
+        """
         repo_spec = self.repo_specs[product]
         t0 = time.time()
-        print("Fetching %s..." % product, file=self.out)
+        print(f"Fetching {product}...", file=self.out)
         self.out.flush()
 
         assert self.build_dir is not None
@@ -280,7 +283,7 @@ class ProductFetcher:
         git = Git(productdir)
 
         # lfs credential helper string
-        helper = '!f() { cat > /dev/null; echo username=; echo password=; }; f'
+        helper = "!f() { cat > /dev/null; echo username=; echo password=; }; f"
 
         # determine if the repo is likely using lfs.
         # if the repos.yaml url is invalid, and a valid pattern generated
@@ -296,7 +299,7 @@ class ProductFetcher:
 
         # verify the URL of origin hasn't changed
         if os.path.isdir(productdir):
-            origin = await git('config', '--get', 'remote.origin.url')
+            origin = await git("config", "--get", "remote.origin.url")
             if origin not in self._origin_candidates(product):
                 shutil.rmtree(productdir)
 
@@ -312,21 +315,21 @@ class ProductFetcher:
                     # these env vars shouldn't have to removed with the cache
                     # helper we are specifying but it doesn't hurt to be
                     # paranoid
-                    if 'GIT_ASKPASS' in os.environ:
-                        del os.environ['GIT_ASKPASS']
-                    if 'SSH_ASKPASS' in os.environ:
-                        del os.environ['SSH_ASKPASS']
+                    if "GIT_ASKPASS" in os.environ:
+                        del os.environ["GIT_ASKPASS"]
+                    if "SSH_ASKPASS" in os.environ:
+                        del os.environ["SSH_ASKPASS"]
 
                     # lfs will pickup the .gitconfig and pull lfs objects for
                     # the default ref during clone.  Config options set on the
                     # cli during the clone get recorded in `.git/config'
-                    args += ['-c', 'filter.lfs.required=false']
+                    args += ["-c", "filter.lfs.required=false"]
                     # We DO NOT want smudge on, because we want to download
                     # only with `git lfs pull`. We do this so we can defer the
                     # download of the LFS files, in case it's not necessary.
-                    args += ['-c', 'filter.lfs.smudge=']
-                    args += ['-c', 'filter.lfs.clean=git-lfs clean %f']
-                    args += ['-c', ('credential.helper=%s' % helper)]
+                    args += ["-c", "filter.lfs.smudge="]
+                    args += ["-c", "filter.lfs.clean=git-lfs clean %f"]
+                    args += ["-c", f"credential.helper={helper}"]
 
                 args += [url, productdir]
 
@@ -342,19 +345,24 @@ class ProductFetcher:
 
         # update from origin
         if not self.no_fetch:
-            # in order to avoid broken HEAD in case the checkout branch is removed
-            # we detach the HEAD of the local repository.
+            # in order to avoid broken HEAD in case the checkout branch is
+            # removed we detach the HEAD of the local repository.
             await git.checkout("--detach")
-            # the line below ensures with a single git command that the refspecs
+            # the line below ensures with a single git command that the
+            # refspecs
             #     refs/heads/*
             #     refs/remotes/origin*
             #     refs/tags/*
             # are synchronized between local repository and remote repository
-            # this ensures that branches deleted remotely, will also be deleted locally
-            await git.fetch("-fp", "origin",
-                            "+refs/heads/*:refs/heads/*",
-                            "+refs/heads/*:refs/remotes/origin/*",
-                            "refs/tags/*:refs/tags/*")
+            # this ensures that branches deleted remotely, will also be deleted
+            # locally
+            await git.fetch(
+                "-fp",
+                "origin",
+                "+refs/heads/*:refs/heads/*",
+                "+refs/heads/*:refs/remotes/origin/*",
+                "refs/tags/*:refs/tags/*",
+            )
 
             # ensure default branch matches origin
             # (mostly for eups pkgautoversion)
@@ -376,14 +384,14 @@ class ProductFetcher:
 
             if branch:
                 # profiling showed that git-pull took a lot of time; since
-                # we know we want the checked out branch to be at the remote sha1
-                # we'll just reset it
+                # we know we want the checked out branch to be at the remote
+                # sha1 we'll just reset it
                 await git.reset("--hard", sha1)
 
-            assert(await git.rev_parse("HEAD") == sha1)
+            assert await git.rev_parse("HEAD") == sha1
             break
         else:
-            raise Exception("None of the specified refs exist in product '%s'" % product)
+            raise Exception(f"None of the specified refs exist in product {product!r}")
 
         # clean up the working directory (eg., remove remnants of
         # previous builds)
@@ -392,7 +400,7 @@ class ProductFetcher:
         # Find out if we are in a branch or a tag (branches get precedence)
         show_ref_output = await git("show-ref", "--heads")
         heads = [i.split()[1] for i in show_ref_output.splitlines()]
-        is_branch = ref in [head[len(models.Ref.HEAD_PREFIX):] for head in heads]
+        is_branch = ref in [head[len(models.Ref.HEAD_PREFIX) :] for head in heads]
         target_ref = models.Ref(name=ref, sha1=sha1, ref_type="branch" if is_branch else "tag")
 
         finish_msg = f"{product} ok [{target_ref.name}] ({time.time() - t0:.1f} sec)."
@@ -402,9 +410,7 @@ class ProductFetcher:
         # Log this ref if it was in the external list
         if self.dependency_module:
             dep_file_path = os.path.join(
-                self.build_dir,
-                productdir,
-                self.dependency_module.dependency_file(product)
+                self.build_dir, productdir, self.dependency_module.dependency_file(product)
             )
             dependency_names = self.dependency_module.dependencies(product, dep_file_path)
             optional_dependency_names = self.dependency_module.optional_dependencies(product, dep_file_path)
@@ -412,14 +418,21 @@ class ProductFetcher:
             dependency_names = []
             optional_dependency_names = []
 
-        product_obj = models.Product(product, target_ref.sha1, None, dependency_names,
-                                     optional_dependencies=optional_dependency_names, ref=target_ref)
+        product_obj = models.Product(
+            product,
+            target_ref.sha1,
+            None,
+            dependency_names,
+            optional_dependencies=optional_dependency_names,
+            ref=target_ref,
+        )
         self.product_index[product] = product_obj
         return target_ref, dependency_names
 
-    def validate_refs(self, refs: List[str]):
+    def validate_refs(self, refs: list[str]):
         """Validate that all external refs were found at least once.
-        Raises RuntimeError if some have not been found."""
+        Raises RuntimeError if some have not been found.
+        """
         matched_refs = {ref: 0 for ref in refs}
         for product in self.product_index.values():
             assert product.ref is not None
@@ -428,11 +441,12 @@ class ProductFetcher:
 
         missed = [ref for ref in matched_refs if matched_refs[ref] == 0]
         if missed:
-            raise RuntimeError("Did not checkout any products with the following refs:"
-                               " {}".format(",".join(missed)))
+            raise RuntimeError(
+                "Did not checkout any products with the following refs: {}".format(",".join(missed))
+            )
 
     async def run_async_tasks(
-            self, worker_function: Callable[[asyncio.Queue], Awaitable[None]], queue: asyncio.Queue
+        self, worker_function: Callable[[asyncio.Queue], Awaitable[None]], queue: asyncio.Queue
     ):
         """Instantiate async worker tasks and process a queue.
 
@@ -444,7 +458,7 @@ class ProductFetcher:
             The parameter for the worker function to be instantiated.
         """
         tasks = []
-        for i in range(ASYNC_QUEUE_WORKERS):
+        for _ in range(ASYNC_QUEUE_WORKERS):
             task = asyncio.create_task(worker_function(queue))
             tasks.append(task)
 
@@ -456,7 +470,7 @@ class ProductFetcher:
         # Wait until all worker tasks are cancelled.
         await asyncio.gather(*tasks, return_exceptions=True)
 
-    def do_fetch_products(self, products: List[str], refs: List[str]):
+    def do_fetch_products(self, products: list[str], refs: list[str]):
         """Perform various product fetching tasks asynchronously while
         building the product index.
 
@@ -487,9 +501,9 @@ class ProductFetcher:
             loop.run_until_complete(self.lfs_checkout())
         loop.close()
 
-    async def fetch_products(self, product_names: List[str], refs: List[str]) -> Set[str]:
-        resolved: Set[str] = set()
-        queued: Set[str] = set()
+    async def fetch_products(self, product_names: list[str], refs: list[str]) -> set[str]:
+        resolved: set[str] = set()
+        queued: set[str] = set()
         print("Fetching Products...", file=self.out)
         exceptions = []
 
@@ -554,9 +568,7 @@ class ProductFetcher:
                     assert self.version_db is not None
                     repo_dir = os.path.join(self.build_dir, product.name)
                     all_dependencies = self.product_index.flat_dependencies(product)
-                    product.version = await self.version_db.version(
-                        product, repo_dir, all_dependencies
-                    )
+                    product.version = await self.version_db.version(product, repo_dir, all_dependencies)
                     queue.task_done()
                 except Exception as e:
                     print(f"Version resolution failed for {product.name}")
@@ -604,7 +616,7 @@ class ProductFetcher:
                     print(f"{finish_msg:>80}", file=self.out)
                     queue.task_done()
                 except Exception as e:
-                    logger.error(f"Failed git-lfs pull for {lfs_product_name}")
+                    logger.error("Failed git-lfs pull for %s", lfs_product_name)
                     exceptions.append(e)
                     queue.task_done()
                     continue
@@ -621,20 +633,16 @@ class ProductFetcher:
 
 
 class VersionDb(metaclass=abc.ABCMeta):
-    """ Construct a full XXX+YYY version for a product.
+    """Construct a full XXX+YYY version for a product.
 
-        The subclasses of VersionDb determine how +YYY will be computed.
-        The XXX part is computed by running EUPS' pkgautoversion.
+    The subclasses of VersionDb determine how +YYY will be computed.
+    The XXX part is computed by running EUPS' pkgautoversion.
     """
 
     @abc.abstractmethod
-    def get_suffix(
-            self,
-            product_name: str,
-            product_version: str,
-            dependencies: List[models.Product]
-    ) -> str:
-        """Return a unique +YYY version suffix for a product given its dependencies
+    def get_suffix(self, product_name: str, product_version: str, dependencies: list[models.Product]) -> str:
+        """Return a unique +YYY version suffix for a product given its
+        dependencies.
 
         Parameters
         ----------
@@ -671,72 +679,69 @@ class VersionDb(metaclass=abc.ABCMeta):
         pass
 
     async def version(
-            self,
-            product: models.Product,
-            productdir: str,
-            dependencies: List[models.Product]
+        self, product: models.Product, productdir: str, dependencies: list[models.Product]
     ) -> str:
-        """Return a standardized XXX+YYY EUPS version, that includes the dependencies.
+        """Return a standardized XXX+YYY EUPS version, that includes the
+        dependencies.
 
         Parameters
         ----------
         product
-            the product to version
+            the product to version.
         productdir
-            the directory with product source code
+            the directory with product source code.
         dependencies (list):
-            A list of `Product`s that are the immediate dependencies of product_name
+            A list of `Product`s that are the immediate dependencies of
+            product_name.
 
         Returns
         -------
         str
             the XXX+YYY version string.
         """
-        product_version = "g" + product.sha1[:self.sha_abbrev_len]
+        product_version = "g" + product.sha1[: self.sha_abbrev_len]
         # add +XXXX suffix, if any
         suffix = ""
         if len(dependencies):
             suffix = self.get_suffix(product.name, product_version, dependencies)
         assert suffix.__class__ == str
-        suffix = "+%s" % suffix if suffix else ""
-        return "%s%s" % (product_version, suffix)
+        suffix = f"+{suffix}" if suffix else ""
+        return f"{product_version}{suffix}"
 
 
 class VersionDbHash(VersionDb):
-    """Subclass of `VersionDb` that generates +YYY suffixes by hashing the dependency names and versions"""
+    """Subclass of `VersionDb` that generates +YYY suffixes by hashing the
+    dependency names and versions.
+    """
 
     def __init__(self, sha_abbrev_len: int, eups: eups.Eups):
         self.sha_abbrev_len = sha_abbrev_len
         self.eups = eups
 
-    def hash_dependencies(self, dependencies: List[models.Product]) -> str:
+    def hash_dependencies(self, dependencies: list[models.Product]) -> str:
         m = hashlib.sha1()
         for dep in sorted(dependencies, key=lambda d: d.name):
-            s = '%s\t%s\n' % (dep.name, dep.sha1)
+            s = f"{dep.name}\t{dep.sha1}\n"
             m.update(s.encode("ascii"))
         return m.hexdigest()
 
-    def get_suffix(
-            self,
-            product_name: str,
-            product_version: str,
-            dependencies: List[models.Product]
-    ) -> str:
-        """Return a hash of the sorted list of printed (dep_name, dep_version) tuples"""
+    def get_suffix(self, product_name: str, product_version: str, dependencies: list[models.Product]) -> str:
+        """Return a hash of the sorted list of printed (dep_name, dep_version)
+        tuples.
+        """
         hash = self.hash_dependencies(dependencies)
-        suffix = hash[:self.sha_abbrev_len]
+        suffix = hash[: self.sha_abbrev_len]
         return suffix
 
     def __get_build_id(self):
         """Allocate the next unused EUPS tag that matches the bNNNN pattern"""
-
         tags = eups.tags.Tags()
         tags.loadFromEupsPath(self.eups.path)
 
-        btre = re.compile('^b[0-9]+$')
+        btre = re.compile("^b[0-9]+$")
         btags = [0]
         btags += [int(tag[1:]) for tag in tags.getTagNames() if btre.match(tag)]
-        tag = "b%s" % (max(btags) + 1)
+        tag = f"b{max(btags) + 1}"
 
         return tag
 
@@ -745,23 +750,23 @@ class VersionDbHash(VersionDb):
 
 
 class VersionDbGit(VersionDbHash):
-    """Subclass of `VersionDb` that generates +DEADBEEF suffixes based on git commits,
-    but still tracks manifests in a repository.
+    """Subclass of `VersionDb` that generates +DEADBEEF suffixes based on git
+    commits, but still tracks manifests in a repository.
     """
 
     def __init__(self, dbdir: str, sha_abbrev_len: int, eups_obj: eups.Eups):
-        super(VersionDbGit, self).__init__(sha_abbrev_len, eups_obj)
+        super().__init__(sha_abbrev_len, eups_obj)
         self.dbdir = dbdir
         self.eups = eups_obj
 
     def __shafn(self):
-        return os.path.join("manifests", 'content_sha.db.txt')
+        return os.path.join("manifests", "content_sha.db.txt")
 
     def __get_build_id(self, manifest_sha: str):
-        """Return a build ID unique to this manifest. If a matching manifest already
-           exists in the database, its build ID will be used.
+        """Return a build ID unique to this manifest. If a matching manifest
+        already exists in the database, its build ID will be used.
         """
-        with open(os.path.join(self.dbdir, 'manifests', 'content_sha.db.txt'), 'a+', encoding='utf-8') as fp:
+        with open(os.path.join(self.dbdir, "manifests", "content_sha.db.txt"), "a+", encoding="utf-8") as fp:
             # Try to find a manifest with existing matching content
             for line in fp:
                 (sha1, tag) = line.strip().split()
@@ -771,8 +776,8 @@ class VersionDbGit(VersionDbHash):
             # Find the next unused tag that matches the bNNNN pattern
             # and isn't defined in EUPS yet
             git = Git(self.dbdir)
-            tags = git.sync_tag('-l', 'b[0-9]*').split()
-            btre = re.compile('^b[0-9]+$')
+            tags = git.sync_tag("-l", "b[0-9]*").split()
+            btre = re.compile("^b[0-9]+$")
             btags = [0]
             btags += [int(t[1:]) for t in tags if btre.match(t)]
             btag = max(btags)
@@ -780,7 +785,7 @@ class VersionDbGit(VersionDbHash):
             defined_tags = self.eups.tags.getTagNames()
             while True:
                 btag += 1
-                tag = "b%s" % btag
+                tag = f"b{btag}"
                 if tag not in defined_tags:
                     break
 
@@ -793,14 +798,15 @@ class VersionDbGit(VersionDbHash):
         manifest.build_id = self.__get_build_id(manifest_sha) if build_id is None else build_id
 
         # Store a copy of the manifest
-        manfn = os.path.join('manifests', "%s.txt" % manifest.build_id)
+        manfn = os.path.join("manifests", f"{manifest.build_id}.txt")
         absmanfn = os.path.join(self.dbdir, manfn)
-        with open(absmanfn, 'w', encoding='utf-8') as fp:
+        with open(absmanfn, "w", encoding="utf-8") as fp:
             manifest.to_file(fp)
 
         if git.sync_tag("-l", manifest.build_id) == manifest.build_id:
-            # If the build_id/manifest are being reused, VersionDB repository must be clean
-            if git.sync_describe('--always', '--dirty=-prljavonakraju').endswith("-prljavonakraju"):
+            # If the build_id/manifest are being reused, VersionDB repository
+            # must be clean.
+            if git.sync_describe("--always", "--dirty=-prljavonakraju").endswith("-prljavonakraju"):
                 raise Exception("Trying to reuse the build_id, but the versionDB repository is dirty!")
         else:
             # add the manifest file
@@ -809,44 +815,41 @@ class VersionDbGit(VersionDbHash):
             # add the new manifest<->build_id mapping
             shafn = self.__shafn()
             absshafn = os.path.join(self.dbdir, shafn)
-            with open(absshafn, 'a+', encoding='utf-8') as fp:
-                fp.write(u"%s\t%s\n" % (manifest_sha, manifest.build_id))
+            with open(absshafn, "a+", encoding="utf-8") as fp:
+                fp.write(f"{manifest_sha}\t{manifest.build_id}\n")
             git.sync_add(shafn)
 
             # git-commit
-            msg = "Updates for build %s." % manifest.build_id
-            git.sync_commit('-m', msg)
+            msg = f"Updates for build {manifest.build_id}."
+            git.sync_commit("-m", msg)
 
             # git-tag
-            msg = "Build ID %s" % manifest.build_id
-            git.sync_tag('-a', '-m', msg, manifest.build_id)
+            msg = "Build ID {manifest.build_id}"
+            git.sync_tag("-a", "-m", msg, manifest.build_id)
 
 
 class ExclusionResolver:
     """A class to determine whether a dependency should be excluded from
-       build for a product, based on matching against a list of regular
-       expression rules.
+    build for a product, based on matching against a list of regular
+    expression rules.
     """
+
     def __init__(self, exclusion_patterns):
         self.exclusions = [
             (re.compile(dep_re), re.compile(prod_re)) for (dep_re, prod_re) in exclusion_patterns
         ]
 
     def is_excluded(self, dep, product):
-        """ Check if dependency 'dep' is excluded for product 'product' """
+        """Check if dependency 'dep' is excluded for product 'product'"""
         try:
             rc = self._exclusion_regex_cache
         except AttributeError:
-            rc = self._exclusion_regex_cache = dict()
+            rc = self._exclusion_regex_cache = {}
 
         if product not in rc:
             rc[product] = [dep_re for (dep_re, prod_re) in self.exclusions if prod_re.match(product)]
 
-        for dep_re in rc[product]:
-            if dep_re.match(dep):
-                return True
-
-        return False
+        return any(dep_re.match(dep) for dep_re in rc[product])
 
     @staticmethod
     def from_file(file_object):
@@ -864,7 +867,8 @@ class ExclusionResolver:
 
 class BuildDirectoryConstructor:
     """A class that, given one or more top level packages, recursively
-    clones them to a build directory thus preparing them to be built."""
+    clones them to a build directory thus preparing them to be built.
+    """
 
     def __init__(self, build_dir, eups, product_fetcher, version_db, exclusion_resolver):
         self.build_dir = os.path.abspath(build_dir)
@@ -885,7 +889,7 @@ class BuildDirectoryConstructor:
         #
         build_dir = args.build_dir
         if not os.access(build_dir, os.W_OK):
-            raise Exception("Directory '%s' does not exist or isn't writable." % build_dir)
+            raise Exception(f"Directory {build_dir!r} does not exist or isn't writable.")
 
         refs = args.ref
 
@@ -895,7 +899,7 @@ class BuildDirectoryConstructor:
         eups_obj = eups.Eups()
 
         if args.exclusion_map:
-            with open(args.exclusion_map, encoding='utf-8') as fp:
+            with open(args.exclusion_map, encoding="utf-8") as fp:
                 exclusion_resolver = ExclusionResolver.from_file(fp)
         else:
             exclusion_resolver = ExclusionResolver([])
@@ -913,7 +917,7 @@ class BuildDirectoryConstructor:
             version_db=version_db,
             repository_patterns=args.repository_pattern,
             no_fetch=args.no_fetch,
-            tries=args.tries
+            tries=args.tries,
         )
         p = BuildDirectoryConstructor(build_dir, eups_obj, product_fetcher, version_db, exclusion_resolver)
 
@@ -926,6 +930,6 @@ class BuildDirectoryConstructor:
         #
         # Store the result in build_dir/manifest.txt
         #
-        manifest_fn = os.path.join(build_dir, 'manifest.txt')
-        with open(manifest_fn, 'w', encoding='utf-8') as fp:
+        manifest_fn = os.path.join(build_dir, "manifest.txt")
+        with open(manifest_fn, "w", encoding="utf-8") as fp:
             manifest.to_file(fp)

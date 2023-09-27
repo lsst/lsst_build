@@ -1,4 +1,4 @@
-from typing import List
+from __future__ import annotations
 
 import eups  # type: ignore
 import eups.tags  # type: ignore
@@ -18,6 +18,7 @@ class EupsModule:
     exclusion_resolver : ExclusionResolver
         object to help exclude products when getting declared dependencies
     """
+
     def __init__(self, eups: eups.Eups, exclusion_resolver):
         self.eups = eups
         self.exclusion_resolver = exclusion_resolver
@@ -26,7 +27,7 @@ class EupsModule:
         """Return the table file location for a package"""
         return f"ups/{package_name}.table"
 
-    def dependencies(self, product_name: str, table_file_path: str) -> List[str]:
+    def dependencies(self, product_name: str, table_file_path: str) -> list[str]:
         """Parse the table file to discover explicit dependencies.
 
         Parameters
@@ -35,6 +36,7 @@ class EupsModule:
             the name of this product we are investigating
         table_file_path
             the path of the table file with information about dependencies
+
         Returns
         -------
         list
@@ -51,7 +53,7 @@ class EupsModule:
             dependency_names.append(dependency.name)
         return dependency_names
 
-    def optional_dependencies(self, product_name: str, table_file_path: str) -> List[str]:
+    def optional_dependencies(self, product_name: str, table_file_path: str) -> list[str]:
         """Parse the table file to discover optional dependencies.
 
         Parameters
@@ -60,6 +62,7 @@ class EupsModule:
             the name of this product we are investigating
         table_file_path
             the path of the table file with information about dependencies
+
         Returns
         -------
         list

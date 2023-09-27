@@ -1,11 +1,13 @@
-from typing import Iterator, Iterable, List, Mapping, Set, Tuple, Dict, Optional
+from __future__ import annotations
+
+from collections.abc import Iterable, Iterator, Mapping
 
 
 class GraphError(Exception):
-    pass
+    """An exception when there is a problem with the graph."""
 
 
-def to_dep_graph(edges: Iterable[Tuple[str, Optional[str]]]) -> Dict[str, Set[str]]:
+def to_dep_graph(edges: Iterable[tuple[str, str | None]]) -> dict[str, set[str]]:
     """Take an iterable collection of (node, dependency) pairs and return
     a mapping of nodes to the set of dependencies for that node.
 
@@ -21,7 +23,7 @@ def to_dep_graph(edges: Iterable[Tuple[str, Optional[str]]]) -> Dict[str, Set[st
         The values in the graph dictionary associated as name to the set of
         dependencies.
     """
-    graph: Dict[str, Set] = {}
+    graph: dict[str, set] = {}
     for node, dep in edges:
         node_set = graph.setdefault(node, set())
         if dep:  # has an edge
@@ -31,7 +33,7 @@ def to_dep_graph(edges: Iterable[Tuple[str, Optional[str]]]) -> Dict[str, Set[st
     return graph
 
 
-def toposort(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
+def toposort(graph_set: dict[str, set[str]]) -> Iterator[list]:
     """Perform a topological sort based on Kahn's algorithm.
 
     This function produces an iterator of topologically sorted dependency
@@ -59,7 +61,7 @@ def toposort(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
         An iterator which produces lists of dependencies in a bottom-up
         topological sort
     """
-    all_dependencies: Set[str] = set()
+    all_dependencies: set[str] = set()
     self_including_nodes = []
     for node, dependencies in graph_set.items():
         if node in dependencies:
@@ -67,16 +69,16 @@ def toposort(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
         all_dependencies.union(dependencies)
     if self_including_nodes:
         raise GraphError(f"Self-including nodes: {self_including_nodes}")
-    missing_nodes = list(sorted(all_dependencies - set(graph_set.keys())))
+    missing_nodes = sorted(all_dependencies - set(graph_set.keys()))
     if missing_nodes:
         raise GraphError(f"Missing nodes in mapping: {missing_nodes}")
     remaining_nodes = graph_set.copy()
     while True:
         # Visit all nodes, remove nodes without dependencies
-        childless_nodes = set(node for node, dependencies in remaining_nodes.items() if not dependencies)
+        childless_nodes = {node for node, dependencies in remaining_nodes.items() if not dependencies}
         if not childless_nodes:
             break
-        yield list(sorted(childless_nodes))
+        yield sorted(childless_nodes)
         more_nodes = {}
         # Remove nodes we returned from dependency lists
         for node, dependencies in remaining_nodes.items():
@@ -88,7 +90,7 @@ def toposort(graph_set: Dict[str, Set[str]]) -> Iterator[List]:
         raise GraphError(f"Cycle among nodes: {remaining_nodes_list}")
 
 
-def toposort_dfs(graph: Mapping[str, Set[str]]) -> List[str]:
+def toposort_dfs(graph: Mapping[str, set[str]]) -> list[str]:
     """Perform a depth-first search topological sort on the mapping of
     dependencies and return an ordered list.
 
@@ -135,7 +137,7 @@ def toposort_dfs(graph: Mapping[str, Set[str]]) -> List[str]:
                 visit(node_map[dep])
             except GraphError as e:
                 # unroll cycle
-                raise GraphError(e.args[0] + f" <- {n.name}")
+                raise GraphError(e.args[0] + f" <- {n.name}") from e
         n.processing = False
         n.processed = True
         sorted_node_names.append(n.name)
@@ -145,7 +147,7 @@ def toposort_dfs(graph: Mapping[str, Set[str]]) -> List[str]:
     return sorted_node_names
 
 
-def flatten(dependency_lists: Iterable[List]) -> List[str]:
+def flatten(dependency_lists: Iterable[list]) -> list[str]:
     """Flatten an iterable collection of dependency lists for serial
     processing.
 
