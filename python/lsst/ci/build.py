@@ -74,12 +74,13 @@ class ProgressReporter:
             self.t0 = self.t = time.time()
 
         def report_progress(self):
-            # throttled progress reporting.
-            #
-            # Write out the version string as a progress bar, character by
-            # character, and then continue with dots.
-            #
-            # Throttle updates to one character every 2 seconds.
+            """Throttled progress reporting.
+
+            Write out the version string as a progress bar, character by
+            character, and then continue with dots.
+
+            Throttle updates to one character every 2 seconds.
+            """
             t1 = time.time()
             while self.t <= t1:
                 if self.progress_bar:
