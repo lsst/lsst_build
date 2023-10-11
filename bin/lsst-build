@@ -57,5 +57,6 @@ build.add_argument(
 )
 
 args = parser.parse_args()
+args.products = args.products[0].split()
 
 args.func(args)
