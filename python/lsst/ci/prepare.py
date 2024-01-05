@@ -608,7 +608,19 @@ class ProductFetcher:
                     repo_dir = os.path.join(self.build_dir, lfs_product_name)
                     git = Git(repo_dir)
                     # pull is equivalent to performing fetch and checkout
-                    await git.lfs("pull")
+                    n_tries = 0
+                    success = False
+                    while not success:
+                        try:
+                            await git.lfs("pull")
+                            success = True
+                        except Exception as e:
+                            n_tries += 1
+                            if n_tries >= self.tries:
+                                raise
+                            logger.warning("Failed git-lfs pull for %s, retrying: %s", lfs_product_name, e)
+                            await asyncio.sleep(3)
+
                     # Reconfigure LFS smudge filter after LFS checkout
                     await git("config", "--local", "filter.lfs.smudge", "git-lfs smudge %f")
                     await git("config", "--local", "filter.lfs.required", "true")
