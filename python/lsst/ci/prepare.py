@@ -262,7 +262,7 @@ class ProductFetcher:
             self.out.flush()
 
             # try to not hammer git remotes with retry attempts
-            time.sleep(3)
+            await asyncio.sleep(3)
 
         # do not cleanup repo dir on the last "try" so it is available for
         # debugging + allow an exception to propagate from the final attempt
