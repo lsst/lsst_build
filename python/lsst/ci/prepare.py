@@ -592,7 +592,7 @@ class ProductFetcher:
 
         This is performed after the git repos are fetched so we can process
         dependency files (e.g. eups Table files) more quickly, and it also
-        let's us perform git-lfs pulls in parallel, for better utilization
+        lets us perform git-lfs pulls in parallel, for better utilization
         on fast connections.
         """
         print("Performing git-lfs pulls...", file=self.out)
