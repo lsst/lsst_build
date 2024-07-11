@@ -716,7 +716,7 @@ class VersionDb(metaclass=abc.ABCMeta):
         suffix = ""
         if len(dependencies):
             suffix = self.get_suffix(product.name, product_version, dependencies)
-        assert suffix.__class__ == str
+        assert suffix.__class__ is str
         suffix = f"+{suffix}" if suffix else ""
         return f"{product_version}{suffix}"
 
