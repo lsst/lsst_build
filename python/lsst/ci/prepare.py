@@ -165,7 +165,7 @@ class ProductFetcher:
         self.no_fetch = no_fetch
         if repos:
             if os.path.exists(repos):
-                with open(repos, "r", encoding="utf-8") as f:
+                with open(repos, encoding="utf-8") as f:
                     self.repos = yaml.safe_load(f)
             else:
                 raise Exception(f"YAML repos file {repos!r} does not exist")
@@ -716,7 +716,7 @@ class VersionDb(metaclass=abc.ABCMeta):
         suffix = ""
         if len(dependencies):
             suffix = self.get_suffix(product.name, product_version, dependencies)
-        assert suffix.__class__ == str
+        assert suffix.__class__ is str
         suffix = f"+{suffix}" if suffix else ""
         return f"{product_version}{suffix}"
 
