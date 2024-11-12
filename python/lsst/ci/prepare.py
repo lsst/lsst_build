@@ -25,6 +25,26 @@ logger = logging.getLogger("lsst.ci")
 
 ASYNC_QUEUE_WORKERS = 8
 
+#1: Determine if the build is running under Jenkins control.  If not, do nothing.
+
+def is_running_under_jenkins():
+    """Check if the script is running under Jenkins control."""
+    return os.getenv('JENKINS_HOME') is not None
+
+""" how to call: 
+if is_running_under_jenkins():
+    print("Running under Jenkins control.")
+    # Proceed with Jenkins-specific actions
+else:
+    print("Not running under Jenkins.")
+    # Do nothing or handle differently
+"""
+
+#2: For each GitHub repo that is being checked out in lsst_build/python/lsst/ci/prepare.py 
+#(which is known in fetch()) with a non-default git ref, contact the GH API to list all the PRs for that repo.
+
+
+
 
 class RemoteError(Exception):
     """Signal that a git repo failed to cloning from all possible remotes
