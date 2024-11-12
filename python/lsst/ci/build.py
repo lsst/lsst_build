@@ -348,3 +348,4 @@ class Builder:
         retcode = b.build()
         b.write_status()
         sys.exit(retcode == 0)
+is_running_under_jenkins()
