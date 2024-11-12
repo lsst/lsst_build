@@ -42,6 +42,7 @@ def is_running_under_jenkins():
     else:
         print("unable to find agent")
               
+is_running_under_jenkins()
 
 """ how to call: 
 if is_running_under_jenkins():
