@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+import json
+import os
+import os.path
+import sys
 from dataclasses import dataclass
+
+import pydantic
+import requests
+from pydantic import BaseModel
 
 from . import tsort
 
 DEFAULT_BRANCH_NAME = "main"
+PR_FILE_NAME = "pr_info.json"
 
 
 class ProductIndex(dict):
@@ -176,3 +185,229 @@ class RepoSpec:
 
     def __str__(self):
         return self.url
+
+
+class GitHubPR(BaseModel):
+    """A single pull request for a given product/repository.
+
+    Attributes
+    ----------
+    product_name : `str`
+        The name of the product associated with the PR.
+    owner : `str`
+        The owner or organization of the repository.
+    repo : `str`
+        The repository name.
+    pr_number : `int`
+        The pull request number.
+    title : `str`
+        The title of the pull request.
+    head_ref : `str`
+        The branch name that the pull request is based on.
+    sha : `str`
+        The commit SHA associated with the pull request.
+    """
+
+    product_name: str
+    owner: str
+    repo: str
+    pr_number: int
+    title: str
+    head_ref: str
+    sha: str
+
+    def __str__(self) -> str:
+        """One liner for logging / printing."""
+        return (
+            f"PR #{self.pr_number} "
+            f"in {self.owner}/{self.repo} "
+            f"for product {self.product_name}: {self.title}"
+        )
+
+    def post_github_status(self, *, state: str, description: str, agent: str) -> None:
+        """Post a single GitHub status to `pr_info` commit.
+
+        Parameters
+        ----------
+        state : `str`
+            The state of the Github status.
+        description : `str`
+            Description of the current status.
+        agent : `str`
+            Current agent that is running.
+        """
+        token = os.getenv("GITHUB_TOKEN")
+        if not token:
+            print("GITHUB_TOKEN not found in environment variables.")
+            return
+
+        url = f"https://api.github.com/repos/{self.owner}/{self.repo}/statuses/{self.sha}"
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github.v3+json",
+        }
+
+        build_url = os.getenv(
+            "RUN_DISPLAY_URL",
+            f"{os.getenv('JENKINS_URL', 'https://rubin-ci.slac.stanford.edu')}"
+            "/blue/organizations/jenkins/stack-os-matrix/activity",
+        )
+
+        data = {
+            "state": state,
+            "description": description,
+            "context": f"Jenkins Build ({agent})",
+            "target_url": build_url,
+        }
+
+        print(f"Posting GitHub status to ({self.owner}/{self.repo}): {state} - {description}")
+
+        response = requests.post(url, headers=headers, json=data, timeout=120)
+        if response.status_code != 201:
+            print(f"Failed to post GitHub status: {response.status_code} - {response.text}", file=sys.stderr)
+
+
+class AllProductPRCollections(BaseModel):
+    """All PR collections for every product.
+
+    Attributes
+    ----------
+    items : `list` [ `GitHubPR` ]
+        A list of PR collections, each representing a product
+        and its associated PRs.
+    """
+
+    items: list[GitHubPR]
+
+    def __iter__(self):
+        """Iterate directly over the contained PRs."""
+        return iter(self.items)
+
+    def __len__(self):
+        """Length of list."""
+        return len(self.items)
+
+    def __bool__(self):
+        """Empty collections are False."""
+        return bool(self.items)
+
+    def print_summary(self) -> None:
+        """Print a summary of all PR collections to console."""
+        if not self:
+            return
+
+        print("**** PRs Summary ****")
+        print(f"Found {len(self)} total matching PR(s) across all products:")
+        for pr_col in self:
+            print(pr_col)
+        print("**** End of summary ****")
+
+    def post_all_status(self, *, agent: str, state: str, description: str) -> None:
+        """Iterate over pr_info and post the same status to every PR.
+
+        Parameters
+        ----------
+        state : `str`
+            The state of the Github status.
+        description : `str`
+            Description of the current status.
+        agent : `str`
+            Current agent that is running.
+        """
+        for pr_col in self.items:
+            try:
+                pr_col.post_github_status(
+                    state=state,
+                    description=description,
+                    agent=agent,
+                )
+
+            except requests.Timeout as time_err:
+                print(f"Timeout posting to {pr_col}: {time_err}", file=sys.stderr)
+                print(f"Skipping {state} posts, but continuing the build.", file=sys.stderr)
+                break
+            except requests.RequestException as req_err:
+                print(f"Network error posting to {pr_col}: {req_err}", file=sys.stderr)
+                print(f"Skipping {state} posts, but continuing the build.", file=sys.stderr)
+                break
+
+    def save(self, build_dir: str) -> None:
+        """Write AllProductPRCollections model to build_dir as pr_info.json.
+
+        Parameters
+        ----------
+        build_dir : `str`
+            Path to the directory where the JSON file will be written.
+
+        Raises
+        ------
+        `ValueError`
+            If `self.build_dir` does not exist or is not a directory.
+
+        Warns
+        -----
+        Prints to `sys.stderr` if the file cannot be deleted or written.
+        """
+        # Ensure build_dir exists
+        if not os.path.isdir(build_dir):
+            raise ValueError(f"build_dir {build_dir} does not exist or is not a directory.")
+
+        path = os.path.join(build_dir, PR_FILE_NAME)
+
+        # Remove any cached pr file before start
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except OSError as os_err:
+                print(f"WARNING: Failed to remove existing file {path}: {os_err}", file=sys.stderr)
+
+        # Write to build_dir
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(self.model_dump_json(indent=2))
+        except OSError as os_err:
+            print(f"Failed to write to {path}: {os_err}", file=sys.stderr)
+
+    @classmethod
+    def from_build_dir(cls, build_dir: str) -> AllProductPRCollections:
+        """Load the PR info from pr_info.json if it exists,
+        otherwise return empty list.
+
+        Parameters
+        ----------
+        build_dir : `str`
+            Path to the directory containing the `pr_info.json` file.
+
+        Returns
+        -------
+        `AllProductPRCollections`
+            The Pydantic model. If `pr_info.json` does not exist or fails
+            to parse or validate, returns an empty model
+            (`AllProductPRCollections(items=[])`).
+        Warns
+        -----
+        Prints to `sys.stderr` on read, decode, or validation failures.
+        """
+        path = os.path.join(build_dir, PR_FILE_NAME)
+        if not os.path.exists(path):
+            print(f"{path} does not exist", file=sys.stderr)
+            return cls(items=[])
+
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = f.read()
+        except OSError as os_err:
+            print(f"WARNING: Could not read {path}: {os_err}", file=sys.stderr)
+            return cls(items=[])
+
+        try:
+            return cls.model_validate_json(data)
+        except json.JSONDecodeError as decode_err:
+            print(f"Invalid JSON in {path}: {decode_err}", file=sys.stderr)
+        except pydantic.ValidationError as val_err:
+            print(
+                f"WARNING: JSON file was valid JSON, but failed Pydantic validation: {val_err}",
+                file=sys.stderr,
+            )
+
+        return cls(items=[])
