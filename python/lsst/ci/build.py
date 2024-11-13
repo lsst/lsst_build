@@ -349,5 +349,18 @@ class Builder:
         b.write_status()
         sys.exit(retcode == 0)
 
-from prepare import is_running_under_jenkins
+def is_running_under_jenkins():
+    label = os.getenv('NODE_LABEL')
+    """Check if the script is running under Jenkins control."""
+    label = label.split(" ")
+    if "arm64" in label:
+        print("linux aarch64")
+    if "mini" in label:
+        print("apple arm")
+    if "mac" in label:
+        print("apple intel")
+    if "docker" in label:
+        print("linux x86")
+    else:
+        print("unable to find agent")
 is_running_under_jenkins()
