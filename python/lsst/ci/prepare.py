@@ -26,10 +26,10 @@ logger = logging.getLogger("lsst.ci")
 ASYNC_QUEUE_WORKERS = 8
 
 #1: Determine if the build is running under Jenkins control.  If not, do nothing.
-
+"""
 def is_running_under_jenkins():
     label = os.getenv('NODE_LABELS')
-    """Check if the script is running under Jenkins control."""
+    #Check if the script is running under Jenkins control.
     label = label.split(" ")
     if "arm64" in label:
         print("linux aarch64")
@@ -41,7 +41,33 @@ def is_running_under_jenkins():
         print("linux x86")
     else:
         print("unable to find agent")
-              
+"""
+
+def is_running_under_jenkins():
+    label = os.getenv('NODE_LABELS')
+    
+    if not label:
+        print("unable to find agent")
+        return
+
+    label = label.split(" ")
+
+    # Use match-case to check the labels
+    for l in label:
+        match l:
+            case "arm64":
+                print("linux aarch64")
+            case "mini":
+                print("apple arm")
+            case "mac":
+                print("apple intel")
+            case "docker":
+                print("linux x86")
+            case _:
+                continue  # Continue the loop if no match is found
+
+    print("unable to find agent")
+
 is_running_under_jenkins()
 
 """ how to call: 
