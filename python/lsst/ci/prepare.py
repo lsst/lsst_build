@@ -52,21 +52,24 @@ def is_running_under_jenkins():
 
     label = label.split(" ")
 
-    # Use match-case to check the labels
     for l in label:
         match l:
             case "arm64":
                 print("linux aarch64")
+                break
             case "mini":
                 print("apple arm")
+                break
             case "mac":
                 print("apple intel")
+                break
             case "docker":
                 print("linux x86")
-            case _:
-                continue  # Continue the loop if no match is found
-
-    print("unable to find agent")
+                break
+        else:
+            continue
+    else:
+        print("unable to find agent")
 
 is_running_under_jenkins()
 
