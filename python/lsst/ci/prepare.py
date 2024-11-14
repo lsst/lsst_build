@@ -72,7 +72,7 @@ def is_running_under_jenkins():
     if agent == "":
         return "no agent found"
 
-
+print("starting to run is_running_under_jenkins()")
 label = is_running_under_jenkins()
 print(label)
 
