@@ -79,7 +79,7 @@ def is_running_under_jenkins():
 is_running_under_jenkins()
 
 
-
+"""
 #2: For each GitHub repo that is being checked out in lsst_build/python/lsst/ci/prepare.py 
 #(which is known in fetch()) with a non-default git ref, contact the GH API to list all the PRs for that repo.
 
@@ -111,7 +111,7 @@ for repo_name in repos:
         print(f"  PR #{pr.number}: {pr.title} (User: {pr.user.login})")
     print()
 
-
+"""
 #3 Find the head-ref in the list of PRs that matches the non-default git ref.
 
 
