@@ -45,7 +45,8 @@ def is_running_under_jenkins():
 
 def is_running_under_jenkins():
     label = os.getenv('NODE_LABELS')
-    
+
+    #Ask about util.groovy where I set null = "unknown"
     if not label:
         print("unable to find agent")
         return
@@ -62,7 +63,7 @@ def is_running_under_jenkins():
                 break
        #     case _ if l.startswith("mac"):  # Use startswith to match 'mac*'
        #         print("apple intel startswith")
-            case _ if re.match(r"mac.*", l):  # Regex to match 'mac*'
+            case _ if re.match(r"mac.*", l):  # Ask which one to use
                 print("apple intel break")
                 break
             case "docker":
@@ -73,14 +74,7 @@ def is_running_under_jenkins():
 
 is_running_under_jenkins()
 
-""" how to call: 
-if is_running_under_jenkins():
-    print("Running under Jenkins control.")
-    # Proceed with Jenkins-specific actions
-else:
-    print("Not running under Jenkins.")
-    # Do nothing or handle differently
-"""
+
 
 #2: For each GitHub repo that is being checked out in lsst_build/python/lsst/ci/prepare.py 
 #(which is known in fetch()) with a non-default git ref, contact the GH API to list all the PRs for that repo.
