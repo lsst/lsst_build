@@ -75,7 +75,7 @@ def is_running_under_jenkins():
             case _:
                 print(label)
                 print("unable to find agent")
-                break
+        
 
 is_running_under_jenkins()
 
