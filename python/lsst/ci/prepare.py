@@ -79,7 +79,34 @@ is_running_under_jenkins()
 #2: For each GitHub repo that is being checked out in lsst_build/python/lsst/ci/prepare.py 
 #(which is known in fetch()) with a non-default git ref, contact the GH API to list all the PRs for that repo.
 
+pip install PyGithub
 
+from github import Github
+from github import Auth
+# using an access token
+auth = Auth.Token("access_token")
+g = Github(auth=auth)
+
+
+repos = [list_of_non-default_repos] 
+
+# Loop through each repository in the list
+for repo_name in repos:
+    # Get a repository 
+    repo = g.get_repo(repo_name)
+    
+    # Get all open PRs for that repository
+    open_pulls = repo.get_pulls(state='open')  
+    
+    # Print information about which repo (may remove this if we want list of PRs only) 
+    print(f"Open pull requests for {repo_name}:")
+    # Print PR information for that repo 
+    for pr in open_pulls:
+        print(f"  PR #{pr.number}: {pr.title} (User: {pr.user.login})")
+    print()
+
+
+#3 Find the head-ref in the list of PRs that matches the non-default git ref.
 
 
 class RemoteError(Exception):
