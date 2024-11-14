@@ -63,14 +63,18 @@ def is_running_under_jenkins():
                 break
        #     case _ if l.startswith("mac"):  # Use startswith to match 'mac*'
        #         print("apple intel startswith")
-            case _ if re.match(r"mac.*", l):  # Ask which one to use
-                print("apple intel break")
+       #     case _ if re.match(r"mac.*", l):  # Ask which one to use
+       #         print("apple intel")
+        #        break
+            case "osx-13" | "osx-12":  
+                print("apple intel")
                 break
             case "docker":
                 print("linux x86")
                 break
-    else:
-        print("unable to find agent")
+            case _:
+                print("unable to find agent")
+                break
 
 is_running_under_jenkins()
 
