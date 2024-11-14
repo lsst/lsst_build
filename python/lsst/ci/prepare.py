@@ -66,8 +66,6 @@ def is_running_under_jenkins():
             case "docker":
                 print("linux x86")
                 break
-        else:
-            continue
     else:
         print("unable to find agent")
 
