@@ -47,38 +47,34 @@ def is_running_under_jenkins():
     label = os.getenv('NODE_LABELS')
 
     #Ask about util.groovy where I set null = "unknown"
-  #  if not label:
-  #      print("unable to find agent")
-   #     return
+    if not label:
+        print("unable to find agent")
+        return
 
     labels = label.split(" ")
-
+    agent = ""
+    
     for label in labels:
         match label:
             case "arm64":
-                print("linux aarch64")
-                break
+                agent = "linux aarch64"
             case "mini":
-                print("apple arm")
-                break
+                agent = "apple arm"
        #     case _ if l.startswith("mac"):  # Use startswith to match 'mac*'
        #         print("apple intel startswith")
        #     case _ if re.match(r"mac.*", l):  # Ask which one to use
        #         print("apple intel")
         #        break
             case "osx-13" | "osx-12":  
-                print("apple intel")
-                break
+                agent = "apple intel"
             case "docker":
-                print("linux x86")
-                break
-            case _:
-                print(label)
-                print("unable to find agent")
-        
+                agent = "linux x86"
+    if agent == "":
+        return "no agent found"
 
-is_running_under_jenkins()
 
+label = is_running_under_jenkins()
+print(label)
 
 """
 #2: For each GitHub repo that is being checked out in lsst_build/python/lsst/ci/prepare.py 
