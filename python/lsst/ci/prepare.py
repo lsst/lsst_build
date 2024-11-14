@@ -81,13 +81,15 @@ is_running_under_jenkins()
 
 pip install PyGithub
 
+#Part of this from demo https://github.com/PyGithub/PyGithub/tree/main 
+
 from github import Github
 from github import Auth
-# using an access token
+# Using an access token - how can I securely put this in?
 auth = Auth.Token("access_token")
 g = Github(auth=auth)
 
-
+# Have to find where this is defined below
 repos = [list_of_non-default_repos] 
 
 # Loop through each repository in the list
