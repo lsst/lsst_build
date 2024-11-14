@@ -60,8 +60,8 @@ def is_running_under_jenkins():
             case "mini":
                 print("apple arm")
                 break
-            case _ if l.startswith("mac"):  # Use startswith to match 'mac*'
-                print("apple intel startswith")
+       #     case _ if l.startswith("mac"):  # Use startswith to match 'mac*'
+       #         print("apple intel startswith")
             case _ if re.match(r"mac.*", l):  # Regex to match 'mac*'
                 print("apple intel break")
                 break
