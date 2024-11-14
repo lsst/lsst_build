@@ -28,7 +28,7 @@ ASYNC_QUEUE_WORKERS = 8
 #1: Determine if the build is running under Jenkins control.  If not, do nothing.
 
 def is_running_under_jenkins():
-    label = os.environ.get('NODE_LABEL')
+    label = os.environ.get('WORKSPACE')
     """Check if the script is running under Jenkins control."""
     label = label.split(" ")
     if "arm64" in label:
