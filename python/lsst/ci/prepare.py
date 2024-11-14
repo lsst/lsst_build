@@ -48,7 +48,7 @@ def is_running_under_jenkins():
 
     #Ask about util.groovy where I set null = "unknown"
     if not label:
-        return "unable to find agent"
+        return "error"
 
     labels = label.split(" ")
     agent = ""
@@ -56,32 +56,34 @@ def is_running_under_jenkins():
     for label in labels:
         match label:
             case "arm64":
-                agent = "linux aarch64"
+                agent = "linux_aarch64"
             case "mini":
-                agent = "apple arm"
+                agent = "apple_arm"
        #     case _ if l.startswith("mac"):  # Use startswith to match 'mac*'
        #         print("apple intel startswith")
        #     case _ if re.match(r"mac.*", l):  # Ask which one to use
        #         print("apple intel")
         #        break
             case "osx-13" | "osx-12":  
-                agent = "apple intel"
+                agent = "apple_intel"
             case "docker":
-                agent = "linux x86"
+                agent = "linux_x86"
     if agent == "":
-        return "no agent found"
+        return "error"
     return agent
     
 print("starting to run is_running_under_jenkins()")
 label = is_running_under_jenkins()
 print(label)
+if label == "error":
+    pass #TODO: handle this error
 
-"""
+help("modules")
 #2: For each GitHub repo that is being checked out in lsst_build/python/lsst/ci/prepare.py 
 #(which is known in fetch()) with a non-default git ref, contact the GH API to list all the PRs for that repo.
 
-pip install PyGithub
-
+#PyGithub
+"""
 #Part of this from demo https://github.com/PyGithub/PyGithub/tree/main 
 
 from github import Github
