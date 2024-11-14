@@ -48,8 +48,7 @@ def is_running_under_jenkins():
 
     #Ask about util.groovy where I set null = "unknown"
     if not label:
-        print("unable to find agent")
-        return
+        return "unable to find agent"
 
     labels = label.split(" ")
     agent = ""
@@ -71,7 +70,8 @@ def is_running_under_jenkins():
                 agent = "linux x86"
     if agent == "":
         return "no agent found"
-
+    return agent
+    
 print("starting to run is_running_under_jenkins()")
 label = is_running_under_jenkins()
 print(label)
