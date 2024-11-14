@@ -47,14 +47,14 @@ def is_running_under_jenkins():
     label = os.getenv('NODE_LABELS')
 
     #Ask about util.groovy where I set null = "unknown"
-    if not label:
-        print("unable to find agent")
-        return
+  #  if not label:
+  #      print("unable to find agent")
+   #     return
 
-    label = label.split(" ")
+    labels = label.split(" ")
 
-    for l in label:
-        match l:
+    for label in labels:
+        match label:
             case "arm64":
                 print("linux aarch64")
                 break
@@ -73,6 +73,7 @@ def is_running_under_jenkins():
                 print("linux x86")
                 break
             case _:
+                print(label)
                 print("unable to find agent")
                 break
 
