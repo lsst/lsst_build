@@ -301,7 +301,8 @@ class ProductFetcher:
         
         # Copy initial refs
         refs = copy.copy(refs)
-
+        print(refs)
+        
         # Add the repository-specific ref if defined
         if repo_spec.ref:
             refs.append(repo_spec.ref)
@@ -312,7 +313,7 @@ class ProductFetcher:
         ]
 
         # Print debugging statement
-        print(f"Non-default refs {non_default_refs}")
+    #    print(f"Non-default refs {non_default_refs}")
 
         return non_default_refs
     
@@ -332,7 +333,7 @@ class ProductFetcher:
         # Get non-default refs from non_default_refs method
         non_default_refs = self.non_default_refs(repo_spec, refs)
 
-        #print(non_default_refs)
+        print(f"Non-default refs {non_default_refs}")
         
         return refs
 
