@@ -306,6 +306,9 @@ class ProductFetcher:
             ref for ref in refs if ref not in (models.DEFAULT_BRANCH_NAME, "master")
         ]
 
+        # Print debugging statement
+        print(f"Non-default refs for {repo_spec.name}: {non_default_refs}")
+
         return non_default_refs
     
     def ref_candidates(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
@@ -323,9 +326,6 @@ class ProductFetcher:
             
         # Get non-default refs from non_default_refs method
         non_default_refs = self.non_default_refs(repo_spec, refs)
-
-        # Print debugging statement
-        print(f"Non-default refs for {repo_spec.name}: {non_default_refs}")
 
         return refs
 
