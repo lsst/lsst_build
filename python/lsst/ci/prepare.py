@@ -113,6 +113,27 @@ for repo_name in repos:
     print()
 """
 
+GITHUB_TOKEN = "github-api-token-sqreadmin"
+GITHUB_API_URL = "https://api.github.com"
+
+def list_prs_for_repo(owner, repo): # Find this from fetch and the non-default refs below
+    url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/pulls"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    
+    response = requests.get(url, headers=headers)
+
+    
+    if response.status_code == 200:
+        print(response) # Debugging PR list
+        return response.json()  # Returns a list of PRs
+    else:
+        print(f"Failed to list PRs for {repo}: {response.content}")
+        return None
+
+
 #3 Find the head-ref in the list of PRs that matches the non-default git ref.
 
 
@@ -296,6 +317,7 @@ class ProductFetcher:
 
     def non_default_refs(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
         """Return a list of non-default refs to attempt to checkout."""
+        
         # Debugging statement
         print(f"Is this even being used??")
         
@@ -307,13 +329,10 @@ class ProductFetcher:
         if repo_spec.ref:
             refs.append(repo_spec.ref)
 
-        # Exclude the default branch from the list
+        # Exclude the default branches from the list
         non_default_refs = [
-            ref for ref in refs if ref not in (models.DEFAULT_BRANCH_NAME, "master")
+            ref for ref in refs if ref not in (models.DEFAULT_BRANCH_NAME) #?? Where does DEFAULT... come from?
         ]
-
-        # Print debugging statement
-    #    print(f"Non-default refs {non_default_refs}")
 
         return non_default_refs
     
