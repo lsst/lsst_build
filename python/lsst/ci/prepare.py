@@ -312,7 +312,7 @@ class ProductFetcher:
         ]
 
         # Print debugging statement
-        print(f"Non-default refs for {repo_spec.name}: {non_default_refs}")
+        print(f"Non-default refs {non_default_refs}")
 
         return non_default_refs
     
@@ -332,7 +332,7 @@ class ProductFetcher:
         # Get non-default refs from non_default_refs method
         non_default_refs = self.non_default_refs(repo_spec, refs)
 
-        print(non_default_refs)
+        #print(non_default_refs)
         
         return refs
 
