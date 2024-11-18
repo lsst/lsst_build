@@ -83,7 +83,7 @@ help("modules")
 #(which is known in fetch()) with a non-default git ref, contact the GH API to list all the PRs for that repo.
 
 #PyGithub
-"""
+
 #Part of this from demo https://github.com/PyGithub/PyGithub/tree/main 
 
 from github import Github
@@ -110,7 +110,7 @@ for repo_name in repos:
         print(f"  PR #{pr.number}: {pr.title} (User: {pr.user.login})")
     print()
 
-"""
+
 #3 Find the head-ref in the list of PRs that matches the non-default git ref.
 
 
@@ -292,6 +292,22 @@ class ProductFetcher:
             locations += [pat % data for pat in self.repository_patterns]
         return locations
 
+    def non_default_refs(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
+        """Return a list of non-default refs to attempt to checkout."""
+        # Copy initial refs
+        refs = copy.copy(refs)
+
+        # Add the repository-specific ref if defined
+        if repo_spec.ref:
+            refs.append(repo_spec.ref)
+
+        # Exclude the default branch from the list
+        non_default_refs = [
+            ref for ref in refs if ref not in (models.DEFAULT_BRANCH_NAME, "master")
+        ]
+
+        return non_default_refs
+    
     def ref_candidates(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
         """Generate a list of refs to attempt to checkout."""
         # ref precedence should be:
@@ -304,6 +320,12 @@ class ProductFetcher:
         # Add main branch to list of refs, if not there already
         if models.DEFAULT_BRANCH_NAME not in refs:
             refs.append(models.DEFAULT_BRANCH_NAME)
+            
+        # Get non-default refs from non_default_refs method
+        non_default_refs = self.non_default_refs(repo_spec, refs)
+
+        # Print debugging statement
+        print(f"Non-default refs for {repo_spec.name}: {non_default_refs}")
 
         return refs
 
