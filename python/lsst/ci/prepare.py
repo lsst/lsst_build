@@ -294,6 +294,9 @@ class ProductFetcher:
 
     def non_default_refs(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
         """Return a list of non-default refs to attempt to checkout."""
+        # Debugging statement
+        print(f"Is this even being used??")
+        
         # Copy initial refs
         refs = copy.copy(refs)
 
@@ -327,6 +330,8 @@ class ProductFetcher:
         # Get non-default refs from non_default_refs method
         non_default_refs = self.non_default_refs(repo_spec, refs)
 
+        print(non_default_refs)
+        
         return refs
 
     async def fetch(self, product: str, refs: list[str]) -> tuple[models.Ref, list[str]]:
