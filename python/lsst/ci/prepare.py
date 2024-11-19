@@ -313,6 +313,8 @@ class ProductFetcher:
             locations.append(repo_spec.url)
         if self.repository_patterns:
             locations += [pat % data for pat in self.repository_patterns]
+        print("this is a marker!!!")
+        print(locations)
         return locations
 
     def non_default_refs(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
@@ -419,6 +421,10 @@ class ProductFetcher:
         productdir = os.path.join(self.build_dir, product)
         git = Git(productdir)
 
+        print("this is a marker!!!")
+        print(productdir)
+        print(git)
+        
         # lfs credential helper string
         helper = "!f() { cat > /dev/null; echo username=; echo password=; }; f"
 
@@ -623,9 +629,6 @@ class ProductFetcher:
 
         # We have fetched everything - sort the index
         self.product_index = self.product_index.toposort()
-        #Debugging print
-        print("this is a marker!!!")
-        print(self.product_index)
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug("Topologically sorted groups:")
             sort_groups = self.product_index.sorted_groups
