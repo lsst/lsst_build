@@ -116,14 +116,32 @@ for repo_name in repos:
 GITHUB_TOKEN = "github-api-token-sqreadmin"
 GITHUB_API_URL = "https://api.github.com"
 
-def list_prs_for_repo(owner, repo): # Find this from fetch and the non-default refs below
-    url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/pulls"
+def list_prs_for_repo(self): 
+   # url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/pulls"
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json"
     }
+
+    # Original github url to repos
+    url = self.repo_specs[product]
+
+    # Remove .git suffix
+    if url.endswith(".git")
+        url = url[:-4]
+
+    # Isolate owner and repo 
+    parts = url.split("/")
+    owner = parts[3]
+    repo = parts[4]
+    print("marker3")
+    print(owner)
+    print(repo)
+
+    api_url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/pulls"
+    print(api_url)
     
-    response = requests.get(url, headers=headers)
+    response = requests.get(api_url, headers=headers)
 
     
     if response.status_code == 200:
@@ -339,8 +357,46 @@ class ProductFetcher:
         non_default_refs = [
             ref for ref in refs if ref not in (models.DEFAULT_BRANCH_NAME) #?? Where does DEFAULT... come from?
         ]
+        print("marker2")
+        print(self.repo_specs[product])
 
         return non_default_refs
+        
+    def list_prs_for_repo(self): 
+        print("called??")
+        headers = {
+            "Authorization": f"token {GITHUB_TOKEN}",
+            "Accept": "application/vnd.github.v3+json"
+        }
+
+        # Original github url to repos
+        url = self.repo_specs[product]
+    
+        # Remove .git suffix
+        if url.endswith(".git")
+            url = url[:-4]
+
+        # Isolate owner and repo 
+        parts = url.split("/")
+        owner = parts[3]
+        repo = parts[4]
+        print("marker3")
+        print(owner)
+        print(repo)
+
+        api_url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/pulls"
+        print(api_url)
+    
+        response = requests.get(api_url, headers=headers)
+
+    
+        if response.status_code == 200:
+            print(response) # Debugging PR list
+            return response.json()  # Returns a list of PRs
+        else:
+            print(f"Failed to list PRs for {repo}: {response.content}")
+            return None
+
     
     def ref_candidates(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
         """Generate a list of refs to attempt to checkout."""
