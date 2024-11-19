@@ -339,7 +339,7 @@ class ProductFetcher:
             locations += [pat % data for pat in self.repository_patterns]
         return locations
 
-    def non_default_refs(self, product, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
+    def non_default_refs(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
         """Return a list of non-default refs to attempt to checkout."""
         
         # Debugging statement
@@ -361,7 +361,7 @@ class ProductFetcher:
         print(self.repo_specs[product])
 
         return non_default_refs
-        
+  """      
     def list_prs_for_repo(self, repo_spec: models.RepoSpec): 
         print("called??")
         headers = {
@@ -397,7 +397,7 @@ class ProductFetcher:
             print(f"Failed to list PRs for {repo}: {response.content}")
             return None
 
-    
+  """  
     def ref_candidates(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
         """Generate a list of refs to attempt to checkout."""
         # ref precedence should be:
