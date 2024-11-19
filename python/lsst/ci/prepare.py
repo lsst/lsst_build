@@ -115,7 +115,7 @@ for repo_name in repos:
 
 GITHUB_TOKEN = "github-api-token-sqreadmin"
 GITHUB_API_URL = "https://api.github.com"
-
+'''
 def list_prs_for_repo(self): 
    # url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/pulls"
     headers = {
@@ -150,7 +150,7 @@ def list_prs_for_repo(self):
     else:
         print(f"Failed to list PRs for {repo}: {response.content}")
         return None
-
+'''
 
 #3 Find the head-ref in the list of PRs that matches the non-default git ref.
 
@@ -370,14 +370,14 @@ class ProductFetcher:
         }
 
         # Original github url to repos
-        url = self.repo_specs[product]
+        gh_url = self.repo_specs[product]
     
         # Remove .git suffix
-        if url.endswith(".git"):
-            url = url[:-4]
+        if gh_url.endswith(".git"):
+            gh_url = gh_url[:-4]
 
         # Isolate owner and repo 
-        parts = url.split("/")
+        parts = gh_url.split("/")
         owner = parts[3]
         repo = parts[4]
         print("marker3")
