@@ -301,6 +301,8 @@ class ProductFetcher:
                 raise Exception(
                     "invalid repos.yaml repo specification -- please check the file with repos-lint"
                 )
+            print("marker1")
+            print(rs)
             self.repo_specs[product] = rs
 
     def _origin_candidates(self, product):
