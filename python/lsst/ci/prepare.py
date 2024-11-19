@@ -339,7 +339,7 @@ class ProductFetcher:
             locations += [pat % data for pat in self.repository_patterns]
         return locations
 
-    def non_default_refs(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
+    def non_default_refs(self, product, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
         """Return a list of non-default refs to attempt to checkout."""
         
         # Debugging statement
