@@ -362,7 +362,7 @@ class ProductFetcher:
 
         return non_default_refs
         
-    def list_prs_for_repo(self): 
+    def list_prs_for_repo(self, repo_spec: models.RepoSpec): 
         print("called??")
         headers = {
             "Authorization": f"token {GITHUB_TOKEN}",
