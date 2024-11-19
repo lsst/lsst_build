@@ -127,7 +127,7 @@ def list_prs_for_repo(self):
     url = self.repo_specs[product]
 
     # Remove .git suffix
-    if url.endswith(".git")
+    if url.endswith(".git"):
         url = url[:-4]
 
     # Isolate owner and repo 
@@ -373,7 +373,7 @@ class ProductFetcher:
         url = self.repo_specs[product]
     
         # Remove .git suffix
-        if url.endswith(".git")
+        if url.endswith(".git"):
             url = url[:-4]
 
         # Isolate owner and repo 
