@@ -273,6 +273,10 @@ class ProductFetcher:
             self.repository_patterns: list[str] | None = repository_patterns.split("|")
         else:
             self.repository_patterns = None
+
+        print("marker!!!")
+        print(repository_patterns)
+        
         self.no_fetch = no_fetch
         if repos:
             if os.path.exists(repos):
@@ -306,6 +310,10 @@ class ProductFetcher:
     def _origin_candidates(self, product):
         """Expand repository_patterns into URLs."""
         data = {"product": product}
+
+        print("marker!")
+        print(data)
+        
         locations = []
         repo_spec = self.repo_specs[product]
 
@@ -313,8 +321,6 @@ class ProductFetcher:
             locations.append(repo_spec.url)
         if self.repository_patterns:
             locations += [pat % data for pat in self.repository_patterns]
-        print("this is a marker!!!")
-        print(locations)
         return locations
 
     def non_default_refs(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
@@ -420,10 +426,6 @@ class ProductFetcher:
         assert self.build_dir is not None
         productdir = os.path.join(self.build_dir, product)
         git = Git(productdir)
-
-        print("this is a marker!!!")
-        print(productdir)
-        print(git)
         
         # lfs credential helper string
         helper = "!f() { cat > /dev/null; echo username=; echo password=; }; f"
