@@ -273,10 +273,6 @@ class ProductFetcher:
             self.repository_patterns: list[str] | None = repository_patterns.split("|")
         else:
             self.repository_patterns = None
-
-        print("marker!!!")
-        print(repository_patterns)
-        
         self.no_fetch = no_fetch
         if repos:
             if os.path.exists(repos):
@@ -310,13 +306,13 @@ class ProductFetcher:
     def _origin_candidates(self, product):
         """Expand repository_patterns into URLs."""
         data = {"product": product}
-
-        print("marker!")
-        print(data)
-        
         locations = []
         repo_spec = self.repo_specs[product]
 
+        print("marker!")
+        print(repo_spec)
+        print(product)
+        
         if repo_spec:
             locations.append(repo_spec.url)
         if self.repository_patterns:
@@ -583,7 +579,9 @@ class ProductFetcher:
             assert product.ref is not None
             if product.ref.name in matched_refs:
                 matched_refs[product.ref.name] += 1
-
+                print("marker!!!")
+                print(matched_refs)
+        
         missed = [ref for ref in matched_refs if matched_refs[ref] == 0]
         if missed:
             raise RuntimeError(
