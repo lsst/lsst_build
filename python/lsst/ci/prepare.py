@@ -623,6 +623,8 @@ class ProductFetcher:
 
         # We have fetched everything - sort the index
         self.product_index = self.product_index.toposort()
+        #Debugging print
+        print(self.product_index)
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug("Topologically sorted groups:")
             sort_groups = self.product_index.sorted_groups
