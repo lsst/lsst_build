@@ -8,6 +8,7 @@ import logging
 import os
 import os.path
 import re
+import requests
 import shutil
 import sys
 import time
@@ -113,6 +114,10 @@ GITHUB_API_URL = "https://api.github.com"
 '''
 def list_prs_for_repo(self): 
    # url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/pulls"
+    token = os.environ['GITHUB_TOKEN']
+    # Use the token in your API calls
+    print(f"Using GitHub token: {token}")
+    
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json"
@@ -331,7 +336,7 @@ class ProductFetcher:
         if self.repository_patterns:
             locations += [pat % data for pat in self.repository_patterns]
         return locations
-
+    """
     def non_default_refs(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
         """Return a list of non-default refs to attempt to checkout."""
         
@@ -354,7 +359,7 @@ class ProductFetcher:
         print(self.repo_specs[product])
 
         return non_default_refs
-
+    """
     def ref_candidates(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
         """Generate a list of refs to attempt to checkout."""
         # ref precedence should be:
@@ -800,6 +805,73 @@ class ProductFetcher:
             first_exception = exceptions[0]
             logger.error("At least one error occurred during while performing LFS pulls")
             raise first_exception
+        
+    def list_non_default_refs_prs(self):
+        """List all PRs for non-default git refs"""
+
+        for product_name, product in self.product_index.items():
+            assert product.ref is not None
+            if product.ref.name != models.DEFAULT_BRANCH_NAME:
+                # Get the repository URL
+                repo_dir = os.path.join(self.build_dir, product_name)
+                git = Git(repo_dir)
+                origin_url = await git("config", "--get", "remote.origin.url")
+
+                # Parse the GitHub repository owner and name from the origin URL
+                repo_info = self._extract_github_repo_info(origin_url)
+                if repo_info:
+                    owner, repo = repo_info
+                    prs = self._get_github_prs(owner, repo)
+                    print(f"Pull requests for {owner}/{repo}:")
+                    for pr in prs:
+                        print(f"#{pr['number']}: {pr['title']}")
+                else:
+                    print(f"Could not parse GitHub repo info from URL: {origin_url}")
+
+    def _extract_github_repo_info(self, url):
+        """Retrieve repo owner and name from URL"""
+        
+        # Remove the '.git' suffix 
+        if url.endswith('.git'):
+            url = url[:-4]
+        
+        #  Handle URLs like 'git@github.com:owner/repo' or 'https://github.com/owner/repo'
+        if url.startswith('git@github.com:'):
+            path = url[len('git@github.com:'):]
+        elif url.startswith('https://github.com/'):
+            path = url[len('https://github.com/'):]
+        else:
+            return None
+
+        parts = path.split('/')
+        if len(parts) == 2:
+            owner, repo = parts
+            return owner, repo
+        else:
+            return None
+
+    def _get_github_prs(self, owner, repo):
+        """Get the list of PRs using the GitHub API."""
+    
+        # Get token set in util.jenkinsWrapper
+        token = os.environ['GITHUB_TOKEN']
+    
+        url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
+        headers = {
+            'Accept': 'application/vnd.github.v3+json',
+            'Authorization': f"token {token}"  
+        }
+
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            prs = response.json()
+            print("printing prs!")
+            print(prs)
+            return prs
+        else:
+            print(f"Failed to get PRs for {owner}/{repo}: {response.status_code}")
+            return []
+
 
 
 class VersionDb(metaclass=abc.ABCMeta):
