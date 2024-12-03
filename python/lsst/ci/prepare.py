@@ -874,9 +874,10 @@ class ProductFetcher:
                         pr_number = pr['number']
                         pr_title = pr['title']
                         pr_head_ref = pr['head']['sha']
+                        pr_sha = pr['sha']
 
                         # Print PR details
-                        print(f"PR #{pr_number}: {pr_title} (head ref: {pr_head_ref})")
+                        print(f"PR #{pr_number}: {pr_title} branch: {pr_head_ref}, (sha: {pr_sha})")
 
                         # Check if the PR's head ref matches the non-default git ref
                         if pr_head_ref == product.ref.name:
