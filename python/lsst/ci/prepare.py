@@ -806,29 +806,8 @@ class ProductFetcher:
             logger.error("At least one error occurred during while performing LFS pulls")
             raise first_exception
         
-    def list_non_default_refs_prs(self):
-        """List all PRs for non-default git refs"""
-        print("hey!")
-        for product_name, product in self.product_index.items():
-            assert product.ref is not None
-            if product.ref.name != models.DEFAULT_BRANCH_NAME:
-                # Get the repository URL
-                repo_dir = os.path.join(self.build_dir, product_name)
-                git = Git(repo_dir)
-                origin_url = git("config", "--get", "remote.origin.url")
-
-                # Parse the GitHub repository owner and name from the origin URL
-                repo_info = self._extract_github_repo_info(origin_url)
-                if repo_info:
-                    owner, repo = repo_info
-                    prs = self._get_github_prs(owner, repo)
-                    print(f"Pull requests for {owner}/{repo}:")
-                    for pr in prs:
-                        print(f"#{pr['number']}: {pr['title']}")
-                else:
-                    print(f"Could not parse GitHub repo info from URL: {origin_url}")
     
-    def _extract_github_repo_info(self, url):
+    def extract_github_repo_info(self, url):
         """Retrieve repo owner and name from URL"""
         print("hey!!")
         # Remove the '.git' suffix 
@@ -850,7 +829,7 @@ class ProductFetcher:
         else:
             return None
 
-    def _get_github_prs(self, owner, repo):
+    def get_github_prs(self, owner, repo):
         """Get the list of PRs using the GitHub API."""
         print("hey!!!")
         # Get token set in util.jenkinsWrapper
@@ -872,6 +851,27 @@ class ProductFetcher:
             print(f"Failed to get PRs for {owner}/{repo}: {response.status_code}")
             return []
 
+    async def list_non_default_refs_prs(self):
+        """List all PRs for non-default git refs"""
+        print("hey!")
+        for product_name, product in self.product_index.items():
+            assert product.ref is not None
+            if product.ref.name != models.DEFAULT_BRANCH_NAME:
+                # Get the repository URL
+                repo_dir = os.path.join(self.build_dir, product_name)
+                git = Git(repo_dir)
+                origin_url = await git("config", "--get", "remote.origin.url")
+
+                # Parse the GitHub repository owner and name from the origin URL
+                repo_info = self.extract_github_repo_info(origin_url)
+                if repo_info:
+                    owner, repo = repo_info
+                    prs = self.get_github_prs(owner, repo)
+                    print(f"Pull requests for {owner}/{repo}:")
+                    for pr in prs:
+                        print(f"#{pr['number']}: {pr['title']}")
+                else:
+                    print(f"Could not parse GitHub repo info from URL: {origin_url}")
 
 
 class VersionDb(metaclass=abc.ABCMeta):
