@@ -344,6 +344,10 @@ class Builder:
         with open(manifest_fn, encoding="utf-8") as fp:
             manifest = Manifest.from_file(fp)
 
+        # Load PR information saved by prepare.py
+        pr_info = Builder.load_pr_info(build_dir)
+        print(f"this is the pr_info {pr_info}")
+
         b = Builder(build_dir, manifest, progress, eups_obj)
         b.rm_status()
         retcode = b.build()
