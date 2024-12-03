@@ -662,6 +662,8 @@ class ProductFetcher:
             loop.run_until_complete(self.resolve_versions())
         if not self.no_fetch and len(self.lfs_product_names):
             loop.run_until_complete(self.lfs_checkout())
+        # Calling non_default_refs_prs method
+        loop.run_until_complete(self.list_non_default_refs_prs())
         loop.close()
 
     async def fetch_products(self, product_names: list[str], refs: list[str]) -> set[str]:
