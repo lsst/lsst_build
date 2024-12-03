@@ -338,7 +338,7 @@ class ProductFetcher:
         return locations
     """
     def non_default_refs(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
-        """Return a list of non-default refs to attempt to checkout."""
+        Return a list of non-default refs to attempt to checkout.
         
         # Debugging statement
         print(f"Is this even being used??")
