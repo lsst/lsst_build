@@ -827,7 +827,7 @@ class ProductFetcher:
                         print(f"#{pr['number']}: {pr['title']}")
                 else:
                     print(f"Could not parse GitHub repo info from URL: {origin_url}")
-
+    
     def _extract_github_repo_info(self, url):
         """Retrieve repo owner and name from URL"""
         
@@ -1175,3 +1175,6 @@ class BuildDirectoryConstructor:
         manifest_fn = os.path.join(build_dir, "manifest.txt")
         with open(manifest_fn, "w", encoding="utf-8") as fp:
             manifest.to_file(fp)
+
+
+        product_fetcher.list_non_default_refs_prs()
