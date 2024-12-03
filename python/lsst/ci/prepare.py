@@ -836,7 +836,6 @@ class ProductFetcher:
         print("hey!!!")
         # Get token set in util.jenkinsWrapper
         token = os.environ['GITHUB_TOKEN']
-        print(f"Token starts with: {token[:2]}")
     
         url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
         headers = {
@@ -847,8 +846,6 @@ class ProductFetcher:
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
             prs = response.json()
-            print("printing prs!")
-            print(prs)
             return prs
         else:
             print(f"Failed to get PRs for {owner}/{repo}: {response.status_code}")
@@ -871,8 +868,17 @@ class ProductFetcher:
                     owner, repo = repo_info
                     prs = self.get_github_prs(owner, repo)
                     print(f"Pull requests for {owner}/{repo}:")
+                    matching_pr = None
                     for pr in prs:
                         print(f"#{pr['number']}: {pr['title']}")
+                        if pr['head']['ref'] == product.ref.name:
+                            matching_pr = pr
+                            break  
+                    if matching_pr:
+                        print(f"Found matching PR for {product_name}:")
+                        print(f"PR #{matching_pr['number']}: {matching_pr['title']}")
+                    else:
+                        print(f"No matching PR found for {product_name} with ref '{product.ref.name}'")
                 else:
                     print(f"Could not parse GitHub repo info from URL: {origin_url}")
 
