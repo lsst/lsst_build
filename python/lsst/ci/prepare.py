@@ -836,6 +836,7 @@ class ProductFetcher:
         print("hey!!!")
         # Get token set in util.jenkinsWrapper
         token = os.environ['GITHUB_TOKEN']
+        print(f"Token starts with: {token[:2]}")
     
         url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
         headers = {
