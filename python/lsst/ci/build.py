@@ -3,6 +3,7 @@ from __future__ import annotations
 # Builder
 import contextlib
 import datetime
+import json
 import os
 import requests
 import select
@@ -353,3 +354,14 @@ class Builder:
         retcode = b.build()
         b.write_status()
         sys.exit(retcode == 0)
+
+    @staticmethod
+    def load_pr_info(build_dir):
+        """Load PR information saved by prepare.py."""
+        pr_info_file = os.path.join(build_dir, 'pr_info.json')
+        if os.path.exists(pr_info_file):
+            with open(pr_info_file, 'r', encoding='utf-8') as f:
+                pr_info = json.load(f)
+            return pr_info
+        else:
+            return None
