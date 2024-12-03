@@ -873,8 +873,8 @@ class ProductFetcher:
                     for pr in prs:
                         pr_number = pr['number']
                         pr_title = pr['title']
-                        pr_head_ref = pr['head']['sha']
-                        pr_sha = pr['sha']
+                        pr_head_ref = pr['head']['ref']
+                        pr_sha = pr['head']['sha']
 
                         # Print PR details
                         print(f"PR #{pr_number}: {pr_title} branch: {pr_head_ref}, (sha: {pr_sha})")
