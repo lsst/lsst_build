@@ -852,7 +852,7 @@ class ProductFetcher:
             return []
 
     async def list_non_default_refs_prs(self):
-        """List all PRs for non-default git refs"""
+        """List all PRs for non-default git refs and matching head refs"""
         print("hey!")
         for product_name, product in self.product_index.items():
             assert product.ref is not None
@@ -870,10 +870,16 @@ class ProductFetcher:
                     print(f"Pull requests for {owner}/{repo}:")
                     matching_pr = None
                     for pr in prs:
-                        print(f"#{pr['number']}: {pr['title']}")
-                        if pr['head']['ref'] == product.ref.name:
+                        pr_number = pr['number']
+                        pr_title = pr['title']
+                        pr_head_ref = pr['head']['ref']
+
+                        # Print PR details
+                        print(f"PR #{pr_number}: {pr_title} (head ref: {pr_head_ref})")
+
+                        # Check if the PR's head ref matches the non-default git ref
+                        if pr_head_ref == product.ref.name:
                             matching_pr = pr
-                            break  
                     if matching_pr:
                         print(f"Found matching PR for {product_name}:")
                         print(f"PR #{matching_pr['number']}: {matching_pr['title']}")
