@@ -59,11 +59,6 @@ def is_running_under_jenkins():
                 agent = "linux_aarch64"
             case "mini":
                 agent = "apple_arm"
-       #     case _ if l.startswith("mac"):  # Use startswith to match 'mac*'
-       #         print("apple intel startswith")
-       #     case _ if re.match(r"mac.*", l):  # Ask which one to use
-       #         print("apple intel")
-        #        break
             case "osx-13" | "osx-12":  
                 agent = "apple_intel"
             case "docker":
