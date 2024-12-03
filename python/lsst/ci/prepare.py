@@ -4,6 +4,7 @@ import abc
 import asyncio
 import copy
 import hashlib
+import json
 import logging
 import os
 import os.path
@@ -872,7 +873,7 @@ class ProductFetcher:
                     for pr in prs:
                         pr_number = pr['number']
                         pr_title = pr['title']
-                        pr_head_ref = pr['head']['ref']
+                        pr_head_ref = pr['head']['sha']
 
                         # Print PR details
                         print(f"PR #{pr_number}: {pr_title} (head ref: {pr_head_ref})")
@@ -883,6 +884,16 @@ class ProductFetcher:
                     if matching_pr:
                         print(f"Found matching PR for {product_name}:")
                         print(f"PR #{matching_pr['number']}: {matching_pr['title']}")
+                        pr_info = {
+                            'owner': owner,
+                            'repo': repo,
+                            'pr_number': matching_pr['number'],
+                            'sha': matching_pr['head']['sha']
+                        }
+                        # Assuming self.build_dir is accessible
+                        pr_info_file = os.path.join(self.build_dir, 'pr_info.json')
+                        with open(pr_info_file, 'w', encoding='utf-8') as f:
+                            json.dump(pr_info, f)                        
                     else:
                         print(f"No matching PR found for {product_name} with ref '{product.ref.name}'")
                 else:

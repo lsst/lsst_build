@@ -4,6 +4,7 @@ from __future__ import annotations
 import contextlib
 import datetime
 import os
+import requests
 import select
 import shlex
 import shutil
