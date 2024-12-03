@@ -374,7 +374,7 @@ class ProductFetcher:
             refs.append(models.DEFAULT_BRANCH_NAME)
             
         # Get non-default refs from non_default_refs method
-        non_default_refs = self.non_default_refs(repo_spec, refs)
+        #non_default_refs = self.non_default_refs(repo_spec, refs)
 
         print(f"Non-default refs {non_default_refs}")
         
