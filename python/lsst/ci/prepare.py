@@ -808,7 +808,7 @@ class ProductFetcher:
         
     def list_non_default_refs_prs(self):
         """List all PRs for non-default git refs"""
-
+        print("hey!")
         for product_name, product in self.product_index.items():
             assert product.ref is not None
             if product.ref.name != models.DEFAULT_BRANCH_NAME:
@@ -830,7 +830,7 @@ class ProductFetcher:
     
     def _extract_github_repo_info(self, url):
         """Retrieve repo owner and name from URL"""
-        
+        print("hey!!")
         # Remove the '.git' suffix 
         if url.endswith('.git'):
             url = url[:-4]
@@ -852,7 +852,7 @@ class ProductFetcher:
 
     def _get_github_prs(self, owner, repo):
         """Get the list of PRs using the GitHub API."""
-    
+        print("hey!!!")
         # Get token set in util.jenkinsWrapper
         token = os.environ['GITHUB_TOKEN']
     
