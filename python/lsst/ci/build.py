@@ -351,7 +351,19 @@ class Builder:
 
         b = Builder(build_dir, manifest, progress, eups_obj)
         b.rm_status()
+
+        # Post "build started" status to GitHub
+        if pr_info:
+            Builder.post_github_status(pr_info, state='pending', description='Build started')
+
         retcode = b.build()
+
+        # Post "build succeeded" or "build failed" status to GitHub
+        if pr_info:
+            state = 'success' if retcode else 'failure'
+            description = 'Build succeeded' if retcode else 'Build failed'
+            Builder.post_github_status(pr_info, state=state, description=description)
+
         b.write_status()
         sys.exit(retcode == 0)
 
@@ -365,3 +377,44 @@ class Builder:
             return pr_info
         else:
             return None
+        
+    @staticmethod
+    def post_github_status(pr_info, state, description):
+        """Post a status to the matching PR on GitHub.
+
+        Parameters
+        ----------
+        pr_info : dict
+            Dictionary containing 'owner', 'repo', 'pr_number', 'sha'.
+        state : str
+            The state of the status ('pending', 'success', 'failure', or 'error').
+        description : str
+            A short description of the status.
+        """
+        print(f"Posting GitHub status: {state} - {description}")
+        token = os.environ['GITHUB_TOKEN']
+        if not token:
+            print("GITHUB_TOKEN not found in environment variables.")
+            return
+
+        owner = pr_info['owner']
+        repo = pr_info['repo']
+        sha = pr_info['sha']  # The commit SHA to which the status will be attached
+
+        url = f"https://api.github.com/repos/{owner}/{repo}/statuses/{sha}"
+        headers = {
+            'Authorization': f'token {token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+
+        data = {
+            'state': state,
+            'description': description,
+            'context': 'CI/build'  # You can customize the context if needed
+        }
+
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 201:
+            print("GitHub status posted successfully.")
+        else:
+            print(f"Failed to post GitHub status: {response.status_code} - {response.text}")
