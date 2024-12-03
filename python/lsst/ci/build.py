@@ -410,7 +410,7 @@ class Builder:
         data = {
             'state': state,
             'description': description,
-            'context': 'CI/build'  # You can customize the context if needed
+            'context': 'Jenkins Build'  # You can customize the context if needed
         }
 
         response = requests.post(url, headers=headers, json=data)
