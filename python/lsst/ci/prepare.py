@@ -815,7 +815,7 @@ class ProductFetcher:
                 # Get the repository URL
                 repo_dir = os.path.join(self.build_dir, product_name)
                 git = Git(repo_dir)
-                origin_url = await git("config", "--get", "remote.origin.url")
+                origin_url = git("config", "--get", "remote.origin.url")
 
                 # Parse the GitHub repository owner and name from the origin URL
                 repo_info = self._extract_github_repo_info(origin_url)
