@@ -162,6 +162,7 @@ class Builder:
         self.eups = eups
         self.built: list[models.Product] = []
         self.failed_at = None
+        self.check_run_id = None # Store GH check run ID
 
     def _tag_product(self, name, version, tag):
         if tag:
@@ -310,7 +311,8 @@ class Builder:
                 self.failed_at = product
                 return False
             self.built.append(product)
-
+        return True # Returns true on success, to use for check
+    
     def rm_status(self):
         if os.path.isfile(self.status_file()):
             os.remove(self.status_file())
@@ -352,20 +354,18 @@ class Builder:
         b = Builder(build_dir, manifest, progress, eups_obj)
         b.rm_status()
 
-        # Post "build started" status to GitHub
+        # Post "build started" status to GitHub using Checks API
         if pr_info:
-            Builder.post_github_status(pr_info, state='pending', description='Build started')
+            b.create_github_check_run(pr_info)
 
-        retcode = b.build()
+        success = b.build()
 
-        # Post "build succeeded" or "build failed" status to GitHub
+        # Post "build succeeded" or "build failed" status to GitHub using Checks API
         if pr_info:
-            state = 'success' if retcode else 'failure'
-            description = 'Build succeeded' if retcode else 'Build failed'
-            Builder.post_github_status(pr_info, state=state, description=description)
+            b.update_github_check_run(pr_info, success=success)
 
         b.write_status()
-        sys.exit(retcode == 0)
+        sys.exit(0 if success else 1)
 
     @staticmethod
     def load_pr_info(build_dir):
@@ -378,43 +378,120 @@ class Builder:
         else:
             return None
         
-    @staticmethod
-    def post_github_status(pr_info, state, description):
-        """Post a status to the matching PR on GitHub.
+    def create_github_check_run(self, pr_info):
+        """Create a check run on GitHub to indicate the build has started."""
 
-        Parameters
-        ----------
-        pr_info : dict
-            Dictionary containing 'owner', 'repo', 'pr_number', 'sha'.
-        state : str
-            The state of the status ('pending', 'success', 'failure', or 'error').
-        description : str
-            A short description of the status.
-        """
-        print(f"Posting GitHub status: {state} - {description}")
-        token = os.environ['GITHUB_TOKEN']
+        print("Creating GitHub check run for build start.")
+        token = os.environ('GITHUB_TOKEN')
         if not token:
             print("GITHUB_TOKEN not found in environment variables.")
             return
 
         owner = pr_info['owner']
         repo = pr_info['repo']
-        sha = pr_info['sha']  # The commit SHA to which the status will be attached
+        sha = pr_info['sha']
 
-        url = f"https://api.github.com/repos/{owner}/{repo}/statuses/{sha}"
+        url = f"https://api.github.com/repos/{owner}/{repo}/check-runs"
         headers = {
             'Authorization': f'token {token}',
             'Accept': 'application/vnd.github.v3+json'
         }
 
         data = {
-            'state': state,
-            'description': description,
-            'context': 'Jenkins Build'  # You can customize the context if needed
+            'name': 'Jenkins Check',
+            'head_sha': sha,
+            'status': 'in_progress',
+            'started_at': datetime.datetime.utcnow().isoformat() + 'Z'
         }
 
         response = requests.post(url, headers=headers, json=data)
         if response.status_code == 201:
-            print("GitHub status posted successfully.")
+            check_run = response.json()
+            self.check_run_id = check_run['id']
+            print(f"GitHub check run created with ID {self.check_run_id}.")
         else:
-            print(f"Failed to post GitHub status: {response.status_code} - {response.text}")
+            print(f"Failed to create GitHub check run: {response.status_code} - {response.text}")
+
+    def update_github_check_run(self, pr_info, success):
+        """Update the GitHub check run with the build result."""
+        
+        if self.check_run_id is None:
+            print("No check run ID available to update.")
+            return
+
+        print("Updating GitHub check run with build result.")
+        token = os.environ('GITHUB_TOKEN')
+        if not token:
+            print("GITHUB_TOKEN not found in environment variables.")
+            return
+
+        owner = pr_info['owner']
+        repo = pr_info['repo']
+        sha = pr_info['sha']
+
+        url = f"https://api.github.com/repos/{owner}/{repo}/check-runs/{self.check_run_id}"
+        headers = {
+            'Authorization': f'token {token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+
+        conclusion = 'success' if success else 'failure'
+        data = {
+            'name': 'Jenkins Check',
+            'status': 'completed',
+            'completed_at': datetime.datetime.utcnow().isoformat() + 'Z',
+            'conclusion': conclusion,
+            'output': {
+                'title': 'Build Result',
+                'summary': 'Build succeeded.' if success else 'Build failed.'
+            }
+        }
+
+        response = requests.patch(url, headers=headers, json=data)
+        if response.status_code == 200:
+            print("GitHub check run updated successfully.")
+        else:
+            print(f"Failed to update GitHub check run: {response.status_code} - {response.text}")
+
+
+
+    # @staticmethod
+    # def post_github_status(pr_info, state, description):
+    #     """Post a status to the matching PR on GitHub.
+
+    #     Parameters
+    #     ----------
+    #     pr_info : dict
+    #         Dictionary containing 'owner', 'repo', 'pr_number', 'sha'.
+    #     state : str
+    #         The state of the status ('pending', 'success', 'failure', or 'error').
+    #     description : str
+    #         A short description of the status.
+    #     """
+    #     print(f"Posting GitHub status: {state} - {description}")
+    #     token = os.environ['GITHUB_TOKEN']
+    #     if not token:
+    #         print("GITHUB_TOKEN not found in environment variables.")
+    #         return
+
+    #     owner = pr_info['owner']
+    #     repo = pr_info['repo']
+    #     sha = pr_info['sha']  # The commit SHA to which the status will be attached
+
+    #     url = f"https://api.github.com/repos/{owner}/{repo}/statuses/{sha}"
+    #     headers = {
+    #         'Authorization': f'token {token}',
+    #         'Accept': 'application/vnd.github.v3+json'
+    #     }
+
+    #     data = {
+    #         'state': state,
+    #         'description': description,
+    #         'context': 'Jenkins Build'  # You can customize the context if needed
+    #     }
+
+    #     response = requests.post(url, headers=headers, json=data)
+    #     if response.status_code == 201:
+    #         print("GitHub status posted successfully.")
+    #     else:
+    #         print(f"Failed to post GitHub status: {response.status_code} - {response.text}")
