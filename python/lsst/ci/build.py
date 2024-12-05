@@ -382,7 +382,7 @@ class Builder:
         """Create a check run on GitHub to indicate the build has started."""
 
         print("Creating GitHub check run for build start.")
-        token = os.environ('GITHUB_TOKEN')
+        token = os.environ['GITHUB_TOKEN']
         if not token:
             print("GITHUB_TOKEN not found in environment variables.")
             return
@@ -420,7 +420,7 @@ class Builder:
             return
 
         print("Updating GitHub check run with build result.")
-        token = os.environ('GITHUB_TOKEN')
+        token = os.environ['GITHUB_TOKEN']
         if not token:
             print("GITHUB_TOKEN not found in environment variables.")
             return
