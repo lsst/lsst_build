@@ -370,6 +370,7 @@ class Builder:
     @staticmethod
     def load_pr_info(build_dir):
         """Load PR information saved by prepare.py."""
+
         pr_info_file = os.path.join(build_dir, 'pr_info.json')
         if os.path.exists(pr_info_file):
             with open(pr_info_file, 'r', encoding='utf-8') as f:
@@ -378,13 +379,65 @@ class Builder:
         else:
             return None
         
+    def authenticate_github_app(self):
+        """Authenticate as GitHub App and obtain installation access token."""
+
+        app_id = os.environ.get('GITHUB_APP_ID')
+        private_key = os.environ.get('GITHUB_APP_KEY')
+        installation_id = os.environ.get('GITHUB_APP_INSTALLATION_ID')
+
+        if not all([app_id, private_key, installation_id]):
+            print("GitHub App credentials not found in environment variables.")
+            return None
+
+        # Generate JWT
+        payload = {
+            'iat': int(time.time()),
+            'exp': int(time.time()) + (10 * 60),
+            'iss': app_id
+        }
+
+        jwt_token = jwt.encode(payload, private_key, algorithm='RS256')
+        self.jwt_token = jwt_token
+
+        # Get Installation Access Token
+        headers = {
+            'Authorization': f'Bearer {jwt_token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+
+        url = f'https://api.github.com/app/installations/{installation_id}/access_tokens'
+        response = requests.post(url, headers=headers)
+        if response.status_code == 201:
+            access_token = response.json()['token']
+            self.access_token = access_token
+            return access_token
+        else:
+            print(f'Failed to get installation access token: {response.status_code} - {response.text}')
+            return None
+    
+    def get_installation_id(self, owner, repo):
+        headers = {
+            'Authorization': f'Bearer {self.jwt_token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+
+        url = f'https://api.github.com/repos/{owner}/{repo}/installation'
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            installation_id = response.json()['id']
+            self.installation_id = installation_id
+            return installation_id
+        else:
+            print(f'Failed to get installation ID: {response.status_code} - {response.text}')
+            return None
+
     def create_github_check_run(self, pr_info):
         """Create a check run on GitHub to indicate the build has started."""
 
         print("Creating GitHub check run for build start.")
-        token = os.environ['GITHUB_TOKEN']
-        if not token:
-            print("GITHUB_TOKEN not found in environment variables.")
+        if not self.access_token:
+            print("There is a problem retrieving the installation token for Github authentication.")
             return
 
         owner = pr_info['owner']
@@ -393,7 +446,7 @@ class Builder:
 
         url = f"https://api.github.com/repos/{owner}/{repo}/check-runs"
         headers = {
-            'Authorization': f'token {token}',
+            'Authorization': f'token {self.access_token}',
             'Accept': 'application/vnd.github.v3+json'
         }
 
@@ -419,11 +472,11 @@ class Builder:
             print("No check run ID available to update.")
             return
 
-        print("Updating GitHub check run with build result.")
-        token = os.environ['GITHUB_TOKEN']
-        if not token:
-            print("GITHUB_TOKEN not found in environment variables.")
+        if not self.access_token:
+            print("No access_token. Make sure create_github_check run is called and running properly")
             return
+
+        print("Updating GitHub check run with build result.")
 
         owner = pr_info['owner']
         repo = pr_info['repo']
@@ -431,7 +484,7 @@ class Builder:
 
         url = f"https://api.github.com/repos/{owner}/{repo}/check-runs/{self.check_run_id}"
         headers = {
-            'Authorization': f'token {token}',
+            'Authorization': f'token {self.access_token}',
             'Accept': 'application/vnd.github.v3+json'
         }
 
