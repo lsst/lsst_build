@@ -809,14 +809,13 @@ class ProductFetcher:
             logger.error("At least one error occurred during while performing LFS pulls")
             raise first_exception
         
-    
     def extract_github_repo_info(self, url):
         """Retrieve repo owner and name from URL"""
         print("hey!!")
         # Remove the '.git' suffix 
         if url.endswith('.git'):
             url = url[:-4]
-        
+
         #  Handle URLs like 'git@github.com:owner/repo' or 'https://github.com/owner/repo'
         if url.startswith('git@github.com:'):
             path = url[len('git@github.com:'):]
