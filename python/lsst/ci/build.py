@@ -22,6 +22,7 @@ import yaml
 
 from . import models
 from .prepare import Manifest
+from .prepare import agent_label
 
 
 def product_representer(dumper, data):
@@ -333,6 +334,9 @@ class Builder:
 
     @staticmethod
     def run(args):
+        # Call agent() from prepare.py
+        agent = agent_label()
+        
         # Ensure build directory exists and is writable
         build_dir = args.build_dir
         if not os.access(build_dir, os.W_OK):
@@ -354,56 +358,24 @@ class Builder:
         b = Builder(build_dir, manifest, progress, eups_obj)
         b.rm_status()
 
-        # Post "build started" status to GitHub
-        if pr_info:
-            Builder.post_github_status(pr_info, state='pending', description='Build started')
+        # Post "build pending" status to GitHub
+        if pr_info and agent != "error":
+            description = f"Build started on {agent}"
+            print("Github status pending")
+            Builder.post_github_status(pr_info, state='pending', description=description, agent=agent)
 
         retcode = b.build()
 
         # Post "build succeeded" or "build failed" status to GitHub
-        if pr_info:
-            state = 'success' if retcode else 'failure'
-            description = 'Build succeeded' if retcode else 'Build failed'
-            Builder.post_github_status(pr_info, state=state, description=description)
+        if pr_info and agent != "error":
+            description = f"Build {'succeeded' if retcode else 'failed'} on {agent}"
+            state = "success" if retcode else "failure"
+            Builder.post_github_status(pr_info, state=state, description=description, agent=agent)
 
         b.write_status()
-        sys.exit(retcode == 0)
+        sys.exit(0 if retcode else 1)
 
-    # @staticmethod
-    # def run(args):
-    #     # Ensure build directory exists and is writable
-    #     build_dir = args.build_dir
-    #     if not os.access(build_dir, os.W_OK):
-    #         raise Exception(f"Directory {build_dir!r} does not exist or isn't writable.")
 
-    #     # Build products
-    #     eups_obj = eups.Eups()
-
-    #     progress = ProgressReporter(sys.stdout)
-
-    #     manifest_fn = os.path.join(build_dir, "manifest.txt")
-    #     with open(manifest_fn, encoding="utf-8") as fp:
-    #         manifest = Manifest.from_file(fp)
-
-    #     # Load PR information saved by prepare.py
-    #     pr_info = Builder.load_pr_info(build_dir)
-    #     print(f"this is the pr_info {pr_info}")
-
-    #     b = Builder(build_dir, manifest, progress, eups_obj)
-    #     b.rm_status()
-
-    #     # Post "build started" status to GitHub using Checks API
-    #     if pr_info:
-    #         b.create_github_check_run(pr_info)
-
-    #     success = b.build()
-
-    #     # Post "build succeeded" or "build failed" status to GitHub using Checks API
-    #     if pr_info:
-    #         b.update_github_check_run(pr_info, success=success)
-
-    #     b.write_status()
-    #     sys.exit(0 if success else 1)
 
     @staticmethod
     def load_pr_info(build_dir):
@@ -547,7 +519,7 @@ class Builder:
 
 
     @staticmethod
-    def post_github_status(pr_info, state, description):
+    def post_github_status(pr_info, state, description, agent):
         """Post a status to the matching PR on GitHub.
 
         Parameters
@@ -575,10 +547,15 @@ class Builder:
             'Accept': 'application/vnd.github.v3+json'
         }
 
+        build_url = os.environ['BUILD_URL']
+        if build_url is None:
+            build_url = "https://rubin-ci-dev.slac.stanford.edu/blue/organizations/jenkins/stack-os-matrix/activity"
+
         data = {
             'state': state,
             'description': description,
-            'context': 'Jenkins Build'  # You can customize the context if needed
+            'context': f'Jenkins Build ({agent})',
+            'target_url': build_url
         }
 
         response = requests.post(url, headers=headers, json=data)

@@ -11,6 +11,7 @@ import os.path
 import re
 import requests
 import shutil
+
 import sys
 import time
 from collections.abc import Awaitable, Callable
@@ -45,16 +46,17 @@ def is_running_under_jenkins():
         print("unable to find agent")
 """
 
-def is_running_under_jenkins():
+
+def agent_label():
     label = os.getenv('NODE_LABELS')
 
-    #Ask about util.groovy where I set null = "unknown"
+    # Ask about util.groovy where I set null = "unknown"
     if not label:
         return "error"
 
     labels = label.split(" ")
     agent = ""
-    
+   
     for label in labels:
         match label:
             case "arm64":
@@ -68,9 +70,9 @@ def is_running_under_jenkins():
     if agent == "":
         return "error"
     return agent
-    
-print("starting to run is_running_under_jenkins()")
-label = is_running_under_jenkins()
+   
+print("starting to run agent_label()")
+label = agent_label()
 print(label)
 if label == "error":
     pass #TODO: handle this error
