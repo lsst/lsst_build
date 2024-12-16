@@ -360,7 +360,7 @@ class Builder:
 
         start_time = time.time()
         hours = 2
-        timeout = {hours} * 60 * 60  # Hours in seconds
+        timeout = hours * 60 * 60  # Hours in seconds
 
         while agent == "error":
             # If we have PR info, post a pending status indicating we are still waiting
