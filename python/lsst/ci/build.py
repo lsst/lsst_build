@@ -393,6 +393,7 @@ class Builder:
         except Exception as e:
             # Post failure if an exception occurs
             if pr_info and agent != "error":
+                print(f"Build failed on {agent}")
                 Builder.post_github_status(pr_info, state='failure', description=f"Build failed on agent {agent}: {e}", agent=agent)
             retcode = False
 
