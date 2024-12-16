@@ -359,7 +359,7 @@ class Builder:
         b.rm_status()
 
         start_time = time.time()
-        hours = 2
+        hours = 1
         timeout = hours * 60 * 60  # Hours in seconds
 
         while agent == "error":
@@ -376,7 +376,7 @@ class Builder:
             if elapsed > timeout:
                 # Post an error status indicating the wait was too long
                 if pr_info:
-                    description = f"Agent unavailable for over {hours} hours"
+                    description = f"Agent unavailable for over {hours} hour(s)"
                     Builder.post_github_status(pr_info, state='error', description=description, agent="unknown")
 
             agent = agent_label()
