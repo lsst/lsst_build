@@ -381,7 +381,7 @@ class Builder:
 
         try:
             # Post "build pending" status to GitHub
-            if pr_info and agent != "error":
+            if agent != "error":
                 description = f"Build started on {agent}"
                 print("Github status pending")
                 Builder.post_github_status(pr_info, state='pending', description=description, agent=agent)
@@ -390,7 +390,7 @@ class Builder:
 
         except Exception as e:
             # Post failure if an exception occurs
-            if pr_info and agent != "error":
+            if agent != "error":
                 print(f"Build failed on {agent}")
                 Builder.post_github_status(pr_info, state='failure', description=f"Build failed on agent {agent}: {e}", agent=agent)
             retcode = False
