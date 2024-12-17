@@ -364,9 +364,8 @@ class Builder:
 
         while agent == "error":
             # If we have PR info, post a pending status indicating we are still waiting
-            if pr_info:
-                description = "Waiting for agent to come online..."
-                Builder.post_github_status(pr_info, state='pending', description=description, agent="unknown")
+            description = "Waiting for agent to come online..."
+            Builder.post_github_status(pr_info, state='pending', description=description, agent="unknown")
 
             print("Agent is busy, waiting 30 seconds before checking again...")
             time.sleep(30)
@@ -375,9 +374,8 @@ class Builder:
             elapsed = time.time() - start_time
             if elapsed > timeout:
                 # Post an error status indicating the wait was too long
-                if pr_info:
-                    description = f"Agent unavailable for over {hours} hour(s)"
-                    Builder.post_github_status(pr_info, state='error', description=description, agent="unknown")
+                description = f"Agent unavailable for over {hours} hour(s)"
+                Builder.post_github_status(pr_info, state='error', description=description, agent="unknown")
 
             agent = agent_label()
 
