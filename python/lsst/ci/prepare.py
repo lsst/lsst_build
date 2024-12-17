@@ -715,7 +715,7 @@ class ProductFetcher:
 
         agent = agent_label()
         print("Github status pending in prepare.py")
-        pr_info = ProductFetcher.list_non_default_refs_prs()
+        pr_info = ProductFetcher.list_non_default_refs_prs(self)
         print(pr_info)
         self.post_github_status(pr_info, state='pending', description=f"Build started on {agent}", agent=agent)
 
