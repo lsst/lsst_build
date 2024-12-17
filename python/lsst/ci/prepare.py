@@ -79,6 +79,8 @@ if label == "error":
 
 help("modules")
 
+        
+
 """
 #2: For each GitHub repo that is being checked out in lsst_build/python/lsst/ci/prepare.py 
 #(which is known in fetch()) with a non-default git ref, contact the GH API to list all the PRs for that repo.
@@ -112,8 +114,8 @@ for repo_name in repos:
     print()
 """
 
-GITHUB_TOKEN = "github-api-token-sqreadmin"
-GITHUB_API_URL = "https://api.github.com"
+# GITHUB_TOKEN = "github-api-token-sqreadmin"
+# GITHUB_API_URL = "https://api.github.com"
 '''
 def list_prs_for_repo(self): 
    # url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/pulls"
@@ -711,6 +713,10 @@ class ProductFetcher:
 
         await self.run_async_tasks(fetch_worker, queue)
 
+        agent = agent_label()
+        print("Github status pending")
+        self.post_github_status(self.pr_info, state='pending', description=f"Build started on {agent}", agent=agent)
+
         if len(exceptions):
             first_exception = exceptions[0]
             logger.error("At least one error occurred during while fetching products")
@@ -892,14 +898,64 @@ class ProductFetcher:
                             'pr_number': matching_pr['number'],
                             'sha': matching_pr['head']['sha']
                         }
+
                         # Assuming self.build_dir is accessible
                         pr_info_file = os.path.join(self.build_dir, 'pr_info.json')
                         with open(pr_info_file, 'w', encoding='utf-8') as f:
-                            json.dump(pr_info, f)                        
+                            json.dump(pr_info, f)             
+                            self.pr_info = json.load(f)
+                        return self.pr_info
+                      
                     else:
                         print(f"No matching PR found for {product_name} with ref '{product.ref.name}'")
                 else:
                     print(f"Could not parse GitHub repo info from URL: {origin_url}")
+    
+    @staticmethod
+    def post_github_status(pr_info, state, description, agent):
+        """Post a status to the matching PR on GitHub.
+
+        Parameters
+        ----------
+        pr_info : dict
+            Dictionary containing 'owner', 'repo', 'pr_number', 'sha'.
+        state : str
+            The state of the status ('pending', 'success', 'failure', or 'error').
+        description : str
+            A short description of the status.
+        """
+        print(f"Posting GitHub status: {state} - {description}")
+        token = os.environ['GITHUB_TOKEN']
+        if not token:
+            print("GITHUB_TOKEN not found in environment variables.")
+            return
+
+        owner = pr_info['owner']
+        repo = pr_info['repo']
+        sha = pr_info['sha']  # The commit SHA to which the status will be attached
+
+        url = f"https://api.github.com/repos/{owner}/{repo}/statuses/{sha}"
+        headers = {
+            'Authorization': f'token {token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+
+        build_url = os.environ['RUN_DISPLAY_URL']
+        if build_url is None:
+            build_url = "https://rubin-ci-dev.slac.stanford.edu/blue/organizations/jenkins/stack-os-matrix/activity"
+
+        data = {
+            'state': state,
+            'description': description,
+            'context': f'Jenkins Build ({agent})',
+            'target_url': build_url
+        }
+
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 201:
+            print("GitHub status posted successfully.")
+        else:
+            print(f"Failed to post GitHub status: {response.status_code} - {response.text}")
 
 
 class VersionDb(metaclass=abc.ABCMeta):
