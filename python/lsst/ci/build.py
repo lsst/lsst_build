@@ -163,7 +163,7 @@ class Builder:
         self.eups = eups
         self.built: list[models.Product] = []
         self.failed_at = None
-        self.check_run_id = None # Store GH check run ID
+        # self.check_run_id = None # Store GH check run ID
 
     def _tag_product(self, name, version, tag):
         if tag:
@@ -341,6 +341,32 @@ class Builder:
         build_dir = args.build_dir
         if not os.access(build_dir, os.W_OK):
             raise Exception(f"Directory {build_dir!r} does not exist or isn't writable.")
+        
+        # Load PR information saved by prepare.py
+        pr_info = Builder.load_pr_info(build_dir)
+        print(f"this is the pr_info {pr_info}")
+
+        # If PR info is missing, log and fail early
+        if not pr_info:
+            print("PR information could not be loaded. Posting failure status.")
+            Builder.post_github_status(
+                pr_info={'owner': 'unknown', 'repo': 'unknown', 'sha': 'unknown'},
+                state='failure',
+                description="Failed to load PR information.",
+                agent="unknown"
+            )
+            sys.exit(1)
+
+        # Handle missing or offline agent with early failure status
+        if agent == "error":
+            print("Agent not available. Posting failure status.")
+            Builder.post_github_status(
+                pr_info=pr_info,
+                state='failure',
+                description="Agent is offline or unknown.",
+                agent="unknown"
+            )
+            sys.exit(1)
 
         # Build products
         eups_obj = eups.Eups()
@@ -351,48 +377,49 @@ class Builder:
         with open(manifest_fn, encoding="utf-8") as fp:
             manifest = Manifest.from_file(fp)
 
-        # Load PR information saved by prepare.py
-        pr_info = Builder.load_pr_info(build_dir)
-        print(f"this is the pr_info {pr_info}")
 
         b = Builder(build_dir, manifest, progress, eups_obj)
         b.rm_status()
 
-        start_time = time.time()
-        hours = 1
-        timeout = hours * 60 * 60  # Hours in seconds
+        # start_time = time.time()
+        # hours = 1
+        # timeout = hours * 60 * 60  # Hours in seconds
 
-        while agent == "error":
-            # If we have PR info, post a pending status indicating we are still waiting
-            description = "Waiting for agent to come online..."
-            Builder.post_github_status(pr_info, state='pending', description=description, agent="unknown")
+        # while agent == "error":
+        #     # If we have PR info, post a pending status indicating we are still waiting
+        #     description = "Waiting for agent to come online..."
+        #     Builder.post_github_status(pr_info, state='pending', description=description, agent="unknown")
 
-            print("Agent is busy, waiting 30 seconds before checking again...")
-            time.sleep(30)
+        #     print("Agent is busy, waiting 30 seconds before checking again...")
+        #     time.sleep(30)
 
-            # Check if we've exceeded our timeout
-            elapsed = time.time() - start_time
-            if elapsed > timeout:
-                # Post an error status indicating the wait was too long
-                description = f"Agent unavailable for over {hours} hour(s)"
-                Builder.post_github_status(pr_info, state='error', description=description, agent="unknown")
+        #     # Check if we've exceeded our timeout
+        #     elapsed = time.time() - start_time
+        #     if elapsed > timeout:
+        #         # Post an error status indicating the wait was too long
+        #         description = f"Agent unavailable for over {hours} hour(s)"
+        #         Builder.post_github_status(pr_info, state='error', description=description, agent="unknown")
 
-            agent = agent_label()
+        #     agent = agent_label()
+
+        # Pending status
+        print("Github status pending")
+        Builder.post_github_status(pr_info, state='pending', description=f"Build started on {agent}", agent=agent)
 
         try:
             # Post "build pending" status to GitHub
-            if agent != "error":
-                description = f"Build started on {agent}"
-                print("Github status pending")
-                Builder.post_github_status(pr_info, state='pending', description=description, agent=agent)
+            # if agent != "error":
+            #     description = f"Build started on {agent}"
+            #     print("Github status pending")
+            #     Builder.post_github_status(pr_info, state='pending', description=description, agent=agent)
 
             retcode = b.build()
 
         except Exception as e:
             # Post failure if an exception occurs
-            if agent != "error":
-                print(f"Build failed on {agent}")
-                Builder.post_github_status(pr_info, state='failure', description=f"Build failed on agent {agent}: {e}", agent=agent)
+            # if agent != "error":
+            print(f"Build failed on {agent}")
+            Builder.post_github_status(pr_info, state='failure', description=f"Build failed on agent {agent}: {e}", agent=agent)
             retcode = False
 
         finally:
@@ -401,10 +428,17 @@ class Builder:
 
         # Post "build succeeded" else exit
         if retcode:
-            if pr_info and agent != "error":
-                description = f"Build succeeded on {agent}"
-                Builder.post_github_status(pr_info, state='success', description=description, agent=agent)
+            # if pr_info and agent != "error":
+            description = f"Build succeeded on {agent}"
+            Builder.post_github_status(pr_info, state='success', description=description, agent=agent)
+            sys.exit(0)
         else:
+            Builder.post_github_status(
+                pr_info=pr_info,
+                state='failure',
+                description=f"Build failed on {agent}",
+                agent=agent
+            )
             sys.exit(1)
 
     @staticmethod
