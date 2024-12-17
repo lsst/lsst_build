@@ -714,8 +714,10 @@ class ProductFetcher:
         await self.run_async_tasks(fetch_worker, queue)
 
         agent = agent_label()
-        print("Github status pending")
-        self.post_github_status(self.pr_info, state='pending', description=f"Build started on {agent}", agent=agent)
+        print("Github status pending in prepare.py")
+        pr_info = ProductFetcher.list_non_default_refs_prs()
+        print(pr_info)
+        self.post_github_status(pr_info, state='pending', description=f"Build started on {agent}", agent=agent)
 
         if len(exceptions):
             first_exception = exceptions[0]
@@ -903,8 +905,7 @@ class ProductFetcher:
                         pr_info_file = os.path.join(self.build_dir, 'pr_info.json')
                         with open(pr_info_file, 'w', encoding='utf-8') as f:
                             json.dump(pr_info, f)             
-                            self.pr_info = json.load(f)
-                        return self.pr_info
+                        return pr_info
                       
                     else:
                         print(f"No matching PR found for {product_name} with ref '{product.ref.name}'")
