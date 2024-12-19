@@ -343,7 +343,7 @@ class Builder:
             raise Exception(f"Directory {build_dir!r} does not exist or isn't writable.")
         
         # Load PR information saved by prepare.py
-        pr_info = load_pr_info(build_dir)
+        pr_info = Builder.load_pr_info(build_dir)
         print(f"this is the pr_info {pr_info}")
 
 
