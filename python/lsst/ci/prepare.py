@@ -28,23 +28,51 @@ logger = logging.getLogger("lsst.ci")
 
 ASYNC_QUEUE_WORKERS = 8
 
-#1: Determine if the build is running under Jenkins control.  If not, do nothing.
-"""
-def is_running_under_jenkins():
-    label = os.getenv('NODE_LABELS')
-    #Check if the script is running under Jenkins control.
-    label = label.split(" ")
-    if "arm64" in label:
-        print("linux aarch64")
-    if "mini" in label:
-        print("apple arm")
-    if "mac" in label:
-        print("apple intel")
-    if "docker" in label:
-        print("linux x86")
-    else:
-        print("unable to find agent")
-"""
+
+# def post_github_status(pr_info, state, description, agent):
+#     """Post a status to the matching PR on GitHub.
+
+#     Parameters
+#     ----------
+#     pr_info : dict
+#         Dictionary containing 'owner', 'repo', 'pr_number', 'sha'.
+#     state : str
+#         The state of the status ('pending', 'success', 'failure', or 'error').
+#     description : str
+#         A short description of the status.
+#     """
+#     print(f"Posting GitHub status: {state} - {description}")
+#     token = os.environ['GITHUB_TOKEN']
+#     if not token:
+#         print("GITHUB_TOKEN not found in environment variables.")
+#         return
+
+#     owner = pr_info['owner']
+#     repo = pr_info['repo']
+#     sha = pr_info['sha']  # The commit SHA to which the status will be attached
+
+#     url = f"https://api.github.com/repos/{owner}/{repo}/statuses/{sha}"
+#     headers = {
+#         'Authorization': f'token {token}',
+#         'Accept': 'application/vnd.github.v3+json'
+#     }
+
+#     build_url = os.environ['RUN_DISPLAY_URL']
+#     if build_url is None:
+#         build_url = "https://rubin-ci-dev.slac.stanford.edu/blue/organizations/jenkins/stack-os-matrix/activity"
+
+#     data = {
+#         'state': state,
+#         'description': description,
+#         'context': f'Jenkins Build ({agent})',
+#         'target_url': build_url
+#     }
+
+#     response = requests.post(url, headers=headers, json=data)
+#     if response.status_code == 201:
+#         print("GitHub status posted successfully.")
+#     else:
+#         print(f"Failed to post GitHub status: {response.status_code} - {response.text}")
 
 
 def agent_label():
@@ -72,12 +100,17 @@ def agent_label():
     return agent
    
 print("starting to run agent_label()")
-label = agent_label()
-print(label)
-if label == "error":
+agent = agent_label()
+print(agent)
+if agent == "error":
     pass #TODO: handle this error
 
 help("modules")
+
+# print("Github status pending")
+# post_github_status(pr_info, state='pending', description=f"Build started on {agent}", agent=agent)
+
+
 
         
 
@@ -606,6 +639,11 @@ class ProductFetcher:
                 matched_refs[product.ref.name] += 1
                 print("marker!!!")
                 print(matched_refs)
+                print(product.ref.name)
+            print("Matched refs:")
+        for ref, count in matched_refs.items():
+            if count > 0:
+                print(f"{ref}: matched {count} time(s)")
         
         missed = [ref for ref in matched_refs if matched_refs[ref] == 0]
         if missed:
@@ -888,7 +926,7 @@ class ProductFetcher:
                         # Print PR details
                         print(f"PR #{pr_number}: {pr_title} branch: {pr_head_ref}, (sha: {pr_sha})")
 
-                        # Check if the PR's head ref matches the non-default git ref
+                        # Check if the PR's head ref matches the non-default git ref name
                         if pr_head_ref == product.ref.name:
                             matching_pr = pr
                     if matching_pr:

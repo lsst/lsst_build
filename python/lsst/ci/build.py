@@ -346,27 +346,6 @@ class Builder:
         pr_info = Builder.load_pr_info(build_dir)
         print(f"this is the pr_info {pr_info}")
 
-        # If PR info is missing, log and fail early
-        if not pr_info:
-            print("PR information could not be loaded. Posting failure status.")
-            Builder.post_github_status(
-                pr_info={'owner': 'unknown', 'repo': 'unknown', 'sha': 'unknown'},
-                state='failure',
-                description="Failed to load PR information.",
-                agent="unknown"
-            )
-            sys.exit(1)
-
-        # Handle missing or offline agent with early failure status
-        if agent == "error":
-            print("Agent not available. Posting failure status.")
-            Builder.post_github_status(
-                pr_info=pr_info,
-                state='failure',
-                description="Agent is offline or unknown.",
-                agent="unknown"
-            )
-            sys.exit(1)
 
         # Build products
         eups_obj = eups.Eups()
@@ -402,56 +381,159 @@ class Builder:
 
         #     agent = agent_label()
 
-        # Pending status
-        print("Github status pending")
-        Builder.post_github_status(pr_info, state='pending', description=f"Build started on {agent}", agent=agent)
+
 
         try:
-            # Post "build pending" status to GitHub
-            # if agent != "error":
-            #     description = f"Build started on {agent}"
-            #     print("Github status pending")
-            #     Builder.post_github_status(pr_info, state='pending', description=description, agent=agent)
+            # Verify PR info
+            if not pr_info:
+                raise ValueError("PR information could not be loaded.")
 
+            # Verify agent
+            if agent == "error":
+                raise RuntimeError("Agent not available or offline.")
+
+            # If we reach here, we have valid PR info and agent
+            print("GitHub status pending - build started")
+            Builder.post_github_status(
+                pr_info=pr_info,
+                state='pending',
+                description=f"Build started on {agent}",
+                agent=agent
+            )
+
+            # Attempt the build
             retcode = b.build()
 
-        except Exception as e:
-            # Post failure if an exception occurs
-            # if agent != "error":
-            print(f"Build failed on {agent}")
-            Builder.post_github_status(pr_info, state='failure', description=f"Build failed on agent {agent}: {e}", agent=agent)
+        except ValueError as no_pr_info:
+            print(no_pr_info)
+            Builder.post_github_status(
+                pr_info={'owner': 'unknown', 'repo': 'unknown', 'sha': 'unknown'},
+                state='failure',
+                description="Failed to load PR information.",
+                agent="unknown"
+            )
             retcode = False
 
-        finally:
-            # Ensures write_status is still called
-            b.write_status()
-
-        # Post "build succeeded" else exit
-        if retcode:
-            # if pr_info and agent != "error":
-            description = f"Build succeeded on {agent}"
-            Builder.post_github_status(pr_info, state='success', description=description, agent=agent)
-            sys.exit(0)
-        else:
+        except RuntimeError as agent_error:
+            print(agent_error)
             Builder.post_github_status(
                 pr_info=pr_info,
                 state='failure',
-                description=f"Build failed on {agent}",
+                description="Agent is offline or unknown.",
+                agent="unknown"
+            )
+            retcode = False
+
+        except Exception as other_ex:
+            print(f"Build failed on {agent}: {other_ex}")
+            Builder.post_github_status(
+                pr_info=pr_info,
+                state='failure',
+                description=f"Build failed on agent {agent}: {other_ex}",
                 agent=agent
             )
-            sys.exit(1)
+            retcode = False
 
-    @staticmethod
-    def load_pr_info(build_dir):
-        """Load PR information saved by prepare.py."""
+        finally:
+            # Ensure status is always written
+            b.write_status()
 
-        pr_info_file = os.path.join(build_dir, 'pr_info.json')
-        if os.path.exists(pr_info_file):
-            with open(pr_info_file, 'r', encoding='utf-8') as f:
-                pr_info = json.load(f)
-            return pr_info
-        else:
-            return None
+            # Now handle final status posting based on retcode
+            if retcode:
+                Builder.post_github_status(
+                    pr_info=pr_info,
+                    state='success',
+                    description=f"Build succeeded on {agent}",
+                    agent=agent
+                )
+                sys.exit(0)
+            else:
+                Builder.post_github_status(
+                    pr_info=pr_info,
+                    state='failure',
+                    description=f"Build failed on {agent}",
+                    agent=agent
+                )
+                sys.exit(1)
+
+
+
+
+
+    #     try:
+
+    #         # If PR info is missing, log and fail early
+    #         if not pr_info:
+    #             print("PR information could not be loaded. Posting failure status.")
+    #             Builder.post_github_status(
+    #                 pr_info={'owner': 'unknown', 'repo': 'unknown', 'sha': 'unknown'},
+    #                 state='failure',
+    #                 description="Failed to load PR information.",
+    #                 agent="unknown"
+    #             )
+    #             sys.exit(1)
+
+    #         # Handle missing or offline agent with early failure status
+    #         if agent == "error":
+    #             print("Agent not available. Posting failure status.")
+    #             Builder.post_github_status(
+    #                 pr_info=pr_info,
+    #                 state='failure',
+    #                 description="Agent is offline or unknown.",
+    #                 agent="unknown"
+    #             )
+    #             sys.exit(1)
+
+    #         else:
+    #         # Pending status
+    #         print("Github status pending - build started")
+    #         Builder.post_github_status(pr_info, state='pending', description=f"Build started on {agent}", agent=agent)
+
+    #         # Post "build pending" status to GitHub
+    #         # if agent != "error":
+    #         #     description = f"Build started on {agent}"
+    #         #     print("Github status pending")
+    #         #     Builder.post_github_status(pr_info, state='pending', description=description, agent=agent)
+
+    #         retcode = b.build()
+
+    #     except Exception as e:
+    #         # Post failure if an exception occurs
+    #         # if agent != "error":
+    #         print(f"Build failed on {agent}")
+    #         Builder.post_github_status(pr_info, state='failure', description=f"Build failed on agent {agent}: {e}", agent=agent)
+    #         retcode = False
+
+    #     finally:
+    #         # Ensures write_status is still called
+    #         b.write_status()
+
+    #     # Post "build succeeded" else exit
+    #     if retcode:
+    #         # if pr_info and agent != "error":
+    #         description = f"Build succeeded on {agent}"
+    #         Builder.post_github_status(pr_info, state='success', description=description, agent=agent)
+    #         sys.exit(0)
+    #     else:
+    #         Builder.post_github_status(
+    #             pr_info=pr_info,
+    #             state='failure',
+    #             description=f"Build failed on {agent}",
+    #             agent=agent
+    #         )
+    #         sys.exit(1)
+
+    # @staticmethod
+    # def load_pr_info(build_dir):
+    #     """Load PR information saved by prepare.py."""
+
+    #     pr_info_file = os.path.join(build_dir, 'pr_info.json')
+    #     if os.path.exists(pr_info_file):
+    #         with open(pr_info_file, 'r', encoding='utf-8') as f:
+    #             pr_info = json.load(f)
+    #         return pr_info
+    #     else:
+    #         return None
         
     # def authenticate_github_app(self):
     #     """Authenticate as GitHub App and obtain installation access token."""
