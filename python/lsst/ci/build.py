@@ -382,7 +382,6 @@ class Builder:
         #     agent = agent_label()
 
 
-
         try:
             # Verify PR info
             if not pr_info:

@@ -705,6 +705,7 @@ class ProductFetcher:
             loop.run_until_complete(self.resolve_versions())
         if not self.no_fetch and len(self.lfs_product_names):
             loop.run_until_complete(self.lfs_checkout())
+        print("is do_product_fetch running?")
         # Calling non_default_refs_prs method
         loop.run_until_complete(self.list_non_default_refs_prs())
         loop.close()
@@ -1238,6 +1239,7 @@ class BuildDirectoryConstructor:
         self.exclusion_resolver = exclusion_resolver
 
     def construct(self, product_names, refs):
+        print("pre-do_fetch_products??")
         self.product_fetcher.do_fetch_products(product_names, refs)
         return Manifest(self.product_fetcher.product_index, None)
 
