@@ -343,7 +343,7 @@ class Builder:
             raise Exception(f"Directory {build_dir!r} does not exist or isn't writable.")
         
         # Load PR information saved by prepare.py
-        pr_info = Builder.load_pr_info(build_dir)
+        pr_info = load_pr_info(build_dir)
         print(f"this is the pr_info {pr_info}")
 
 
@@ -523,17 +523,17 @@ class Builder:
     #         )
     #         sys.exit(1)
 
-    # @staticmethod
-    # def load_pr_info(build_dir):
-    #     """Load PR information saved by prepare.py."""
+    @staticmethod
+    def load_pr_info(build_dir):
+        """Load PR information saved by prepare.py."""
 
-    #     pr_info_file = os.path.join(build_dir, 'pr_info.json')
-    #     if os.path.exists(pr_info_file):
-    #         with open(pr_info_file, 'r', encoding='utf-8') as f:
-    #             pr_info = json.load(f)
-    #         return pr_info
-    #     else:
-    #         return None
+        pr_info_file = os.path.join(build_dir, 'pr_info.json')
+        if os.path.exists(pr_info_file):
+            with open(pr_info_file, 'r', encoding='utf-8') as f:
+                pr_info = json.load(f)
+            return pr_info
+        else:
+            return None
         
     # def authenticate_github_app(self):
     #     """Authenticate as GitHub App and obtain installation access token."""
