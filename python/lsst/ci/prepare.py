@@ -105,50 +105,13 @@ print(agent)
 if agent == "error":
     pass #TODO: handle this error
 
-help("modules")
 
 # print("Github status pending")
 # post_github_status(pr_info, state='pending', description=f"Build started on {agent}", agent=agent)
 
 
 
-        
 
-"""
-#2: For each GitHub repo that is being checked out in lsst_build/python/lsst/ci/prepare.py 
-#(which is known in fetch()) with a non-default git ref, contact the GH API to list all the PRs for that repo.
-
-#PyGithub
-
-#Part of this from demo https://github.com/PyGithub/PyGithub/tree/main 
-
-from github import Github
-from github import Auth
-# Using an access token - how can I securely put this in?
-auth = Auth.Token("access_token")
-g = Github(auth=auth)
-
-# Have to find where this is defined below
-repos = [list_of_non-default_repos] 
-
-# Loop through each repository in the list
-for repo_name in repos:
-    # Get a repository 
-    repo = g.get_repo(repo_name)
-    
-    # Get all open PRs for that repository
-    open_pulls = repo.get_pulls(state='open')  
-    
-    # Print information about which repo (may remove this if we want list of PRs only) 
-    print(f"Open pull requests for {repo_name}:")
-    # Print PR information for that repo 
-    for pr in open_pulls:
-        print(f"  PR #{pr.number}: {pr.title} (User: {pr.user.login})")
-    print()
-"""
-
-# GITHUB_TOKEN = "github-api-token-sqreadmin"
-# GITHUB_API_URL = "https://api.github.com"
 '''
 def list_prs_for_repo(self): 
    # url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/pulls"
