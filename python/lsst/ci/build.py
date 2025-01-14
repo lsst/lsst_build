@@ -405,12 +405,12 @@ class Builder:
 
         except ValueError as no_pr_info:
             print(no_pr_info)
-            Builder.post_github_status(
-                pr_info={'owner': 'unknown', 'repo': 'unknown', 'sha': 'unknown'},
-                state='failure',
-                description="Failed to load PR information.",
-                agent="unknown"
-            )
+            # Builder.post_github_status(
+            #     pr_info={'owner': 'unknown', 'repo': 'unknown', 'sha': 'unknown'},
+            #     state='failure',
+            #     description="Failed to load PR information.",
+            #     agent="unknown"
+            # )
             retcode = False
 
         except RuntimeError as agent_error:

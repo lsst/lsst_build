@@ -57,8 +57,7 @@ print("starting to run agent_label()")
 agent = agent_label()
 print(agent)
 if agent == "error":
-    pass #TODO: handle this error
-
+    print("agent is offline or unknown")
 
 
 class RemoteError(Exception):
