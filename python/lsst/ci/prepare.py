@@ -29,52 +29,6 @@ logger = logging.getLogger("lsst.ci")
 ASYNC_QUEUE_WORKERS = 8
 
 
-# def post_github_status(pr_info, state, description, agent):
-#     """Post a status to the matching PR on GitHub.
-
-#     Parameters
-#     ----------
-#     pr_info : dict
-#         Dictionary containing 'owner', 'repo', 'pr_number', 'sha'.
-#     state : str
-#         The state of the status ('pending', 'success', 'failure', or 'error').
-#     description : str
-#         A short description of the status.
-#     """
-#     print(f"Posting GitHub status: {state} - {description}")
-#     token = os.environ['GITHUB_TOKEN']
-#     if not token:
-#         print("GITHUB_TOKEN not found in environment variables.")
-#         return
-
-#     owner = pr_info['owner']
-#     repo = pr_info['repo']
-#     sha = pr_info['sha']  # The commit SHA to which the status will be attached
-
-#     url = f"https://api.github.com/repos/{owner}/{repo}/statuses/{sha}"
-#     headers = {
-#         'Authorization': f'token {token}',
-#         'Accept': 'application/vnd.github.v3+json'
-#     }
-
-#     build_url = os.environ['RUN_DISPLAY_URL']
-#     if build_url is None:
-#         build_url = "https://rubin-ci-dev.slac.stanford.edu/blue/organizations/jenkins/stack-os-matrix/activity"
-
-#     data = {
-#         'state': state,
-#         'description': description,
-#         'context': f'Jenkins Build ({agent})',
-#         'target_url': build_url
-#     }
-
-#     response = requests.post(url, headers=headers, json=data)
-#     if response.status_code == 201:
-#         print("GitHub status posted successfully.")
-#     else:
-#         print(f"Failed to post GitHub status: {response.status_code} - {response.text}")
-
-
 def agent_label():
     label = os.getenv('NODE_LABELS')
 
@@ -105,55 +59,6 @@ print(agent)
 if agent == "error":
     pass #TODO: handle this error
 
-
-# print("Github status pending")
-# post_github_status(pr_info, state='pending', description=f"Build started on {agent}", agent=agent)
-
-
-
-
-'''
-def list_prs_for_repo(self): 
-   # url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/pulls"
-    token = os.environ['GITHUB_TOKEN']
-    # Use the token in your API calls
-    print(f"Using GitHub token: {token}")
-    
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-
-    # Original github url to repos
-    url = self.repo_specs[product]
-
-    # Remove .git suffix
-    if url.endswith(".git"):
-        url = url[:-4]
-
-    # Isolate owner and repo 
-    parts = url.split("/")
-    owner = parts[3]
-    repo = parts[4]
-    print("marker3")
-    print(owner)
-    print(repo)
-
-    api_url = f"{GITHUB_API_URL}/repos/{owner}/{repo}/pulls"
-    print(api_url)
-    
-    response = requests.get(api_url, headers=headers)
-
-    
-    if response.status_code == 200:
-        print(response) # Debugging PR list
-        return response.json()  # Returns a list of PRs
-    else:
-        print(f"Failed to list PRs for {repo}: {response.content}")
-        return None
-'''
-
-#3 Find the head-ref in the list of PRs that matches the non-default git ref.
 
 
 class RemoteError(Exception):
