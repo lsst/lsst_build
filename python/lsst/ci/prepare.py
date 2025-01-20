@@ -29,35 +29,83 @@ logger = logging.getLogger("lsst.ci")
 ASYNC_QUEUE_WORKERS = 8
 
 
-def agent_label():
-    label = os.getenv('NODE_LABELS')
+# def agent_label():
+#     """Determine the agent label based on the NODE_LABELS env variable."""
 
-    # Ask about util.groovy where I set null = "unknown"
-    if not label:
-        return "error"
+#     label = os.getenv('NODE_LABELS')
 
-    labels = label.split(" ")
-    agent = ""
+#     if not label:
+#         return "error"
+
+#     labels = label.split(" ")
+#     agent = ""
    
-    for label in labels:
-        match label:
-            case "arm64":
-                agent = "linux_aarch64"
-            case "mini":
-                agent = "apple_arm"
-            case "osx-13" | "osx-12":  
-                agent = "apple_intel"
-            case "docker":
-                agent = "linux_x86"
-    if agent == "":
-        return "error"
-    return agent
-   
-print("starting to run agent_label()")
-agent = agent_label()
-print(agent)
-if agent == "error":
-    print("agent is offline or unknown")
+#     for label in labels:
+#         match label:
+#             case "arm64":
+#                 agent = "linux_aarch64"
+#             case "mini":
+#                 agent = "apple_arm"
+#             case "osx-13" | "osx-12":  
+#                 agent = "apple_intel"
+#             case "docker":
+#                 agent = "linux_x86"
+#     if agent == "":
+#         return "error"
+#     return agent
+
+
+# print("Starting to run agent_label()...")
+# agent = agent_label()
+# print(agent_label())
+# if agent == "error":
+#     print("Agent is offline or unknown.")
+
+
+class AgentManager:
+    """Handles agent label determination and verification."""
+
+    @staticmethod
+    def agent_label():
+        """Determine the agent label based on the NODE_LABELS
+        environment variable.
+        """
+
+        label = os.getenv('NODE_LABELS')
+
+        if not label:
+            return "error"
+
+        labels = label.split(" ")
+        agent = ""
+
+        for label in labels:
+            match label:
+                case "arm64":
+                    agent = "linux_aarch64"
+                case "mini":
+                    agent = "apple_arm"
+                case "osx-13" | "osx-12":  
+                    agent = "apple_intel"
+                case "docker":
+                    agent = "linux_x86"
+        if agent == "":
+            return "error"
+        return agent
+
+    @classmethod
+    def verify_agent(cls):
+        """Run agent_label() and handle the result."""
+
+        agent = cls.agent_label()
+        if agent == "error":
+            print("Agent is offline or unknown.")
+        return agent
+
+    def __init__(self):
+        """Call verify_agent()."""
+        self.agent = self.verify_agent()
+        print(f"Agent verified: {self.agent}")
 
 
 class RemoteError(Exception):

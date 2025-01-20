@@ -359,27 +359,6 @@ class Builder:
         b = Builder(build_dir, manifest, progress, eups_obj)
         b.rm_status()
 
-        # start_time = time.time()
-        # hours = 1
-        # timeout = hours * 60 * 60  # Hours in seconds
-
-        # while agent == "error":
-        #     # If we have PR info, post a pending status indicating we are still waiting
-        #     description = "Waiting for agent to come online..."
-        #     Builder.post_github_status(pr_info, state='pending', description=description, agent="unknown")
-
-        #     print("Agent is busy, waiting 30 seconds before checking again...")
-        #     time.sleep(30)
-
-        #     # Check if we've exceeded our timeout
-        #     elapsed = time.time() - start_time
-        #     if elapsed > timeout:
-        #         # Post an error status indicating the wait was too long
-        #         description = f"Agent unavailable for over {hours} hour(s)"
-        #         Builder.post_github_status(pr_info, state='error', description=description, agent="unknown")
-
-        #     agent = agent_label()
-
         try:
             # Verify PR info
             if not pr_info:
