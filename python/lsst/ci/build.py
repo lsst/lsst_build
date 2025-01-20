@@ -22,7 +22,7 @@ import yaml
 
 from . import models
 from .prepare import Manifest
-from .prepare import agent_label
+from .prepare import AgentManager
 
 
 def product_representer(dumper, data):
@@ -334,8 +334,8 @@ class Builder:
 
     @staticmethod
     def run(args):
-        # Call agent() from prepare.py
-        agent = agent_label()
+        # Call verify_agent() from prepare.py
+        agent = AgentManager.verify_agent()
         
         # Ensure build directory exists and is writable
         build_dir = args.build_dir
