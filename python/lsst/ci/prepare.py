@@ -232,39 +232,15 @@ class ProductFetcher:
         locations = []
         repo_spec = self.repo_specs[product]
 
-        print("marker!")
         print(repo_spec)
         print(product)
-        
+
         if repo_spec:
             locations.append(repo_spec.url)
         if self.repository_patterns:
             locations += [pat % data for pat in self.repository_patterns]
         return locations
-    """
-    def non_default_refs(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
-        Return a list of non-default refs to attempt to checkout.
-        
-        # Debugging statement
-        print(f"Is this even being used??")
-        
-        # Copy initial refs
-        refs = copy.copy(refs)
-        print(refs)
-        
-        # Add the repository-specific ref if defined
-        if repo_spec.ref:
-            refs.append(repo_spec.ref)
 
-        # Exclude the default branches from the list
-        non_default_refs = [
-            ref for ref in refs if ref not in (models.DEFAULT_BRANCH_NAME) #?? Where does DEFAULT... come from?
-        ]
-        print("marker2")
-        print(self.repo_specs[product])
-
-        return non_default_refs
-    """
     def ref_candidates(self, repo_spec: models.RepoSpec, refs: list[str]) -> list[str]:
         """Generate a list of refs to attempt to checkout."""
         # ref precedence should be:
@@ -504,13 +480,6 @@ class ProductFetcher:
             assert product.ref is not None
             if product.ref.name in matched_refs:
                 matched_refs[product.ref.name] += 1
-                print("marker!!!")
-                print(matched_refs)
-                print(product.ref.name)
-            print("Matched refs:")
-        for ref, count in matched_refs.items():
-            if count > 0:
-                print(f"{ref}: matched {count} time(s)")
         
         missed = [ref for ref in matched_refs if matched_refs[ref] == 0]
         if missed:
@@ -721,7 +690,7 @@ class ProductFetcher:
         
     def extract_github_repo_info(self, url):
         """Retrieve repo owner and name from URL"""
-        print("hey!!")
+
         # Remove the '.git' suffix 
         if url.endswith('.git'):
             url = url[:-4]
@@ -743,7 +712,7 @@ class ProductFetcher:
 
     def get_github_prs(self, owner, repo):
         """Get the list of PRs using the GitHub API."""
-        print("hey!!!")
+
         # Get token set in util.jenkinsWrapper
         token = os.environ['GITHUB_TOKEN']
     
@@ -763,7 +732,7 @@ class ProductFetcher:
 
     async def list_non_default_refs_prs(self):
         """List all PRs for non-default git refs and matching head refs"""
-        print("hey!")
+
         for product_name, product in self.product_index.items():
             assert product.ref is not None
             if product.ref.name != models.DEFAULT_BRANCH_NAME:

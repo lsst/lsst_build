@@ -404,33 +404,15 @@ class Builder:
             retcode = b.build()
 
         except ValueError as no_pr_info:
-            print(no_pr_info)
-            # Builder.post_github_status(
-            #     pr_info={'owner': 'unknown', 'repo': 'unknown', 'sha': 'unknown'},
-            #     state='failure',
-            #     description="Failed to load PR information.",
-            #     agent="unknown"
-            # )
+            print(f"{no_pr_info} : PR information could not be loaded.")
             retcode = False
 
         except RuntimeError as agent_error:
-            print(agent_error)
-            Builder.post_github_status(
-                pr_info=pr_info,
-                state='failure',
-                description="Agent is offline or unknown.",
-                agent="unknown"
-            )
+            print(f"{agent_error} : Agent not available or offline.")
             retcode = False
 
         except Exception as other_ex:
             print(f"Build failed on {agent}: {other_ex}")
-            Builder.post_github_status(
-                pr_info=pr_info,
-                state='failure',
-                description=f"Build failed on agent {agent}: {other_ex}",
-                agent=agent
-            )
             retcode = False
 
         finally:
