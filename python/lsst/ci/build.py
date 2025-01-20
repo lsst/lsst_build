@@ -428,7 +428,7 @@ class Builder:
                         agent=agent
                     )
                 else:
-                    print("No PR info, skipping 'success' status post.")
+                    print("No PR info, skipping posting a 'success' check on Github.")
 
                 sys.exit(0)
             else:

@@ -777,7 +777,7 @@ class ProductFetcher:
                         return pr_info
                       
                     else:
-                        print(f"No matching PR found for {product_name} with ref '{product.ref.name}'")
+                        print(f"No matching PR information found for {product_name} with ref '{product.ref.name}'")
                         if os.path.exists(pr_info_file):
                             os.remove(pr_info_file)
                         return None
