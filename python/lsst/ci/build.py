@@ -383,30 +383,31 @@ class Builder:
         try:
             # Verify PR info
             if not pr_info:
-                raise ValueError("PR information could not be loaded.")
+                print("WARNING: PR information could not be loaded. Do you have a PR open?")
+
+            else:
+                # If we reach here, we have valid PR info
+                print("GitHub status pending - build started")
+                Builder.post_github_status(
+                    pr_info=pr_info,
+                    state='pending',
+                    description=f"Build started on {agent}",
+                    agent=agent
+                )
 
             # Verify agent
             if agent == "error":
                 raise RuntimeError("Agent not available or offline.")
 
-            # If we reach here, we have valid PR info and agent
-            print("GitHub status pending - build started")
-            Builder.post_github_status(
-                pr_info=pr_info,
-                state='pending',
-                description=f"Build started on {agent}",
-                agent=agent
-            )
-
             # Attempt the build
             retcode = b.build()
 
-        except ValueError as no_pr_info:
-            print(f"{no_pr_info} : PR information could not be loaded.")
-            retcode = False
+        # except ValueError as no_pr_info:
+        #     print({no_pr_info})
+        #     retcode = False
 
         except RuntimeError as agent_error:
-            print(f"{agent_error} : Agent not available or offline.")
+            print(f"Build error: {agent_error}")
             retcode = False
 
         except Exception as other_ex:
@@ -419,12 +420,16 @@ class Builder:
 
             # Now handle final status posting based on retcode
             if retcode:
-                Builder.post_github_status(
-                    pr_info=pr_info,
-                    state='success',
-                    description=f"Build succeeded on {agent}",
-                    agent=agent
-                )
+                if pr_info:
+                    Builder.post_github_status(
+                        pr_info=pr_info,
+                        state='success',
+                        description=f"Build succeeded on {agent}",
+                        agent=agent
+                    )
+                else:
+                    print("No PR info, skipping 'success' status post.")
+
                 sys.exit(0)
             else:
                 Builder.post_github_status(
