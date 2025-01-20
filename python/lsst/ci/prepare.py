@@ -732,7 +732,7 @@ class ProductFetcher:
 
     async def list_non_default_refs_prs(self):
         """List all PRs for non-default git refs and matching head refs"""
-
+        pr_info_file = os.path.join(self.build_dir, 'pr_info.json')
         for product_name, product in self.product_index.items():
             assert product.ref is not None
             if product.ref.name != models.DEFAULT_BRANCH_NAME:
@@ -771,7 +771,7 @@ class ProductFetcher:
                         }
 
                         # Assuming self.build_dir is accessible
-                        pr_info_file = os.path.join(self.build_dir, 'pr_info.json')
+                    #    pr_info_file = os.path.join(self.build_dir, 'pr_info.json')
                         with open(pr_info_file, 'w', encoding='utf-8') as f:
                             json.dump(pr_info, f)             
                         return pr_info

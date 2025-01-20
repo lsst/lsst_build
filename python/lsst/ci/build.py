@@ -312,7 +312,7 @@ class Builder:
                 self.failed_at = product
                 return False
             self.built.append(product)
-        return True # Returns true on success, to use for check
+        return True  # Returns true on success, to use for check
     
     def rm_status(self):
         if os.path.isfile(self.status_file()):
@@ -344,8 +344,8 @@ class Builder:
         
         # Load PR information saved by prepare.py
         pr_info = Builder.load_pr_info(build_dir)
-        print(f"this is the pr_info {pr_info}")
-
+        if pr_info is not None:
+            print(f"This is the pr_info {pr_info}")
 
         # Build products
         eups_obj = eups.Eups()
@@ -355,7 +355,6 @@ class Builder:
         manifest_fn = os.path.join(build_dir, "manifest.txt")
         with open(manifest_fn, encoding="utf-8") as fp:
             manifest = Manifest.from_file(fp)
-
 
         b = Builder(build_dir, manifest, progress, eups_obj)
         b.rm_status()
@@ -380,7 +379,6 @@ class Builder:
         #         Builder.post_github_status(pr_info, state='error', description=description, agent="unknown")
 
         #     agent = agent_label()
-
 
         try:
             # Verify PR info
@@ -437,19 +435,17 @@ class Builder:
                 )
                 sys.exit(1)
 
-
     @staticmethod
     def load_pr_info(build_dir):
         """Load PR information saved by prepare.py."""
-
         pr_info_file = os.path.join(build_dir, 'pr_info.json')
+
         if os.path.exists(pr_info_file):
             with open(pr_info_file, 'r', encoding='utf-8') as f:
                 pr_info = json.load(f)
             return pr_info
         else:
             return None
-
 
     @staticmethod
     def post_github_status(pr_info, state, description, agent):
