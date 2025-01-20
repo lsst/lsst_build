@@ -778,6 +778,9 @@ class ProductFetcher:
                       
                     else:
                         print(f"No matching PR found for {product_name} with ref '{product.ref.name}'")
+                        if os.path.exists(pr_info_file):
+                            os.remove(pr_info_file)
+                        return None
                 else:
                     print(f"Could not parse GitHub repo info from URL: {origin_url}")
     
