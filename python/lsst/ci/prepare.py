@@ -11,7 +11,6 @@ import os.path
 import re
 import requests
 import shutil
-
 import sys
 import time
 from collections.abc import Awaitable, Callable
@@ -31,6 +30,17 @@ ASYNC_QUEUE_WORKERS = 8
 
 class AgentManager:
     """Handles agent label determination and verification."""
+
+    def __init__(self):
+        self.agent = self.verify_agent()
+
+    def verify_agent(self):
+        agent = self.agent_label()
+
+        if agent == "error":
+            print("Agent is offline or unknown.")
+        print(f"Agent verified: {agent}")
+        return agent
 
     @staticmethod
     def agent_label():
@@ -52,28 +62,13 @@ class AgentManager:
                     agent = "linux_aarch64"
                 case "mini":
                     agent = "apple_arm"
-                case "osx-13" | "osx-12":  
+                case "osx-13" | "osx-12":
                     agent = "apple_intel"
                 case "docker":
                     agent = "linux_x86"
         if agent == "":
             return "error"
         return agent
-    
-    def __init__(self):
-        """Calls verify_agent()."""
-        self.agent = self.verify_agent()
-
-    def verify_agent(self):
-        """Calls agent_label() and handles error result."""
-
-        agent = self.agent_label()
-        if agent == "error":
-            print("Agent is offline or unknown.")
-        print(f"Agent verified: {agent}")
-        return agent
-
-
 
 
 class RemoteError(Exception):
@@ -247,9 +242,6 @@ class ProductFetcher:
         data = {"product": product}
         locations = []
         repo_spec = self.repo_specs[product]
-
-        print(repo_spec)
-        print(product)
 
         if repo_spec:
             locations.append(repo_spec.url)
@@ -702,7 +694,7 @@ class ProductFetcher:
     def extract_github_repo_info(self, url):
         """Retrieve repo owner and name from URL"""
 
-        # Remove the '.git' suffix 
+        # Remove the '.git' suffix
         if url.endswith('.git'):
             url = url[:-4]
 
@@ -730,7 +722,7 @@ class ProductFetcher:
         url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
         headers = {
             'Accept': 'application/vnd.github.v3+json',
-            'Authorization': f"token {token}"  
+            'Authorization': f"token {token}"
         }
 
         response = requests.get(url, headers=headers)
@@ -752,7 +744,7 @@ class ProductFetcher:
                 git = Git(repo_dir)
                 origin_url = await git("config", "--get", "remote.origin.url")
 
-                # Parse the GitHub repository owner and name from the origin URL
+                # Parse the GitHub repo owner and name from the origin URL
                 repo_info = self.extract_github_repo_info(origin_url)
                 if repo_info:
                     owner, repo = repo_info
@@ -788,7 +780,7 @@ class ProductFetcher:
 
                     else:
                         # If not found, remove cached pr_info_file in self.build_dir
-                        print(f"No matching PR information found for {product_name} with ref '{product.ref.name}'")
+                        print(f"No matching PR info found for {product_name} with ref '{product.ref.name}'")
                         if os.path.exists(pr_info_file):
                             os.remove(pr_info_file)
                         return None
@@ -1043,7 +1035,6 @@ class BuildDirectoryConstructor:
         self.exclusion_resolver = exclusion_resolver
 
     def construct(self, product_names, refs):
-        print("pre-do_fetch_products??")
         self.product_fetcher.do_fetch_products(product_names, refs)
         return Manifest(self.product_fetcher.product_index, None)
 

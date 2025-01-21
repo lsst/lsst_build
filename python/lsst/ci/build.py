@@ -314,7 +314,7 @@ class Builder:
                 return False
             self.built.append(product)
         return True  # Returns true on success, to use for check
-    
+
     def rm_status(self):
         if os.path.isfile(self.status_file()):
             os.remove(self.status_file())
@@ -335,7 +335,7 @@ class Builder:
 
     @staticmethod
     def run(args):
-        # Call verify_agent() from prepare.py
+        # Instantiate AgentManager and define agent
         manager = AgentManager()
         agent = manager.agent
 
@@ -343,7 +343,7 @@ class Builder:
         build_dir = args.build_dir
         if not os.access(build_dir, os.W_OK):
             raise Exception(f"Directory {build_dir!r} does not exist or isn't writable.")
-        
+
         # Load PR information saved by prepare.py
         pr_info = Builder.load_pr_info(build_dir)
         if pr_info is not None:
@@ -405,7 +405,7 @@ class Builder:
                         agent=agent
                     )
                 else:
-                    print("No PR info, skipping posting a 'success' status on Github.")
+                    print("No PR info, skipping a 'success' status on Github.")
 
                 sys.exit(0)
             else:
@@ -417,14 +417,14 @@ class Builder:
                         agent=agent
                     )
                 else:
-                    print(f"Build failed on {agent}. No PR info - skipping posting a 'failure' status on Github.")
+                    print(f"Build failed on {agent}. No PR info - skipping a 'failure' status on Github.")
                 sys.exit(1)
 
     @staticmethod
     def load_pr_info(build_dir):
         """Load PR information saved by prepare.py."""
-        pr_info_file = os.path.join(build_dir, 'pr_info.json')
 
+        pr_info_file = os.path.join(build_dir, 'pr_info.json')
         if os.path.exists(pr_info_file):
             with open(pr_info_file, 'r', encoding='utf-8') as f:
                 pr_info = json.load(f)
