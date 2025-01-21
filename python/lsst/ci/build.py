@@ -379,10 +379,6 @@ class Builder:
             if agent == "error":
                 raise RuntimeError("Agent not available or offline.")
 
-            #Simulate Value error
-            pr_info = {"number": 123}  #example PR
-            pr_title = pr_info["title"]  #call wrong key
-
             # Attempt the build
             retcode = b.build()
 
@@ -409,7 +405,7 @@ class Builder:
                         agent=agent
                     )
                 else:
-                    print("No PR info, skipping posting a 'success' check on Github.")
+                    print("No PR info, skipping posting a 'success' status on Github.")
 
                 sys.exit(0)
             else:
@@ -419,9 +415,9 @@ class Builder:
                         state='failure',
                         description=f"Build failed on {agent}",
                         agent=agent
-                    )
+                    )     
                 else:
-                    print(f"Build failed on {agent}. No PR info - skipping posting a 'failure' check on Github.")
+                    print(f"Build failed on {agent}. No PR info - skipping posting a 'failure' status on Github.")
                 sys.exit(1)
 
     @staticmethod
