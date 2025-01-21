@@ -392,8 +392,7 @@ class Builder:
 
         except Exception as other_ex:
             print(f"Build failed on {agent}: {other_ex}")
-            print("Detailed traceback:")
-            traceback.format_exc()
+            traceback.print_exc()
             retcode = False
 
         finally:
