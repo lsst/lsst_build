@@ -446,15 +446,16 @@ class Builder:
             print("GITHUB_TOKEN not found in environment variables.")
             return
 
-        owner = pr_info['owner']
-        repo = pr_info['repo']
-        sha = pr_info['sha']  # The commit SHA to which the status will be attached
+        if pr_info:
+            owner = pr_info['owner']
+            repo = pr_info['repo']
+            sha = pr_info['sha']  # The commit SHA to which the status will be attached
 
-        url = f"https://api.github.com/repos/{owner}/{repo}/statuses/{sha}"
-        headers = {
-            'Authorization': f'token {token}',
-            'Accept': 'application/vnd.github.v3+json'
-        }
+            url = f"https://api.github.com/repos/{owner}/{repo}/statuses/{sha}"
+            headers = {
+                'Authorization': f'token {token}',
+                'Accept': 'application/vnd.github.v3+json'
+            }
 
         build_url = os.environ['RUN_DISPLAY_URL']
         if build_url is None:
