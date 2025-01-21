@@ -70,7 +70,7 @@ class AgentManager:
         agent = self.agent_label()
         if agent == "error":
             print("Agent is offline or unknown.")
-        print(f"Agent verified: {self.agent}")
+        print(f"Agent verified: {agent}")
         return agent
 
 
