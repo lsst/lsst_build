@@ -337,7 +337,6 @@ class Builder:
         # Call verify_agent() from prepare.py
         manager = AgentManager()
         agent = manager.agent
-        print(f"Using agent: {agent}")
 
         # Ensure build directory exists and is writable
         build_dir = args.build_dir
@@ -367,7 +366,6 @@ class Builder:
                 print("WARNING: PR information could not be loaded. Do you have a PR open?")
 
             else:
-                # If we reach here, we have valid PR info
                 print("GitHub status pending - build started")
                 Builder.post_github_status(
                     pr_info=pr_info,
@@ -379,6 +377,10 @@ class Builder:
             # Verify agent
             if agent == "error":
                 raise RuntimeError("Agent not available or offline.")
+
+            #Simulate Exception error
+            pr_info={"number": 123} #example PR
+            pr_title=pr_info["title"] #call wrong key
 
             # Attempt the build
             retcode = b.build()
@@ -417,7 +419,7 @@ class Builder:
                         agent=agent
                     )
                 else:
-                    print(f"Build failed on {agent} - no PR info, skipping posting a 'failure' check on Github")
+                    print(f"Build failed on {agent}. No PR info - skipping posting a 'failure' check on Github.")
                 sys.exit(1)
 
     @staticmethod
