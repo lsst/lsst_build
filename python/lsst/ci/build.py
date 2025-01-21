@@ -337,7 +337,7 @@ class Builder:
         # Call verify_agent() from prepare.py
         manager = AgentManager()
         agent = manager.agent
-        print(f"Using agent {agent})
+        print(f"Using agent: {agent}")
 
         # Ensure build directory exists and is writable
         build_dir = args.build_dir
