@@ -60,20 +60,19 @@ class AgentManager:
             return "error"
         return agent
 
-    @classmethod
-    def verify_agent(cls):
+    def verify_agent(self):
         """Calls agent_label() and handles error result."""
 
-        agent = cls.agent_label()
+        agent = self.agent_label()
         if agent == "error":
             print("Agent is offline or unknown.")
+        print(f"Agent verified: {self.agent}")
         return agent
 
     def __init__(self):
         """Calls verify_agent()."""
         self.agent = self.verify_agent()
-        print(f"Agent verified: {self.agent}")
-        return self.agent
+
 
 
 class RemoteError(Exception):
