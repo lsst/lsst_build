@@ -335,8 +335,10 @@ class Builder:
     @staticmethod
     def run(args):
         # Call verify_agent() from prepare.py
-        agent = AgentManager()
-        
+        agent = AgentManager().agent
+        print(agent)
+        AgentManager()
+
         # Ensure build directory exists and is writable
         build_dir = args.build_dir
         if not os.access(build_dir, os.W_OK):

@@ -73,6 +73,7 @@ class AgentManager:
         """Calls verify_agent()."""
         self.agent = self.verify_agent()
         print(f"Agent verified: {self.agent}")
+        return self.agent
 
 
 class RemoteError(Exception):
