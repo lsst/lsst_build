@@ -5,7 +5,6 @@ import contextlib
 import datetime
 import json
 import os
-import requests
 import select
 import shlex
 import shutil
@@ -14,16 +13,17 @@ import subprocess
 import sys
 import textwrap
 import time
-from typing import TextIO
 import traceback
+from typing import TextIO
+
 
 import eups
 import eups.tags
+import requests
 import yaml
 
 from . import models
-from .prepare import Manifest
-from .prepare import AgentManager
+from .prepare import AgentManager, Manifest
 
 
 def product_representer(dumper, data):

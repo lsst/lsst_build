@@ -9,7 +9,6 @@ import logging
 import os
 import os.path
 import re
-import requests
 import shutil
 import sys
 import time
@@ -17,6 +16,7 @@ from collections.abc import Awaitable, Callable
 
 import eups  # type: ignore
 import eups.tags  # type: ignore
+import requests
 import yaml
 
 from . import models
