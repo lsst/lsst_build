@@ -269,7 +269,7 @@ class ProductFetcher:
         # Add main branch to list of refs, if not there already
         if models.DEFAULT_BRANCH_NAME not in refs:
             refs.append(models.DEFAULT_BRANCH_NAME)
-        
+
         return refs
 
     async def fetch(self, product: str, refs: list[str]) -> tuple[models.Ref, list[str]]:
@@ -334,7 +334,7 @@ class ProductFetcher:
         assert self.build_dir is not None
         productdir = os.path.join(self.build_dir, product)
         git = Git(productdir)
-        
+
         # lfs credential helper string
         helper = "!f() { cat > /dev/null; echo username=; echo password=; }; f"
 
@@ -491,7 +491,7 @@ class ProductFetcher:
             assert product.ref is not None
             if product.ref.name in matched_refs:
                 matched_refs[product.ref.name] += 1
-        
+
         missed = [ref for ref in matched_refs if matched_refs[ref] == 0]
         if missed:
             raise RuntimeError(
@@ -698,7 +698,7 @@ class ProductFetcher:
             first_exception = exceptions[0]
             logger.error("At least one error occurred during while performing LFS pulls")
             raise first_exception
-        
+
     def extract_github_repo_info(self, url):
         """Retrieve repo owner and name from URL"""
 
@@ -726,7 +726,7 @@ class ProductFetcher:
 
         # Get token set in util.jenkinsWrapper
         token = os.environ['GITHUB_TOKEN']
-    
+
         url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
         headers = {
             'Accept': 'application/vnd.github.v3+json',
@@ -785,7 +785,7 @@ class ProductFetcher:
                         with open(pr_info_file, 'w', encoding='utf-8') as f:
                             json.dump(pr_info, f)             
                         return pr_info
-                      
+
                     else:
                         # If not found, remove cached pr_info_file in self.build_dir
                         print(f"No matching PR information found for {product_name} with ref '{product.ref.name}'")
