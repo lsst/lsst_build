@@ -29,39 +29,6 @@ logger = logging.getLogger("lsst.ci")
 ASYNC_QUEUE_WORKERS = 8
 
 
-# def agent_label():
-#     """Determine the agent label based on the NODE_LABELS env variable."""
-
-#     label = os.getenv('NODE_LABELS')
-
-#     if not label:
-#         return "error"
-
-#     labels = label.split(" ")
-#     agent = ""
-   
-#     for label in labels:
-#         match label:
-#             case "arm64":
-#                 agent = "linux_aarch64"
-#             case "mini":
-#                 agent = "apple_arm"
-#             case "osx-13" | "osx-12":  
-#                 agent = "apple_intel"
-#             case "docker":
-#                 agent = "linux_x86"
-#     if agent == "":
-#         return "error"
-#     return agent
-
-
-# print("Starting to run agent_label()...")
-# agent = agent_label()
-# print(agent_label())
-# if agent == "error":
-#     print("Agent is offline or unknown.")
-
-
 class AgentManager:
     """Handles agent label determination and verification."""
 
@@ -95,7 +62,7 @@ class AgentManager:
 
     @classmethod
     def verify_agent(cls):
-        """Run agent_label() and handle the result."""
+        """Calls agent_label() and handles error result."""
 
         agent = cls.agent_label()
         if agent == "error":
@@ -103,7 +70,7 @@ class AgentManager:
         return agent
 
     def __init__(self):
-        """Call verify_agent()."""
+        """Calls verify_agent()."""
         self.agent = self.verify_agent()
         print(f"Agent verified: {self.agent}")
 
@@ -301,11 +268,6 @@ class ProductFetcher:
         # Add main branch to list of refs, if not there already
         if models.DEFAULT_BRANCH_NAME not in refs:
             refs.append(models.DEFAULT_BRANCH_NAME)
-            
-        # Get non-default refs from non_default_refs method
-        #non_default_refs = self.non_default_refs(repo_spec, refs)
-
-        #print(f"Non-default refs {non_default_refs}")
         
         return refs
 
@@ -818,13 +780,13 @@ class ProductFetcher:
                             'sha': matching_pr['head']['sha']
                         }
 
-                        # Assuming self.build_dir is accessible
-                    #    pr_info_file = os.path.join(self.build_dir, 'pr_info.json')
+                        # Write to self.build_dir
                         with open(pr_info_file, 'w', encoding='utf-8') as f:
                             json.dump(pr_info, f)             
                         return pr_info
                       
                     else:
+                        # If not found, remove cached pr_info_file in self.build_dir
                         print(f"No matching PR information found for {product_name} with ref '{product.ref.name}'")
                         if os.path.exists(pr_info_file):
                             os.remove(pr_info_file)

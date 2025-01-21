@@ -381,10 +381,6 @@ class Builder:
             # Attempt the build
             retcode = b.build()
 
-        # except ValueError as no_pr_info:
-        #     print({no_pr_info})
-        #     retcode = False
-
         except RuntimeError as agent_error:
             print(f"Build error: {agent_error}")
             retcode = False
