@@ -407,12 +407,15 @@ class Builder:
 
                 sys.exit(0)
             else:
-                Builder.post_github_status(
-                    pr_info=pr_info,
-                    state='failure',
-                    description=f"Build failed on {agent}",
-                    agent=agent
-                )
+                if pr_info:
+                    Builder.post_github_status(
+                        pr_info=pr_info,
+                        state='failure',
+                        description=f"Build failed on {agent}",
+                        agent=agent
+                    )
+                else:
+                    print(f"Build failed on {agent} - no PR info, skipping posting a 'failure' check on Github")
                 sys.exit(1)
 
     @staticmethod
@@ -446,16 +449,15 @@ class Builder:
             print("GITHUB_TOKEN not found in environment variables.")
             return
 
-        if pr_info:
-            owner = pr_info['owner']
-            repo = pr_info['repo']
-            sha = pr_info['sha']  # The commit SHA to which the status will be attached
+        owner = pr_info['owner']
+        repo = pr_info['repo']
+        sha = pr_info['sha']  # The commit SHA to which the status will be attached
 
-            url = f"https://api.github.com/repos/{owner}/{repo}/statuses/{sha}"
-            headers = {
-                'Authorization': f'token {token}',
-                'Accept': 'application/vnd.github.v3+json'
-            }
+        url = f"https://api.github.com/repos/{owner}/{repo}/statuses/{sha}"
+        headers = {
+            'Authorization': f'token {token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
 
         build_url = os.environ['RUN_DISPLAY_URL']
         if build_url is None:
