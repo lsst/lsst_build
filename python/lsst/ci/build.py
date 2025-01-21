@@ -379,8 +379,9 @@ class Builder:
             if agent == "error":
                 raise RuntimeError("Agent not available or offline.")
 
-            #Simulate Attribute error
-            pr_info.append("test")
+            #Simulate Value error
+            pr_info = {"number": 123}  #example PR
+            pr_title = pr_info["title"]  #call wrong key
 
             # Attempt the build
             retcode = b.build()
@@ -392,7 +393,7 @@ class Builder:
         except Exception as other_ex:
             print(f"Build failed on {agent}: {other_ex}")
             print("Detailed traceback:")
-            traceback.print_exc() 
+            traceback.print_exc()
             retcode = False
 
         finally:
