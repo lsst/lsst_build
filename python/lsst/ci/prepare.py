@@ -11,6 +11,7 @@ import os.path
 import re
 import requests
 import shutil
+
 import sys
 import time
 from collections.abc import Awaitable, Callable
@@ -30,19 +31,6 @@ ASYNC_QUEUE_WORKERS = 8
 
 class AgentManager:
     """Handles agent label determination and verification."""
-    
-    def __init__(self):
-        """Calls verify_agent()."""
-        self.agent = self.verify_agent()
-
-    def verify_agent(self):
-        """Calls agent_label() and handles error result."""
-
-        agent = self.agent_label()
-        if agent == "error":
-            print("Agent is offline or unknown.")
-        print(f"Agent verified: {agent}")
-        return agent
 
     @staticmethod
     def agent_label():
@@ -71,6 +59,21 @@ class AgentManager:
         if agent == "":
             return "error"
         return agent
+    
+    def __init__(self):
+        """Calls verify_agent()."""
+        self.agent = self.verify_agent()
+
+    def verify_agent(self):
+        """Calls agent_label() and handles error result."""
+
+        agent = self.agent_label()
+        if agent == "error":
+            print("Agent is offline or unknown.")
+        print(f"Agent verified: {agent}")
+        return agent
+
+
 
 
 class RemoteError(Exception):
@@ -245,6 +248,9 @@ class ProductFetcher:
         locations = []
         repo_spec = self.repo_specs[product]
 
+        print(repo_spec)
+        print(product)
+
         if repo_spec:
             locations.append(repo_spec.url)
         if self.repository_patterns:
@@ -263,7 +269,7 @@ class ProductFetcher:
         # Add main branch to list of refs, if not there already
         if models.DEFAULT_BRANCH_NAME not in refs:
             refs.append(models.DEFAULT_BRANCH_NAME)
-
+        
         return refs
 
     async def fetch(self, product: str, refs: list[str]) -> tuple[models.Ref, list[str]]:
@@ -328,7 +334,7 @@ class ProductFetcher:
         assert self.build_dir is not None
         productdir = os.path.join(self.build_dir, product)
         git = Git(productdir)
-
+        
         # lfs credential helper string
         helper = "!f() { cat > /dev/null; echo username=; echo password=; }; f"
 
@@ -485,7 +491,7 @@ class ProductFetcher:
             assert product.ref is not None
             if product.ref.name in matched_refs:
                 matched_refs[product.ref.name] += 1
-
+        
         missed = [ref for ref in matched_refs if matched_refs[ref] == 0]
         if missed:
             raise RuntimeError(
@@ -546,8 +552,8 @@ class ProductFetcher:
             loop.run_until_complete(self.resolve_versions())
         if not self.no_fetch and len(self.lfs_product_names):
             loop.run_until_complete(self.lfs_checkout())
-
-        # Call list_non_default_refs_prs method
+        print("is do_product_fetch running?")
+        # Calling non_default_refs_prs method
         loop.run_until_complete(self.list_non_default_refs_prs())
         loop.close()
 
@@ -1083,6 +1089,7 @@ class BuildDirectoryConstructor:
         self.exclusion_resolver = exclusion_resolver
 
     def construct(self, product_names, refs):
+        print("pre-do_fetch_products??")
         self.product_fetcher.do_fetch_products(product_names, refs)
         return Manifest(self.product_fetcher.product_index, None)
 

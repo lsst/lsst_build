@@ -164,6 +164,7 @@ class Builder:
         self.eups = eups
         self.built: list[models.Product] = []
         self.failed_at = None
+        # self.check_run_id = None # Store GH check run ID
 
     def _tag_product(self, name, version, tag):
         if tag:
@@ -312,7 +313,8 @@ class Builder:
                 self.failed_at = product
                 return False
             self.built.append(product)
-
+        return True  # Returns true on success, to use for check
+    
     def rm_status(self):
         if os.path.isfile(self.status_file()):
             os.remove(self.status_file())
@@ -333,7 +335,7 @@ class Builder:
 
     @staticmethod
     def run(args):
-        # Define agent from prepare.py
+        # Call verify_agent() from prepare.py
         manager = AgentManager()
         agent = manager.agent
 
@@ -377,6 +379,10 @@ class Builder:
             if agent == "error":
                 raise RuntimeError("Agent not available or offline.")
 
+            #Simulate Value error
+            pr_info = {"number": 123}  #example PR
+            pr_title = pr_info["title"]  #call wrong key
+
             # Attempt the build
             retcode = b.build()
 
@@ -403,7 +409,7 @@ class Builder:
                         agent=agent
                     )
                 else:
-                    print("No PR info, skipping posting a 'success' status on Github.")
+                    print("No PR info, skipping posting a 'success' check on Github.")
 
                 sys.exit(0)
             else:
@@ -413,9 +419,9 @@ class Builder:
                         state='failure',
                         description=f"Build failed on {agent}",
                         agent=agent
-                    )     
+                    )
                 else:
-                    print(f"Build failed on {agent}. No PR info - skipping posting a 'failure' status on Github.")
+                    print(f"Build failed on {agent}. No PR info - skipping posting a 'failure' check on Github.")
                 sys.exit(1)
 
     @staticmethod
