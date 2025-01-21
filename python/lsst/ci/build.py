@@ -164,7 +164,6 @@ class Builder:
         self.eups = eups
         self.built: list[models.Product] = []
         self.failed_at = None
-        # self.check_run_id = None # Store GH check run ID
 
     def _tag_product(self, name, version, tag):
         if tag:
@@ -313,8 +312,7 @@ class Builder:
                 self.failed_at = product
                 return False
             self.built.append(product)
-        return True  # Returns true on success, to use for check
-    
+
     def rm_status(self):
         if os.path.isfile(self.status_file()):
             os.remove(self.status_file())
@@ -335,7 +333,7 @@ class Builder:
 
     @staticmethod
     def run(args):
-        # Call verify_agent() from prepare.py
+        # Define agent from prepare.py
         manager = AgentManager()
         agent = manager.agent
 
