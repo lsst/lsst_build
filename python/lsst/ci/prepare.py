@@ -59,6 +59,10 @@ class AgentManager:
         if agent == "":
             return "error"
         return agent
+    
+    def __init__(self):
+        """Calls verify_agent()."""
+        self.agent = self.verify_agent()
 
     def verify_agent(self):
         """Calls agent_label() and handles error result."""
@@ -69,9 +73,6 @@ class AgentManager:
         print(f"Agent verified: {self.agent}")
         return agent
 
-    def __init__(self):
-        """Calls verify_agent()."""
-        self.agent = self.verify_agent()
 
 
 
