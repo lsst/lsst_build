@@ -795,51 +795,51 @@ class ProductFetcher:
                 else:
                     print(f"Could not parse GitHub repo info from URL: {origin_url}")
     
-    @staticmethod
-    def post_github_status(pr_info, state, description, agent):
-        """Post a status to the matching PR on GitHub.
+    # @staticmethod
+    # def post_github_status(pr_info, state, description, agent):
+    #     """Post a status to the matching PR on GitHub.
 
-        Parameters
-        ----------
-        pr_info : dict
-            Dictionary containing 'owner', 'repo', 'pr_number', 'sha'.
-        state : str
-            The state of the status ('pending', 'success', 'failure', or 'error').
-        description : str
-            A short description of the status.
-        """
-        print(f"Posting GitHub status: {state} - {description}")
-        token = os.environ['GITHUB_TOKEN']
-        if not token:
-            print("GITHUB_TOKEN not found in environment variables.")
-            return
+    #     Parameters
+    #     ----------
+    #     pr_info : dict
+    #         Dictionary containing 'owner', 'repo', 'pr_number', 'sha'.
+    #     state : str
+    #         The state of the status ('pending', 'success', 'failure', or 'error').
+    #     description : str
+    #         A short description of the status.
+    #     """
+    #     print(f"Posting GitHub status: {state} - {description}")
+    #     token = os.environ['GITHUB_TOKEN']
+    #     if not token:
+    #         print("GITHUB_TOKEN not found in environment variables.")
+    #         return
 
-        owner = pr_info['owner']
-        repo = pr_info['repo']
-        sha = pr_info['sha']  # The commit SHA to which the status will be attached
+    #     owner = pr_info['owner']
+    #     repo = pr_info['repo']
+    #     sha = pr_info['sha']  # The commit SHA to which the status will be attached
 
-        url = f"https://api.github.com/repos/{owner}/{repo}/statuses/{sha}"
-        headers = {
-            'Authorization': f'token {token}',
-            'Accept': 'application/vnd.github.v3+json'
-        }
+    #     url = f"https://api.github.com/repos/{owner}/{repo}/statuses/{sha}"
+    #     headers = {
+    #         'Authorization': f'token {token}',
+    #         'Accept': 'application/vnd.github.v3+json'
+    #     }
 
-        build_url = os.environ['RUN_DISPLAY_URL']
-        if build_url is None:
-            build_url = "https://rubin-ci-dev.slac.stanford.edu/blue/organizations/jenkins/stack-os-matrix/activity"
+    #     build_url = os.environ['RUN_DISPLAY_URL']
+    #     if build_url is None:
+    #         build_url = "https://rubin-ci-dev.slac.stanford.edu/blue/organizations/jenkins/stack-os-matrix/activity"
 
-        data = {
-            'state': state,
-            'description': description,
-            'context': f'Jenkins Build ({agent})',
-            'target_url': build_url
-        }
+    #     data = {
+    #         'state': state,
+    #         'description': description,
+    #         'context': f'Jenkins Build ({agent})',
+    #         'target_url': build_url
+    #     }
 
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 201:
-            print("GitHub status posted successfully.")
-        else:
-            print(f"Failed to post GitHub status: {response.status_code} - {response.text}")
+    #     response = requests.post(url, headers=headers, json=data)
+    #     if response.status_code == 201:
+    #         print("GitHub status posted successfully.")
+    #     else:
+    #         print(f"Failed to post GitHub status: {response.status_code} - {response.text}")
 
 
 class VersionDb(metaclass=abc.ABCMeta):
