@@ -346,12 +346,16 @@ class Builder:
 
         # Load PR information saved by prepare.py
         pr_info = Builder.load_pr_info(build_dir)
-        if pr_info is not None:
-            print(f"This is the pr_info {pr_info}")
+        if pr_info:
+            print(f"Loaded {len(pr_info)} PR(s) from pr_info.json")
+            for info in pr_info:
+                print(" -", info)
+        else:
+            print("No PR info was loaded. No matching PRs or no pr_info.json found")
+            pr_info = []
 
         # Build products
         eups_obj = eups.Eups()
-
         progress = ProgressReporter(sys.stdout)
 
         manifest_fn = os.path.join(build_dir, "manifest.txt")
@@ -362,18 +366,18 @@ class Builder:
         b.rm_status()
 
         try:
-            # Verify PR info
-            if not pr_info:
-                print("WARNING: PR information could not be loaded. Do you have a PR open?")
-
+            # Verify PR info and loop over all PRs
+            if pr_info:
+                for single_pr_info in pr_info:
+                    print("GitHub status pending - build started")
+                    Builder.post_github_status(
+                        pr_info=single_pr_info,
+                        state='pending',
+                        description=f"Build started on {agent}",
+                        agent=agent
+                    )
             else:
-                print("GitHub status pending - build started")
-                Builder.post_github_status(
-                    pr_info=pr_info,
-                    state='pending',
-                    description=f"Build started on {agent}",
-                    agent=agent
-                )
+                print("WARNING: PR information could not be loaded. Do you have a PR open?")
 
             # Verify agent
             if agent == "error":
@@ -397,40 +401,60 @@ class Builder:
 
             # Now handle final status posting based on retcode
             if retcode:
+                print(f"Build succeeded on {agent}. Posting 'success' status to PR(s)")
                 if pr_info:
-                    Builder.post_github_status(
-                        pr_info=pr_info,
-                        state='success',
-                        description=f"Build succeeded on {agent}",
-                        agent=agent
-                    )
+                    for single_pr_info in pr_info:
+                        Builder.post_github_status(
+                            pr_info=single_pr_info,
+                            state='success',
+                            description=f"Build succeeded on {agent}",
+                            agent=agent
+                        )
                 else:
                     print("No PR info, skipping a 'success' status on Github.")
 
                 sys.exit(0)
             else:
                 if pr_info:
-                    Builder.post_github_status(
-                        pr_info=pr_info,
-                        state='failure',
-                        description=f"Build failed on {agent}",
-                        agent=agent
-                    )
+                    for single_pr_info in pr_info
+                        Builder.post_github_status(
+                            pr_info=single_pr_info,
+                            state='failure',
+                            description=f"Build failed on {agent}",
+                            agent=agent
+                        )
                 else:
                     print(f"Build failed on {agent}. No PR info - skipping a 'failure' status on Github.")
                 sys.exit(1)
 
     @staticmethod
     def load_pr_info(build_dir):
-        """Load PR information saved by prepare.py."""
+        """Load PR information saved by prepare.py and parse the list."""
 
         pr_info_file = os.path.join(build_dir, 'pr_info.json')
-        if os.path.exists(pr_info_file):
-            with open(pr_info_file, 'r', encoding='utf-8') as f:
-                pr_info = json.load(f)
-            return pr_info
-        else:
+        if not os.path.exists(pr_info_file):
+            # If there's no file, just return an empty list.
             return None
+
+        try:
+            with open(pr_info_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return data
+            else:
+                print(f"WARNING: Expected a list in {pr_info_file}, but got {type(data)}.")
+                return []
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"WARNING: Could not read {pr_info_file}: {e}")
+            return None
+
+        # pr_info_file = os.path.join(build_dir, 'pr_info.json')
+        # if os.path.exists(pr_info_file):
+        #     with open(pr_info_file, 'r', encoding='utf-8') as f:
+        #         pr_info = json.load(f)
+        #     return pr_info
+        # else:
+        #     return None
 
     @staticmethod
     def post_github_status(pr_info, state, description, agent):

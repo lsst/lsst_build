@@ -736,7 +736,9 @@ class ProductFetcher:
     async def list_non_default_refs_prs(self):
         """List all PRs for non-default git refs and matching head refs"""
 
+        pr_info = []
         pr_info_file = os.path.join(self.build_dir, 'pr_info.json')
+
         for product_name, product in self.product_index.items():
             assert product.ref is not None
             if product.ref.name != models.DEFAULT_BRANCH_NAME:
@@ -747,46 +749,64 @@ class ProductFetcher:
 
                 # Parse the GitHub repo owner and name from the origin URL
                 repo_info = self.extract_github_repo_info(origin_url)
-                if repo_info:
-                    owner, repo = repo_info
-                    prs = self.get_github_prs(owner, repo)
-                    print(f"Pull requests for {owner}/{repo}:")
-                    matching_pr = None
-                    for pr in prs:
-                        pr_number = pr['number']
-                        pr_title = pr['title']
-                        pr_head_ref = pr['head']['ref']
-                        pr_sha = pr['head']['sha']
 
-                        # Print PR details
-                        print(f"PR #{pr_number}: {pr_title} branch: {pr_head_ref}, (sha: {pr_sha})")
+                if not repo_info:
+                    print(f"Could not parse GitHub repo info from URL: {origin_url}")
+                    continue
 
-                        # Check if the PR's head ref matches the non-default git ref name
-                        if pr_head_ref == product.ref.name:
-                            matching_pr = pr
-                    if matching_pr:
-                        print(f"Found matching PR for {product_name}:")
-                        print(f"PR #{matching_pr['number']}: {matching_pr['title']}")
-                        pr_info = {
+                owner, repo = repo_info
+
+                # Retrieve PRs from Github
+                prs = self.get_github_prs(owner, repo)
+                print(f"Pull requests for {owner}/{repo}:")
+
+                matching_pr = []
+                for pr in prs:
+                    pr_number = pr['number']
+                    pr_title = pr['title']
+                    pr_head_ref = pr['head']['ref']
+                    pr_sha = pr['head']['sha']
+
+                    # Print PR details
+                    print(f"PR #{pr_number}: {pr_title} branch: {pr_head_ref}, (sha: {pr_sha})")
+
+                    # Check if the PR's head ref matches the non-default git ref name
+                    if pr_head_ref == product.ref.name:
+                        matching_pr.append({
+                            'product_name': product_name,
                             'owner': owner,
                             'repo': repo,
-                            'pr_number': matching_pr['number'],
-                            'sha': matching_pr['head']['sha']
-                        }
+                            'pr_number': pr_number,
+                            'title': pr_title,
+                            'sha': pr_sha
+                        })
+                if matching_pr:
+                    print(f"Found {len(matching_prs)} matching PR(s) for {product_name}:")
+                    for match in matching_pr:
+                        print(f"PR #{match['number']}: {match['title']}")
 
-                        # Write to self.build_dir
-                        with open(pr_info_file, 'w', encoding='utf-8') as f:
-                            json.dump(pr_info, f)             
-                        return pr_info
+                    pr_info.extend(matching_pr)
 
-                    else:
-                        # If not found, remove cached pr_info_file in self.build_dir
-                        print(f"No matching PR info found for {product_name} with ref '{product.ref.name}'")
-                        if os.path.exists(pr_info_file):
-                            os.remove(pr_info_file)
-                        return None
-                else:
-                    print(f"Could not parse GitHub repo info from URL: {origin_url}")
+                    # pr_info = {
+                    #     'owner': owner,
+                    #     'repo': repo,
+                    #     'pr_number': matching_pr['number'],
+                    #     'sha': matching_pr['head']['sha']
+                    # }
+
+        if pr_info:
+            # Write to self.build_dir
+            with open(pr_info_file, 'w', encoding='utf-8') as f:
+                json.dump(pr_info, f)             
+            print(f"Wrote ALL matching PR info to {pr_info_file}")  
+
+        else:
+            # If not found, remove cached pr_info_file in self.build_dir
+            if os.path.exists(pr_info_file):
+                os.remove(pr_info_file)
+            print("No matching PR info found.")
+
+        return pr_info
 
 
 class VersionDb(metaclass=abc.ABCMeta):
