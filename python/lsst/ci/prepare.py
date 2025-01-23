@@ -735,6 +735,7 @@ class ProductFetcher:
 
     async def list_non_default_refs_prs(self):
         """List all PRs for non-default git refs and matching head refs"""
+
         pr_info_file = os.path.join(self.build_dir, 'pr_info.json')
         for product_name, product in self.product_index.items():
             assert product.ref is not None

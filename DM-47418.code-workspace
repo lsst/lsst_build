@@ -4,5 +4,38 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		    "editor.rulers": [
+        79,
+        110
+    ],
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.coverage.*": true,
+        "**/.pytest_cache": true,
+        "**/.sconf_temp": true,
+        "**/.sconsign.dblite": true,
+        "**/.tests": true,
+        "**/*.o": true,
+        "**/*.os": true
+    },
+    "files.watcherExclude": {
+        "**/__pycache__": true
+    },
+    "trailing-spaces.trimOnSave": true,
+    "restructuredtext.linter.extraArgs": [
+        "--ignore D001"
+    ],
+    "[restructuredtext]": {
+        "editor.wordWrap": "wordWrapColumn",
+    },
+    "python.linting.flake8Enabled": true,
+    "python.linting.pylintEnabled": false,
+    "search.useGlobalIgnoreFiles": true,
+    "python.dataScience.enabled": false,
+    "latex-workshop.latex.external.build.command": "make",
+    "[cpp]": {
+        "editor.defaultFormatter": "ms-vscode.cpptools"
+    }
+	}
 }
