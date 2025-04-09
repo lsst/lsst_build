@@ -17,6 +17,7 @@ from typing import TextIO
 import eups
 import eups.tags
 import yaml
+import requests
 
 from . import models
 from .prepare import Manifest
@@ -280,6 +281,92 @@ class Builder:
 
         return (eups_prod, retcode, logfile)
 
+    def _fetch_product_if_needed(self, product, server_path, progress):
+        # Downloads package if it already available in eups distrib
+        productdir = os.path.abspath(os.path.join(self.build_dir, product.name))
+        buildscript = os.path.join(productdir, "_build.sh")
+        logfile = os.path.join(productdir, "_build.log")
+        eupsdir = eups.productDir("eups")
+        eupspath = os.environ["EUPS_PATH"]
+
+        # construct the tags file with exact dependencies
+        setups = [
+            f"\t{dep.name:20s} {dep.version}"
+            for dep in self.manifest.product_index.flat_dependencies(product)
+        ]
+
+        # create the buildscript
+        with open(buildscript, "w", encoding="utf-8") as fp:
+            text = textwrap.dedent(
+                f"""\
+            #!/bin/bash
+
+            # redirect stderr to stdin
+            exec 2>&1
+
+            # stop on any error
+            set -ex
+
+            # define the setup command, but preserve EUPS_PATH
+            #. "{eupsdir}/bin/setups.sh"
+            #export EUPS_PATH="{eupspath}"
+
+            cd "{productdir}"
+
+            # clean up the working directory
+            git reset --hard
+            git clean -d -f -q -x -e '_build.*'
+
+            # fetch
+            export EUPS_PKGROOT={server_path}
+            eups distrib install {product.name} {product.version}
+
+            # explicitly append SHA1 to pkginfo
+            # echo SHA1={product.sha1} >> $(eups list {product.name} {product.version} -d)/ups/pkginfo
+            """
+            )
+
+            fp.write(text)
+        st = os.stat(buildscript)
+        os.chmod(buildscript, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+        # Run the build script
+        with open(logfile, "w", encoding="utf-8") as logfp:
+            # execute the build file from the product directory, capturing the
+            # output and return code.
+            process = subprocess.Popen(
+                buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir
+            )
+            select_list = [process.stdout]
+            buf = b""
+            while True:
+                # Wait up to 2 seconds for output
+                ready_to_read, _, _ = select.select(select_list, [], [], 2)
+                if ready_to_read:
+                    c = process.stdout.read(1)
+                    buf += c
+                    if (c == b"" or c == b"\n") and buf:
+                        line = f"[{datetime.datetime.utcnow().isoformat()}Z] {buf.decode()}"
+                        logfp.write(line)
+                        buf = b""
+                    # Ready to read but nothing there means end of file
+                    if c == b"":
+                        break
+                progress.report_progress()
+        retcode = process.poll()
+        if not retcode:
+            # copy the log file to product directory
+            eups_prod = self.eups.getProduct(product.name, product.version)
+            shutil.copy2(logfile, eups_prod.dir)
+        else:
+            eups_prod = None
+
+        return (eups_prod, retcode, logfile)
+
+    def _check_if_in_distrib(self, product, server_path):
+        res = requests.get(f"{server_path}/{product.name}-{product.version}@Linux64.tar.gz")
+        return res.status_code == 200
+
     def _build_product_if_needed(self, product):
         # Build a product if it hasn't been installed already
         #
@@ -288,7 +375,14 @@ class Builder:
                 # skip the build if the product has been installed
                 eups_prod, retcode, logfile = self.eups.getProduct(product.name, product.version), 0, None
             except eups.ProductNotFound:
-                eups_prod, retcode, logfile = self._build_product(product, progress)
+                distrib_path = os.environ["EUPS_DISTRIB"]
+
+                if self._check_if_in_distrib(product, distrib_path):
+                    eups_prod, retcode, logfile = self._fetch_product_if_needed(
+                        product, distrib_path, progress
+                    )
+                else:
+                    eups_prod, retcode, logfile = self._build_product(product, progress)
 
             if eups_prod is not None and self.manifest.build_id not in eups_prod.tags:
                 self._tag_product(product.name, product.version, self.manifest.build_id)
