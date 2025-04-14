@@ -308,21 +308,12 @@ class Builder:
             set -ex
 
             # define the setup command, but preserve EUPS_PATH
-            #. "{eupsdir}/bin/setups.sh"
-            #export EUPS_PATH="{eupspath}"
-
-            cd "{productdir}"
-
-            # clean up the working directory
-            git reset --hard
-            git clean -d -f -q -x -e '_build.*'
+            export EUPS_PATH="{eupspath}"
 
             # fetch
             export EUPS_PKGROOT={server_path}
-            eups distrib install {product.name} {product.version}
+            eups distrib install -j {product.name} {product.version}
 
-            # explicitly append SHA1 to pkginfo
-            # echo SHA1={product.sha1} >> $(eups list {product.name} {product.version} -d)/ups/pkginfo
             """
             )
 
@@ -364,7 +355,7 @@ class Builder:
         return (eups_prod, retcode, logfile)
 
     def _check_if_in_distrib(self, product, server_path):
-        res = requests.get(f"{server_path}/{product.name}-{product.version}@Linux64.tar.gz")
+        res = requests.get(f"{server_path}/{product.name}-{product.version}@{self.eups.flavor}.tar.gz")
         return res.status_code == 200
 
     def _build_product_if_needed(self, product):
