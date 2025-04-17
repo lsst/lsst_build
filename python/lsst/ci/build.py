@@ -152,13 +152,23 @@ class Builder:
         the `ProgressReporter` reporting for this build
     eups
         an eups object for eups operations (e.g. discovering product info)
+    no_binary_fetch
+        If true, builder will not fetch binaries from server if they are available
     """
 
-    def __init__(self, build_dir: str, manifest: Manifest, progress: ProgressReporter, eups: eups.Eups):
+    def __init__(
+        self,
+        build_dir: str,
+        manifest: Manifest,
+        progress: ProgressReporter,
+        eups: eups.Eups,
+        no_fetch_binary: bool,
+    ):
         self.build_dir = build_dir
         self.manifest = manifest
         self.progress = progress
         self.eups = eups
+        self.no_fetch_binary = no_fetch_binary
         self.built: list[models.Product] = []
         self.failed_at = None
 
@@ -368,7 +378,7 @@ class Builder:
             except eups.ProductNotFound:
                 distrib_path = os.environ["EUPS_DISTRIB"]
 
-                if self._check_if_in_distrib(product, distrib_path):
+                if not self.no_fetch_binary and self._check_if_in_distrib(product, distrib_path):
                     eups_prod, retcode, logfile = self._fetch_product_if_needed(
                         product, distrib_path, progress
                     )
@@ -416,6 +426,7 @@ class Builder:
     def run(args):
         # Ensure build directory exists and is writable
         build_dir = args.build_dir
+        no_binary_fetch = args.no_binary_fetch
         if not os.access(build_dir, os.W_OK):
             raise Exception(f"Directory {build_dir!r} does not exist or isn't writable.")
 
@@ -428,7 +439,7 @@ class Builder:
         with open(manifest_fn, encoding="utf-8") as fp:
             manifest = Manifest.from_file(fp)
 
-        b = Builder(build_dir, manifest, progress, eups_obj)
+        b = Builder(build_dir, manifest, progress, eups_obj, no_binary_fetch)
         b.rm_status()
         retcode = b.build()
         b.write_status()
