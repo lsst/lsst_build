@@ -376,7 +376,8 @@ class ProductFetcher:
             if not sha1:
                 sha1, _ = await git.rev_parse("-q", "--verify", "refs/tags/" + ref + "^0", return_status=True)
             if not sha1:
-                sha1, _ = await git.rev_parse("-q", "--verify", "__dummy-g" + ref, return_status=True)
+                # fix for git >= 1.49, rev-parse does not allow __dummy-g{SHA}
+                sha1, _ = await git.rev_parse("-q", "--verify", f"{ref}^{{commit}}", return_status=True)
             if not sha1:
                 continue
 
