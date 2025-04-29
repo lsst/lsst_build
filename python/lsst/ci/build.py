@@ -16,8 +16,8 @@ from typing import TextIO
 
 import eups
 import eups.tags
-import yaml
 import requests
+import yaml
 
 from . import models
 from .prepare import Manifest
@@ -153,7 +153,7 @@ class Builder:
     eups
         an eups object for eups operations (e.g. discovering product info)
     no_binary_fetch
-        If true, builder will not fetch binaries from server if they are available
+        builder will not fetch binaries from server if they are available
     """
 
     def __init__(
@@ -296,14 +296,7 @@ class Builder:
         productdir = os.path.abspath(os.path.join(self.build_dir, product.name))
         buildscript = os.path.join(productdir, "_build.sh")
         logfile = os.path.join(productdir, "_build.log")
-        eupsdir = eups.productDir("eups")
         eupspath = os.environ["EUPS_PATH"]
-
-        # construct the tags file with exact dependencies
-        setups = [
-            f"\t{dep.name:20s} {dep.version}"
-            for dep in self.manifest.product_index.flat_dependencies(product)
-        ]
 
         # create the buildscript
         with open(buildscript, "w", encoding="utf-8") as fp:
