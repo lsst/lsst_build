@@ -176,6 +176,33 @@ class Builder:
         if tag:
             self.eups.declare(name, version, tag=str(tag))
 
+    def _execute_build_script(self, script, logfile, progress, productdir):
+        # Make executable (equivalent of 'chmod +x $script')
+        st = os.stat(script)
+        os.chmod(script, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        # Run the build script
+        with open(logfile, "w", encoding="utf-8") as logfp:
+            # execute the build file from the product directory, capturing the
+            # output and return code.
+            process = subprocess.Popen(script, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir)
+            select_list = [process.stdout]
+            buf = b""
+            while True:
+                # Wait up to 2 seconds for output
+                ready_to_read, _, _ = select.select(select_list, [], [], 2)
+                if ready_to_read:
+                    c = process.stdout.read(1)
+                    buf += c
+                    if (c == b"" or c == b"\n") and buf:
+                        line = f"[{datetime.datetime.utcnow().isoformat()}Z] {buf.decode()}"
+                        logfp.write(line)
+                        buf = b""
+                    # Ready to read but nothing there means end of file
+                    if c == b"":
+                        break
+                progress.report_progress()
+        return process.poll()
+
     def _build_product(self, product, progress):
         # run the eupspkg sequence for the product
         #
@@ -253,35 +280,7 @@ class Builder:
 
             fp.write(text)
 
-        # Make executable (equivalent of 'chmod +x $buildscript')
-        st = os.stat(buildscript)
-        os.chmod(buildscript, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-        # Run the build script
-        with open(logfile, "w", encoding="utf-8") as logfp:
-            # execute the build file from the product directory, capturing the
-            # output and return code.
-            process = subprocess.Popen(
-                buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir
-            )
-            select_list = [process.stdout]
-            buf = b""
-            while True:
-                # Wait up to 2 seconds for output
-                ready_to_read, _, _ = select.select(select_list, [], [], 2)
-                if ready_to_read:
-                    c = process.stdout.read(1)
-                    buf += c
-                    if (c == b"" or c == b"\n") and buf:
-                        line = f"[{datetime.datetime.utcnow().isoformat()}Z] {buf.decode()}"
-                        logfp.write(line)
-                        buf = b""
-                    # Ready to read but nothing there means end of file
-                    if c == b"":
-                        break
-                progress.report_progress()
-
-        retcode = process.poll()
+        retcode = self._execute_build_script(buildscript, logfile, progress, productdir)
         if not retcode:
             # copy the log file to product directory
             eups_prod = self.eups.getProduct(product.name, product.version)
@@ -321,33 +320,7 @@ class Builder:
             )
 
             fp.write(text)
-        st = os.stat(buildscript)
-        os.chmod(buildscript, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-        # Run the build script
-        with open(logfile, "w", encoding="utf-8") as logfp:
-            # execute the build file from the product directory, capturing the
-            # output and return code.
-            process = subprocess.Popen(
-                buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir
-            )
-            select_list = [process.stdout]
-            buf = b""
-            while True:
-                # Wait up to 2 seconds for output
-                ready_to_read, _, _ = select.select(select_list, [], [], 2)
-                if ready_to_read:
-                    c = process.stdout.read(1)
-                    buf += c
-                    if (c == b"" or c == b"\n") and buf:
-                        line = f"[{datetime.datetime.utcnow().isoformat()}Z] {buf.decode()}"
-                        logfp.write(line)
-                        buf = b""
-                    # Ready to read but nothing there means end of file
-                    if c == b"":
-                        break
-                progress.report_progress()
-        retcode = process.poll()
+        retcode = self._execute_build_script(buildscript, logfile, progress, productdir)
         if not retcode:
             # copy the log file to product directory
             eups_prod = self.eups.getProduct(product.name, product.version)
