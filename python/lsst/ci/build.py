@@ -16,6 +16,7 @@ from typing import TextIO
 
 import eups
 import eups.tags
+import requests
 import yaml
 
 from . import models
@@ -151,19 +152,56 @@ class Builder:
         the `ProgressReporter` reporting for this build
     eups
         an eups object for eups operations (e.g. discovering product info)
+    no_binary_fetch
+        builder will not fetch binaries from server if they are available
     """
 
-    def __init__(self, build_dir: str, manifest: Manifest, progress: ProgressReporter, eups: eups.Eups):
+    def __init__(
+        self,
+        build_dir: str,
+        manifest: Manifest,
+        progress: ProgressReporter,
+        eups: eups.Eups,
+        no_fetch_binary: bool,
+    ):
         self.build_dir = build_dir
         self.manifest = manifest
         self.progress = progress
         self.eups = eups
+        self.no_fetch_binary = no_fetch_binary
         self.built: list[models.Product] = []
         self.failed_at = None
 
     def _tag_product(self, name, version, tag):
         if tag:
             self.eups.declare(name, version, tag=str(tag))
+
+    def _execute_build_script(self, script, logfile, progress, productdir):
+        # Make executable (equivalent of 'chmod +x $script')
+        st = os.stat(script)
+        os.chmod(script, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        # Run the build script
+        with open(logfile, "w", encoding="utf-8") as logfp:
+            # execute the build file from the product directory, capturing the
+            # output and return code.
+            process = subprocess.Popen(script, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir)
+            select_list = [process.stdout]
+            buf = b""
+            while True:
+                # Wait up to 2 seconds for output
+                ready_to_read, _, _ = select.select(select_list, [], [], 2)
+                if ready_to_read:
+                    c = process.stdout.read(1)
+                    buf += c
+                    if (c == b"" or c == b"\n") and buf:
+                        line = f"[{datetime.datetime.utcnow().isoformat()}Z] {buf.decode()}"
+                        logfp.write(line)
+                        buf = b""
+                    # Ready to read but nothing there means end of file
+                    if c == b"":
+                        break
+                progress.report_progress()
+        return process.poll()
 
     def _build_product(self, product, progress):
         # run the eupspkg sequence for the product
@@ -242,35 +280,7 @@ class Builder:
 
             fp.write(text)
 
-        # Make executable (equivalent of 'chmod +x $buildscript')
-        st = os.stat(buildscript)
-        os.chmod(buildscript, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-
-        # Run the build script
-        with open(logfile, "w", encoding="utf-8") as logfp:
-            # execute the build file from the product directory, capturing the
-            # output and return code.
-            process = subprocess.Popen(
-                buildscript, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=productdir
-            )
-            select_list = [process.stdout]
-            buf = b""
-            while True:
-                # Wait up to 2 seconds for output
-                ready_to_read, _, _ = select.select(select_list, [], [], 2)
-                if ready_to_read:
-                    c = process.stdout.read(1)
-                    buf += c
-                    if (c == b"" or c == b"\n") and buf:
-                        line = f"[{datetime.datetime.utcnow().isoformat()}Z] {buf.decode()}"
-                        logfp.write(line)
-                        buf = b""
-                    # Ready to read but nothing there means end of file
-                    if c == b"":
-                        break
-                progress.report_progress()
-
-        retcode = process.poll()
+        retcode = self._execute_build_script(buildscript, logfile, progress, productdir)
         if not retcode:
             # copy the log file to product directory
             eups_prod = self.eups.getProduct(product.name, product.version)
@@ -280,6 +290,50 @@ class Builder:
 
         return (eups_prod, retcode, logfile)
 
+    def _fetch_product_if_needed(self, product, server_path, progress):
+        # Downloads package if it already available in eups distrib
+        productdir = os.path.abspath(os.path.join(self.build_dir, product.name))
+        buildscript = os.path.join(productdir, "_build.sh")
+        logfile = os.path.join(productdir, "_build.log")
+        eupspath = os.environ["EUPS_PATH"]
+
+        # create the buildscript
+        with open(buildscript, "w", encoding="utf-8") as fp:
+            text = textwrap.dedent(
+                f"""\
+            #!/bin/bash
+
+            # redirect stderr to stdin
+            exec 2>&1
+
+            # stop on any error
+            set -ex
+
+            # define the setup command, but preserve EUPS_PATH
+            export EUPS_PATH="{eupspath}"
+
+            # fetch
+            export EUPS_PKGROOT={server_path}
+            eups distrib install -j {product.name} {product.version}
+
+            """
+            )
+
+            fp.write(text)
+        retcode = self._execute_build_script(buildscript, logfile, progress, productdir)
+        if not retcode:
+            # copy the log file to product directory
+            eups_prod = self.eups.getProduct(product.name, product.version)
+            shutil.copy2(logfile, eups_prod.dir)
+        else:
+            eups_prod = None
+
+        return (eups_prod, retcode, logfile)
+
+    def _check_if_in_distrib(self, product, server_path):
+        res = requests.get(f"{server_path}/{product.name}-{product.version}@{self.eups.flavor}.tar.gz")
+        return res.status_code == 200
+
     def _build_product_if_needed(self, product):
         # Build a product if it hasn't been installed already
         #
@@ -288,7 +342,14 @@ class Builder:
                 # skip the build if the product has been installed
                 eups_prod, retcode, logfile = self.eups.getProduct(product.name, product.version), 0, None
             except eups.ProductNotFound:
-                eups_prod, retcode, logfile = self._build_product(product, progress)
+                distrib_path = os.environ["EUPS_DISTRIB"]
+
+                if not self.no_fetch_binary and self._check_if_in_distrib(product, distrib_path):
+                    eups_prod, retcode, logfile = self._fetch_product_if_needed(
+                        product, distrib_path, progress
+                    )
+                else:
+                    eups_prod, retcode, logfile = self._build_product(product, progress)
 
             if eups_prod is not None and self.manifest.build_id not in eups_prod.tags:
                 self._tag_product(product.name, product.version, self.manifest.build_id)
@@ -331,6 +392,7 @@ class Builder:
     def run(args):
         # Ensure build directory exists and is writable
         build_dir = args.build_dir
+        no_binary_fetch = args.no_binary_fetch
         if not os.access(build_dir, os.W_OK):
             raise Exception(f"Directory {build_dir!r} does not exist or isn't writable.")
 
@@ -343,7 +405,7 @@ class Builder:
         with open(manifest_fn, encoding="utf-8") as fp:
             manifest = Manifest.from_file(fp)
 
-        b = Builder(build_dir, manifest, progress, eups_obj)
+        b = Builder(build_dir, manifest, progress, eups_obj, no_binary_fetch)
         b.rm_status()
         retcode = b.build()
         b.write_status()
