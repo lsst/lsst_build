@@ -7,3 +7,7 @@ dist/
 *.pyc
 .pytest_cache/
 .vagrant/
+*.code-workspace
+settings.json
+requirements.txt
+.pre-commit-config.yaml

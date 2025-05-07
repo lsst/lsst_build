@@ -12,14 +12,17 @@ import shutil
 import sys
 import time
 from collections.abc import Awaitable, Callable
+from urllib.parse import urlparse
 
 import eups  # type: ignore
 import eups.tags  # type: ignore
+import requests
 import yaml
 
 from . import models
 from .eups_module import EupsModule
 from .git import Git, GitError
+from .models import AllProductPRCollections, GitHubPR
 
 logger = logging.getLogger("lsst.ci")
 
@@ -482,6 +485,11 @@ class ProductFetcher:
         refs
             List of refs the user specified.
         """
+        # Create the PRInfoCollector
+        collector = PRInfoCollector(
+            build_dir=self.build_dir, product_index=self.product_index, repo_specs=self.repo_specs
+        )
+
         loop = asyncio.get_event_loop()
         loop.run_until_complete(self.fetch_products(products, refs))
 
@@ -500,6 +508,9 @@ class ProductFetcher:
             loop.run_until_complete(self.resolve_versions())
         if not self.no_fetch and len(self.lfs_product_names):
             loop.run_until_complete(self.lfs_checkout())
+
+        # Calling method to list branch prs
+        loop.run_until_complete(collector.list_non_default_refs_prs())
         loop.close()
 
     async def fetch_products(self, product_names: list[str], refs: list[str]) -> set[str]:
@@ -643,6 +654,147 @@ class ProductFetcher:
             first_exception = exceptions[0]
             logger.error("At least one error occurred during while performing LFS pulls")
             raise first_exception
+
+
+class PRInfoCollector:
+    """Gathers pull request information from corresponding branches.
+
+    Parameters
+    ----------
+    build_dir : `str`
+        The root for product repos. Products are cloned in this directory.
+    product_index : `models.ProductIndex`
+        A ProductIndex dictionary mapping product names to metadata.
+    """
+
+    def __init__(
+        self, build_dir: str, product_index: models.ProductIndex, repo_specs: dict[str, models.RepoSpec]
+    ) -> None:
+        self.build_dir = build_dir
+        self.product_index = product_index
+        self.repo_specs = repo_specs
+
+    @staticmethod
+    def extract_github_repo_info(url: str) -> tuple[str, str] | None:
+        """Retrieve Github repo owner and name from URL
+
+        Parameters
+        ----------
+        url : `str`
+            The git URL from which to extract `owner` and `repo`.
+
+        Returns
+        -------
+        `tuple[str, str]` or `None`
+            A tuple containing (owner, repo)
+            if successfully parsed, otherwise `None`.
+        """
+        # Remove the '.git' suffix
+        url = url.removesuffix(".git")
+        parsed_url = urlparse(url)
+
+        if parsed_url.netloc != "github.com":
+            return None
+
+        parts = parsed_url.path.strip("/").split("/")
+        if len(parts) != 2:
+            return None
+
+        return tuple(parts)  # ('owner', 'repo')
+
+    @staticmethod
+    def get_github_prs(owner: str, repo: str) -> list[dict]:
+        """Get the list of PRs using the GitHub API.
+
+        Parameters
+        ----------
+        owner : `str`
+            The GitHub owner or organization name.
+        repo : `str`
+            The GitHub repository name.
+
+        Returns
+        -------
+        `list[dict]`
+            A list of dictionaries containing PR data from the Github API.
+        """
+        # Get token set in util.jenkinsWrapper
+        token = os.getenv("GITHUB_TOKEN")
+
+        url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
+        headers = {"Accept": "application/vnd.github.v3+json", "Authorization": f"token {token}"}
+
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            prs = response.json()
+            return prs
+        else:
+            print(f"Failed to get PR for {owner}/{repo}: {response.status_code}")
+            return []
+
+    async def list_non_default_refs_prs(self) -> models.AllProductPRCollections:
+        """List all PRs for non-default git refs and matching head refs,
+        returning them as a single Pydantic model: AllProductPRCollections.
+
+        Returns
+        -------
+        `AllProductPRCollections`
+            A pydantic model containing all matching pull requests
+            across products.
+        """
+        pr_items = []
+
+        for product_name, product in self.product_index.items():
+            if product.ref is None:
+                continue
+
+            repo_spec = self.repo_specs.get(product_name)
+            default_branch = repo_spec.ref if repo_spec else models.DEFAULT_BRANCH_NAME
+
+            if product.ref.name == default_branch:
+                continue
+
+            # Extract local repo info
+            repo_dir = os.path.join(self.build_dir, product_name)
+            git = Git(repo_dir)
+            origin_url = await git("config", "--get", "remote.origin.url")
+
+            # Parse GitHub info
+            repo_info = PRInfoCollector.extract_github_repo_info(origin_url)
+            if not repo_info:
+                print(f"Could not parse GitHub repo info from URL: {origin_url}")
+                continue
+
+            owner, repo = repo_info
+
+            # Retrieve PRs from GitHub
+            raw_prs = PRInfoCollector.get_github_prs(owner, repo)
+
+            # Filter relevant PRs and convert to Pydantic objects
+            for pr in raw_prs:
+                # If the PR's head ref matches the product's ref
+                if pr["head"]["ref"] == product.ref.name:
+                    # Create a single GitHubPR for this PR
+                    pr_col = GitHubPR(
+                        product_name=product_name,
+                        owner=owner,
+                        repo=repo,
+                        pr_number=pr["number"],
+                        title=pr["title"],
+                        head_ref=pr["head"]["ref"],
+                        sha=pr["head"]["sha"],
+                    )
+                    pr_items.append(pr_col)
+
+        # Model to hold all product PR items
+        pr_info = AllProductPRCollections(items=pr_items)
+
+        # Print summary
+        pr_info.print_summary()
+
+        pr_info.save(self.build_dir)
+
+        return pr_info
 
 
 class VersionDb(metaclass=abc.ABCMeta):

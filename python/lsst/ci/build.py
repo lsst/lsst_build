@@ -4,6 +4,7 @@ from __future__ import annotations
 import contextlib
 import datetime
 import os
+import platform
 import select
 import shlex
 import shutil
@@ -12,6 +13,7 @@ import subprocess
 import sys
 import textwrap
 import time
+import traceback
 from typing import TextIO
 
 import eups
@@ -20,6 +22,7 @@ import requests
 import yaml
 
 from . import models
+from .models import AllProductPRCollections
 from .prepare import Manifest
 
 
@@ -369,6 +372,7 @@ class Builder:
                 self.failed_at = product
                 return False
             self.built.append(product)
+        return True  # Returns true on success, to use for check
 
     def rm_status(self):
         if os.path.isfile(self.status_file()):
@@ -389,16 +393,51 @@ class Builder:
             yaml.dump(status, sf, encoding="utf-8", default_flow_style=False)
 
     @staticmethod
-    def run(args):
+    def get_agent() -> str:
+        """Determine the system agent based on OS type and architecture.
+
+        Returns
+        -------
+        `str`
+            The formatted agent string, such as `"macos_arm64"` or
+            `"linux_x86_64"`. If the system platform or architecture.
+
+        Raises
+        ------
+        `UnknownAgentError`
+            If either the operating-system name or the CPU architecture
+            cannot be obtained.
+        """
+        os_type = sys.platform
+        arch = platform.machine()
+
+        if not os_type or not arch:
+            raise UnknownAgentError("unknown_agent")
+
+        match os_type:
+            case "darwin":
+                agent = f"macos_{arch}"
+            case _:
+                agent = f"{os_type}_{arch}"
+
+        return agent
+
+    @staticmethod
+    def run(args) -> None:
+        """Run the build process, including GitHub status updates."""
+        # agent = Builder.get_agent()
+
         # Ensure build directory exists and is writable
         build_dir = args.build_dir
         no_binary_fetch = args.no_binary_fetch
         if not os.access(build_dir, os.W_OK):
             raise Exception(f"Directory {build_dir!r} does not exist or isn't writable.")
 
+        # Load PR pydantic model
+        pr_info = AllProductPRCollections.from_build_dir(build_dir)
+
         # Build products
         eups_obj = eups.Eups()
-
         progress = ProgressReporter(sys.stdout)
 
         manifest_fn = os.path.join(build_dir, "manifest.txt")
@@ -407,6 +446,60 @@ class Builder:
 
         b = Builder(build_dir, manifest, progress, eups_obj, no_binary_fetch)
         b.rm_status()
-        retcode = b.build()
-        b.write_status()
-        sys.exit(retcode == 0)
+
+        try:
+            agent = Builder.get_agent()
+
+        except UnknownAgentError as err:
+            print(f"WARNING: {err}", file=sys.stderr)
+            agent = "unknown_agent"
+
+        try:
+            # Verify PR info and post pending Github status
+            if pr_info:
+                pr_info.post_all_status(agent=agent, state="pending", description=f"Build started on {agent}")
+
+            # Attempt the build
+            retcode = b.build()
+
+        except Exception as other_ex:
+            print(f"Build failed on {agent}: {other_ex}", file=sys.stderr)
+            traceback.print_exc()
+            retcode = False
+
+        finally:
+            # Ensure status is always written
+            b.write_status()
+
+            # Final status posting based on retcode
+            if retcode:
+                if pr_info:
+                    pr_info.post_all_status(
+                        agent=agent, state="success", description=f"Build succeeded on {agent}"
+                    )
+                else:
+                    print(f"Build succeeded on {agent}.")
+
+                sys.exit(0)
+            else:
+                if pr_info:
+                    pr_info.post_all_status(
+                        agent=agent, state="failure", description=f"Build failed on {agent}"
+                    )
+                else:
+                    print(f"Build failed on {agent}")
+                sys.exit(1)
+
+
+class UnknownAgentError(Exception):
+    """Raised when the agent is unknown.
+
+    Parameters
+    ----------
+    agent : `str`
+        The agent that could not be determined.
+    """
+
+    def __init__(self, agent: str) -> None:
+        super().__init__(f"Unknown agent '{agent}', ensure sys.platform is available. Continuing build.")
+        self.agent = agent

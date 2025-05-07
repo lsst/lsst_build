@@ -56,7 +56,10 @@ build.add_argument(
     "build_dir", type=str, help="Build directory with manifest.txt built by the `prepare` subcommand"
 )
 build.add_argument(
-        "--no-binary-fetch", help="Will not attempt to download binaries, instead it will build products from source", action="store_true")
+    "--no-binary-fetch",
+    help="Will not attempt to download binaries, instead it will build products from source",
+    action="store_true",
+)
 
 args = parser.parse_args()
 
