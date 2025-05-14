@@ -96,7 +96,7 @@ class ProgressReporter:
                 self.out.flush()
                 self.t += 2
 
-        def report_result(self, retcode, logfile):
+        def report_result(self, retcode, logfile, fetched):
             # Make sure we write out the full version string, even if the build
             # ended quickly.
             if self.progress_bar:
@@ -106,6 +106,9 @@ class ProgressReporter:
             # If logfile is None, the product was already installed.
             if logfile is None:
                 self.out.write("(already installed).\n")
+                self.out.flush()
+            elif fetched:
+                self.out.write("(installed from binary).\n")
                 self.out.flush()
             else:
                 elapsed_time = time.time() - self.t0
@@ -341,6 +344,7 @@ class Builder:
         # Build a product if it hasn't been installed already
         #
         with self.progress.new_build(product) as progress:
+            fetched = False
             try:
                 # skip the build if the product has been installed
                 eups_prod, retcode, logfile = self.eups.getProduct(product.name, product.version), 0, None
@@ -351,13 +355,14 @@ class Builder:
                     eups_prod, retcode, logfile = self._fetch_product_if_needed(
                         product, distrib_path, progress
                     )
+                    fetched = True
                 else:
                     eups_prod, retcode, logfile = self._build_product(product, progress)
 
             if eups_prod is not None and self.manifest.build_id not in eups_prod.tags:
                 self._tag_product(product.name, product.version, self.manifest.build_id)
 
-            progress.report_result(retcode, logfile)
+            progress.report_result(retcode, logfile, fetched)
 
         return retcode == 0
 
