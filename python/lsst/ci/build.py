@@ -104,14 +104,14 @@ class ProgressReporter:
                 self.out.flush()
 
             # If logfile is None, the product was already installed.
+            elapsed_time = time.time() - self.t0
             if logfile is None:
                 self.out.write("(already installed).\n")
                 self.out.flush()
             elif fetched:
-                self.out.write("(installed from binary).\n")
+                print(f"(installed from binary in {elapsed_time:.1f} sec).")
                 self.out.flush()
             else:
-                elapsed_time = time.time() - self.t0
                 if retcode:
                     print(f"ERROR ({elapsed_time:.1f} sec).", file=self.out)
                     print(f"*** error building product {self.product.name}.", file=self.out)
