@@ -459,6 +459,7 @@ class Builder:
             print(f"WARNING: {err}", file=sys.stderr)
             agent = "unknown_agent"
 
+        retcode = False
         try:
             # Verify PR info and post pending Github status
             if pr_info:
