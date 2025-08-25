@@ -207,7 +207,7 @@ class Builder:
                     if c == b"":
                         break
                 progress.report_progress()
-        return process.poll()
+        return process.wait()
 
     def _build_product(self, product, progress):
         # run the eupspkg sequence for the product
