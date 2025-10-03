@@ -109,7 +109,10 @@ class ProgressReporter:
                 self.out.write("(already installed).\n")
                 self.out.flush()
             elif fetched:
-                print(f"(installed from binary in {elapsed_time:.1f} sec).")
+                if not retcode:
+                    print(f"(installed from binary in {elapsed_time:.1f} sec).")
+                else:
+                    print(f"(failed to install from binary, exit code = {retcode}).")
                 self.out.flush()
             else:
                 if retcode:
