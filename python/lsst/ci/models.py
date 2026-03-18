@@ -364,7 +364,10 @@ class AllProductPRCollections(BaseModel):
         # Write to build_dir
         try:
             with open(path, "w", encoding="utf-8") as f:
-                f.write(self.model_dump_json(indent=2))
+                if hasattr(self, "model_dump_json"):
+                     f.write(self.model_dump_json(indent=2))
+                else:  # fallback for pydantic v1
+                    f.write(self.json(indent=2))
         except OSError as os_err:
             print(f"Failed to write to {path}: {os_err}", file=sys.stderr)
 
@@ -401,7 +404,11 @@ class AllProductPRCollections(BaseModel):
             return cls(items=[])
 
         try:
-            return cls.model_validate_json(data)
+            if hasattr(cls, "model_validate_json"):
+                return cls.model_validate_json(data)
+            else:
+                return cls.parse_raw(data)
+
         except json.JSONDecodeError as decode_err:
             print(f"Invalid JSON in {path}: {decode_err}", file=sys.stderr)
         except pydantic.ValidationError as val_err:
