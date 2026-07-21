@@ -6,7 +6,8 @@ build-backend = "setuptools.build_meta"
 name = "lsst_build"
 requires-python = ">=3.11.0"
 description = "LSST build automation"
-license = "MIT"
+license = "BSD-3-Clause"
+license-files = ["COPYRIGHT", "LICENSE"]
 readme = "README.md"
 authors = [
     {name="Rubin Observatory Data Management", email="dm-admin@lists.lsst.org"},
