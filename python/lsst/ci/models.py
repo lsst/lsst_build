@@ -230,9 +230,7 @@ class GitHubPR(BaseModel):
     def __str__(self) -> str:
         """One liner for logging / printing."""
         return (
-            f"PR #{self.pr_number} "
-            f"in {self.owner}/{self.repo} "
-            f"for product {self.product_name}: {self.title}"
+            f"PR #{self.pr_number} in {self.owner}/{self.repo} for product {self.product_name}: {self.title}"
         )
 
     def post_github_status(self, *, state: str, description: str, agent: str) -> None:
