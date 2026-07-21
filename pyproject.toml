@@ -72,8 +72,6 @@ line-length = 110
 target-version = "py311"
 exclude = [
     "__init__.py",
-    "lex.py",
-    "yacc.py",
 ]
 
 [tool.ruff.lint]
@@ -103,8 +101,15 @@ select = [
     "UP",  # pyupgrade
 ]
 
+[tool.ruff.lint.isort]
+known-first-party = ["lsst"]
+
 [tool.ruff.lint.pycodestyle]
 max-doc-length = 79
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 79
