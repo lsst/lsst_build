@@ -9,6 +9,5 @@
 # Use of this source code is governed by a 3-clause BSD-style
 # license that can be found in the LICENSE file.
 
-from pkgutil import extend_path
-
-__path__ = extend_path(__path__, __name__)
+import pkgutil
+__path__ = pkgutil.extend_path(__path__, __name__)
