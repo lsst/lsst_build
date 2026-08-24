@@ -14,7 +14,7 @@
 import asyncio
 import os
 import sys
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -25,7 +25,7 @@ sys.modules["eups.tags"] = Mock()
 import lsst.ci.git  # noqa: E402
 from lsst.ci.git import GitError  # noqa: E402
 from lsst.ci.models import DEFAULT_BRANCH_NAME  # noqa: E402
-from lsst.ci.prepare import ProductFetcher, RemoteError  # noqa: E402
+from lsst.ci.prepare import PRInfoCollector, ProductFetcher, RemoteError  # noqa: E402
 
 
 @pytest.fixture
@@ -157,3 +157,29 @@ def test_fetch_products(tmpdir, repos_yaml_good, test_product):
 
     asyncio.run(product_fetcher.fetch_products([test_product], refs))
     assert os.path.exists(os.path.join(tmpdir, test_product, ".git"))
+
+
+@pytest.fixture
+def no_current_event_loop():
+    """Clear the thread's current event loop, as in Python 3.14 where
+    asyncio.get_event_loop() no longer creates one implicitly.
+    """
+    asyncio.set_event_loop(None)
+    yield
+    asyncio.set_event_loop(None)
+
+
+def test_do_fetch_products_no_current_event_loop(
+    tmpdir, repos_yaml_good, test_product, no_current_event_loop
+):
+    """Drive do_fetch_products without a current event loop in the thread."""
+    product_fetcher = ProductFetcher(tmpdir, repos_yaml_good, None, no_fetch=True)
+
+    with (
+        patch.object(ProductFetcher, "fetch_products", new_callable=AsyncMock) as fetch_products,
+        patch.object(PRInfoCollector, "list_non_default_refs_prs", new_callable=AsyncMock) as list_prs,
+    ):
+        product_fetcher.do_fetch_products([test_product], [])
+
+    fetch_products.assert_awaited_once_with([test_product], [])
+    list_prs.assert_awaited_once()
