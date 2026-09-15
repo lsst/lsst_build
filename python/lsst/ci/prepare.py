@@ -496,13 +496,16 @@ class ProductFetcher:
         refs
             List of refs the user specified.
         """
+        asyncio.run(self._do_fetch_products(products, refs))
+
+    async def _do_fetch_products(self, products: list[str], refs: list[str]):
+        """Async implementation of `do_fetch_products`."""
         # Create the PRInfoCollector
         collector = PRInfoCollector(
             build_dir=self.build_dir, product_index=self.product_index, repo_specs=self.repo_specs
         )
 
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.fetch_products(products, refs))
+        await self.fetch_products(products, refs)
 
         # We have fetched everything - sort the index
         self.product_index = self.product_index.toposort()
@@ -516,13 +519,12 @@ class ProductFetcher:
 
         self.validate_refs(refs)
         if self.version_db:
-            loop.run_until_complete(self.resolve_versions())
+            await self.resolve_versions()
         if not self.no_fetch and len(self.lfs_product_names):
-            loop.run_until_complete(self.lfs_checkout())
+            await self.lfs_checkout()
 
         # Calling method to list branch prs
-        loop.run_until_complete(collector.list_non_default_refs_prs())
-        loop.close()
+        await collector.list_non_default_refs_prs()
 
     async def fetch_products(self, product_names: list[str], refs: list[str]) -> set[str]:
         resolved: set[str] = set()
