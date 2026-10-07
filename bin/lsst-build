@@ -54,6 +54,12 @@ prepare.add_argument(
     help="Build ID (default: autodetected from existing EUPS or git tags)",
 )
 prepare.add_argument("--no-fetch", action="store_true", help="Don't git-fetch any products")
+prepare.add_argument(
+    "--no-pr-info",
+    dest="pr_info",
+    action="store_false",
+    help="Don't query GitHub for pull requests matching non-default refs",
+)
 prepare.add_argument("--exclusion-map", type=str, help="File with map of optional packages to exclude.")
 prepare.add_argument(
     "--version-git-repo", type=str, help="Working directory of a git repository with the version database."

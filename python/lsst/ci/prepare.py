@@ -154,6 +154,9 @@ class ProductFetcher:
         VersionDb implementation
     no_fetch
         If true, don't fetch, just checkout the first matching ref.
+    pr_info
+        If true, query GitHub for pull requests matching any non-default
+        refs that were checked out.
     out
         FD which to send console output.
     tries
@@ -168,6 +171,7 @@ class ProductFetcher:
         dependency_module: EupsModule | None = None,
         version_db: VersionDb | None = None,
         no_fetch: bool = False,
+        pr_info: bool = True,
         out=sys.stdout,
         tries=1,
     ):
@@ -177,6 +181,7 @@ class ProductFetcher:
         else:
             self.repository_patterns = None
         self.no_fetch = no_fetch
+        self.pr_info = pr_info
         if repos:
             if os.path.exists(repos):
                 with open(repos, encoding="utf-8") as f:
@@ -500,11 +505,6 @@ class ProductFetcher:
 
     async def _do_fetch_products(self, products: list[str], refs: list[str]):
         """Async implementation of `do_fetch_products`."""
-        # Create the PRInfoCollector
-        collector = PRInfoCollector(
-            build_dir=self.build_dir, product_index=self.product_index, repo_specs=self.repo_specs
-        )
-
         await self.fetch_products(products, refs)
 
         # We have fetched everything - sort the index
@@ -523,8 +523,11 @@ class ProductFetcher:
         if not self.no_fetch and len(self.lfs_product_names):
             await self.lfs_checkout()
 
-        # Calling method to list branch prs
-        await collector.list_non_default_refs_prs()
+        if self.pr_info:
+            collector = PRInfoCollector(
+                build_dir=self.build_dir, product_index=self.product_index, repo_specs=self.repo_specs
+            )
+            await collector.list_non_default_refs_prs()
 
     async def fetch_products(self, product_names: list[str], refs: list[str]) -> set[str]:
         resolved: set[str] = set()
@@ -1095,6 +1098,7 @@ class BuildDirectoryConstructor:
             version_db=version_db,
             repository_patterns=args.repository_pattern,
             no_fetch=args.no_fetch,
+            pr_info=args.pr_info,
             tries=args.tries,
         )
         p = BuildDirectoryConstructor(build_dir, eups_obj, product_fetcher, version_db, exclusion_resolver)
