@@ -258,8 +258,7 @@ class GitHubPR(BaseModel):
 
         build_url = os.getenv(
             "RUN_DISPLAY_URL",
-            f"{os.getenv('JENKINS_URL', 'https://ci.lsst.cloud')}"
-            "/blue/organizations/jenkins/stack-os-matrix/activity",
+            f"{os.getenv('JENKINS_URL', 'https://ci.lsst.cloud')}/job/stack-os-matrix/",
         )
 
         data = {
